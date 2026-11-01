@@ -1,0 +1,72 @@
+import type { Plugin } from "@opencode/plugin"
+import { errorText, SERVER_NAME } from "./constants.js"
+import { READ_TOOLS } from "./linear-tools.js"
+
+export interface Rule {
+  readonly action: string
+  readonly resource: string
+  readonly effect: "allow" | "ask" | "deny"
+}
+
+/** The host's permission action for an MCP tool of the `linear` server. */
+const actionOf = (tool: string) => `${SERVER_NAME}_${tool}`
+/** The plugin's first rule, and its marker: any Linear tool asks unless a later rule decides otherwise. */
+const ASK_ALL: Rule = { action: actionOf("*"), resource: "*", effect: "ask" }
+const rule = (tool: string, effect: Rule["effect"]): Rule => ({ action: actionOf(tool), resource: "*", effect })
+
+/** Broad first, narrow last, because the last matching rule wins: every Linear tool asks, then known reads run. */
+export const defaultRules = (): Rule[] => [{ ...ASK_ALL }, ...READ_TOOLS.map((tool) => rule(tool, "allow"))]
+
+const same = (a: Rule, b: Rule) => a.action === b.action && a.resource === b.resource && a.effect === b.effect
+const BASE_ALLOW: Rule = { action: "*", resource: "*", effect: "allow" }
+
+/**
+ * True when the agent carries the plugin's `linear_*` rule anywhere after its base allow, inserted by the plugin or
+ * added by the user. Other plugins insert at the same index, so the rule need not follow the base allow directly.
+ */
+export function hasDefaultRules(permissions: readonly Rule[]) {
+  const base = permissions.findIndex((item) => same(item, BASE_ALLOW))
+  return permissions.some((item, index) => index > base && same(item, ASK_ALL))
+}
+
+/**
+ * Splices `rules` in right after the agent's base `* * allow`, by index. Everything later still wins: the agent's
+ * own stricter rules (Plan, Explore), the user's `permissions`, and saved approvals. Agents without a base allow,
+ * or that already carry the rules, are left alone. Returns whether it inserted.
+ */
+export function insertRules(permissions: Rule[], rules: readonly Rule[]) {
+  if (hasDefaultRules(permissions)) return false
+  const base = permissions.findIndex((item) => same(item, BASE_ALLOW))
+  if (base === -1) return false
+  permissions.splice(base + 1, 0, ...rules.map((item) => ({ ...item })))
+  return true
+}
+
+/** Registers the default rules for every agent. Synchronous and never throws; a failure is kept for status. */
+export function registerDefaultRules(
+  agent: Pick<Plugin.Context["agent"], "transform">,
+  rules: readonly Rule[],
+  report: (problem: string | undefined) => void,
+) {
+  return agent.transform((editor) => {
+    try {
+      for (const { id } of editor.list()) editor.update(id, (info) => void insertRules(info.permissions, rules))
+      report(undefined)
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      report(errorText("RULES_NOT_ADDED", `Linear's default permission rules could not be added (${reason}), so Linear tools may run without asking.`, "Restart OpenCode."))
+    }
+  })
+}
+
+const wildcard = (pattern: string) =>
+  new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".")}$`)
+
+/** The host's evaluation for an MCP call (resource `*`): the last matching rule wins, and no match asks. */
+export function evaluate(permissions: readonly Rule[], action: string): Rule["effect"] {
+  return permissions.findLast((item) => wildcard(item.action).test(action) && wildcard(item.resource).test("*"))?.effect ?? "ask"
+}
+
+/** Agents where a new Linear tool would run without asking: no default rules, and nothing else stops it. */
+export const unguardedAgents = (agents: readonly { readonly id: string; readonly permissions: readonly Rule[] }[]) =>
+  agents.filter((agent) => !hasDefaultRules(agent.permissions) && evaluate(agent.permissions, actionOf("new_tool")) === "allow").map((agent) => agent.id)
