@@ -1,0 +1,167 @@
+# Contributing
+
+Read [AGENTS.md](AGENTS.md) first: it lists the rules for this repository and the APIs that must never appear in it.
+[docs/architecture.md](docs/architecture.md) explains how the plugin works.
+
+## Set up
+
+You need Node.js 22.18 or later, npm, and [Bun](https://bun.sh). CI and the release use Node.js 24 and Bun 1.4.4,
+the Bun inside stock OpenCode 2.2.3 and 2.2.4.
+
+```sh
+npm ci --ignore-scripts
+```
+
+### Run your checkout in OpenCode
+
+```sh
+npm run build
+```
+
+Then list the folder in `plugins`, as an absolute path or a path relative to the config file that contains it, and
+restart OpenCode. One entry loads both the server part and the terminal UI part. Run `npm run build` again after you
+pull changes.
+
+```json
+{
+  "plugins": ["/path/to/opencode-linear"]
+}
+```
+
+## Check
+
+One command runs every check, in order, and stops at the first failure:
+
+```sh
+npm run check
+```
+
+| Stage | What it does |
+| --- | --- |
+| `typecheck` | `tsc --noEmit` over `src/` and `test/`, strict, with unused names as errors |
+| `unit` | `bun test ./test/unit`: options, host check, tool classification, rules, status, skills and the UI view |
+| `build` | `node scripts/build.mjs`: deletes `dist/` and bundles `src/index.ts` and `src/tui.ts` with esbuild into the self-contained `dist/index.js` and `dist/tui.js`. Fails if a bundle imports anything the host does not provide |
+| `host` | `bun test ./test/host`: the plugin inside an embedded OpenCode host |
+| `pack` | `bun test ./test/pack`: builds, packs and installs the package, imports both entry points, and loads it in stock OpenCode 2.2.3 and 2.2.4 |
+| `forbidden` | `node scripts/check-forbidden.mjs`: scans `src/`, `test/`, `scripts/` and `dist/` for forbidden APIs and machine-local paths |
+| `whitelist` | Checks `package.json` against the approved package shape, and that `dist/` holds exactly `index.js` and `tui.js` |
+
+To run some stages only, name them; they run in the order given:
+
+```sh
+node scripts/check.mjs typecheck unit
+```
+
+Shortcuts: `npm run typecheck`, `npm run build`, `npm test` (the `unit` stage), `npm run test:host`,
+`npm run test:pack` and `npm run lint` (the `forbidden` stage).
+
+The host stage starts `@opencode/sdk` 2.2.3 in a temporary home folder, with a local fake of Linear's MCP server. A
+request to any address other than the local machine fails the test. To run the host stage on another OpenCode 2.2.x,
+install that SDK in a separate folder, outside this repository's lockfile, and point `HOST_SDK_DIR` at it:
+
+```sh
+mkdir ../sdk-2.2.4 && cd ../sdk-2.2.4 && npm init -y && npm install @opencode/sdk@2.2.4 --ignore-scripts && cd -
+HOST_SDK_DIR=../sdk-2.2.4 node scripts/check.mjs host
+```
+
+The pack stage needs network access to the npm registry. It checks that the tarball contains exactly the `files`
+whitelist, with fewer than 30 entries and at most 100 KB; that `dist/` holds only `index.js` and `tui.js`, with no
+relative import, dynamic `import()` or `require()`; and that they import only modules OpenCode provides. It
+installs the tarball next to the host packages that OpenCode 2.2.3 provides and imports both entry points under Bun.
+Then it installs the tarball alone and loads it with `opencode serve` from stock OpenCode 2.2.3 and 2.2.4. Each server
+runs offline, in its own temporary home, on its own port with a password. The stage checks that every path in
+`opencode debug paths` is inside that home, that the plugin is active, that the `linear` server and the default rules
+are registered for both access modes, that `/connect` lists the server as "Linear", and that the status RPC answers.
+
+To use `opencode` binaries you already have, set `OPENCODE_BIN_2_2_3` and `OPENCODE_BIN_2_2_4`:
+
+```sh
+OPENCODE_BIN_2_2_3=/path/to/opencode-2.2.3 OPENCODE_BIN_2_2_4=/path/to/opencode-2.2.4 node scripts/check.mjs pack
+```
+
+Otherwise the stage installs `@opencode/cli` with the binary for your platform (macOS or Linux, arm64 or x64), a few
+hundred megabytes per version, into a temporary folder that it deletes afterwards.
+
+CI (`.github/workflows/ci.yml`) runs `npm ci --ignore-scripts` and `npm run check` on Linux and macOS.
+
+## Drift check for Linear's tools
+
+`src/linear-tools.ts` lists the Linear tools the plugin knows: `READ_TOOLS` run without a prompt, and `WRITE_TOOLS`
+ask. Linear can add, rename or remove tools at any time. The drift check is a manual maintainer check: it compares
+Linear's live tool list with these lists. It is not part of `npm run check` or CI, and nothing at runtime depends on
+it. Run it before a release, with a read-only Linear API key in `LINEAR_API_KEY`:
+
+```sh
+LINEAR_API_KEY=<read-only key> npm run drift
+LINEAR_API_KEY=<read-only key> npm run drift -- --strict --endpoint <url>
+```
+
+- It needs Node.js 22.18 or later, which loads `src/linear-tools.ts` by stripping its types. Keep that file free of
+  runtime imports.
+- Create a read-only personal API key in Linear (Settings, Security & access). The key goes only into the bearer
+  header. The script stores nothing.
+- It prints only tool names, grouped as unclassified (served by Linear but in neither list), removed (listed but no
+  longer served) and hint conflicts (the list disagrees with Linear's `readOnlyHint` or `destructiveHint`), with those
+  two hints.
+- `--endpoint` takes another HTTPS URL, or plain HTTP on a loopback address.
+- Exit codes: `0` for no drift, or drift without `--strict`; `1` for drift with `--strict`; `2` for a usage, sign-in
+  or connection error.
+
+### Updating the tool lists
+
+1. Run the drift check.
+2. For each name it reports, read the tool's description and schema, and check what it does.
+3. Add a tool to `READ_TOOLS` only if it never changes anything in Linear, because reads run without a prompt. Add
+   tools that change anything to `WRITE_TOOLS`. Leave a tool out if you are not sure: it then asks before every call.
+4. Remove names that Linear no longer serves.
+5. Run `npm run check`. The skills test fails if a skill names a tool that is in neither list.
+6. Record the change in `CHANGELOG.md`. Moving a tool between the lists changes the default rules, which are part of
+   the plugin's contract. Update the counts in `README.md` and `docs/configuration.md` too.
+
+## Commits
+
+Use `type(scope): summary`, for example `fix(status): explain a disabled server`. Keep commits small, and keep
+`npm run check` green.
+
+## Releases
+
+### Versioning
+
+The version follows semantic versioning on the plugin's contract: its options, the `/linear-status` command, the
+`/linear` dialog, the skill names, the server name `linear` and its URLs, the status RPC method and the default rule
+behaviour. While the major version is 0, a breaking change raises the minor version, and anything else the patch
+version.
+
+Each release supports one tested OpenCode line, stated as `opencode.host` in `package.json` and enforced by the host
+check (`SUPPORTED_HOST` in `src/constants.ts`). Both must change together, with the README's requirements. Each
+`CHANGELOG.md` entry follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+### Releasing
+
+1. Update `version` in `package.json` and add the `CHANGELOG.md` entry, then run `npm run check`.
+2. Push the release commit to `master` and tag it `v<version>`, for example `v0.0.0`. The release workflow refuses a
+   private package or a tag that differs from `version`.
+3. Approve the run in the GitHub environment `release`.
+
+CI then runs `npm run check`, packs the tree, runs the pack test against that exact tarball
+(`PACK_TARBALL=<tarball> node scripts/check.mjs pack`), and publishes it with npm trusted publishing and provenance:
+`npm publish <tarball> --provenance --access public`. The trusted publisher on npmjs.com names this repository, the
+workflow `release.yml` and the environment `release`, and allows `npm publish`. A rerun skips a version that is
+already on npm.
+
+### Dist-tags
+
+- `latest`: the newest stable release. The release workflow sets it for versions without a prerelease part.
+- `next`: prereleases, such as `0.0.1-rc.1`. The release workflow sets it.
+- `host-2.2`: the newest release for OpenCode 2.2.x. Move it by hand, so users on 2.2 can still install a matching
+  version after `latest` moves to a newer OpenCode line:
+
+  ```sh
+  npm dist-tag add @joe-broadhead/opencode-linear@<version> host-2.2
+  ```
+
+Never unpublish a release. Deprecate it instead, and name the version to use:
+
+```sh
+npm deprecate @joe-broadhead/opencode-linear@<version> "<reason>. Use <version> instead."
+```
