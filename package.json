@@ -51,5 +51,530 @@
     "esbuild": "0.28.2",
     "solid-js": "1.9.17",
     "typescript": "5.9.3"
+  },
+  "jelly": {
+    "tools": [
+      {
+        "name": "linear.issues",
+        "permission": "linear_issues",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.extract_images",
+        "permission": "linear_extract_images",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_agent_skill",
+        "permission": "linear_get_agent_skill",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_attachment",
+        "permission": "linear_get_attachment",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_diff",
+        "permission": "linear_get_diff",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_diff_threads",
+        "permission": "linear_get_diff_threads",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_document",
+        "permission": "linear_get_document",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_initiative",
+        "permission": "linear_get_initiative",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_issue",
+        "permission": "linear_get_issue",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_issue_status",
+        "permission": "linear_get_issue_status",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_milestone",
+        "permission": "linear_get_milestone",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_notifications",
+        "permission": "linear_get_notifications",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_project",
+        "permission": "linear_get_project",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_release",
+        "permission": "linear_get_release",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_release_note",
+        "permission": "linear_get_release_note",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_status_updates",
+        "permission": "linear_get_status_updates",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_team",
+        "permission": "linear_get_team",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_template",
+        "permission": "linear_get_template",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_triage_responsibility",
+        "permission": "linear_get_triage_responsibility",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_user",
+        "permission": "linear_get_user",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.get_workspace",
+        "permission": "linear_get_workspace",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_agent_skills",
+        "permission": "linear_list_agent_skills",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_comments",
+        "permission": "linear_list_comments",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_custom_views",
+        "permission": "linear_list_custom_views",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_cycles",
+        "permission": "linear_list_cycles",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_diffs",
+        "permission": "linear_list_diffs",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_documents",
+        "permission": "linear_list_documents",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_initiative_labels",
+        "permission": "linear_list_initiative_labels",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_initiatives",
+        "permission": "linear_list_initiatives",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_issue_labels",
+        "permission": "linear_list_issue_labels",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_issue_statuses",
+        "permission": "linear_list_issue_statuses",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_issues",
+        "permission": "linear_list_issues",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_milestones",
+        "permission": "linear_list_milestones",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_project_labels",
+        "permission": "linear_list_project_labels",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_projects",
+        "permission": "linear_list_projects",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_release_notes",
+        "permission": "linear_list_release_notes",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_release_pipelines",
+        "permission": "linear_list_release_pipelines",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_releases",
+        "permission": "linear_list_releases",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_teams",
+        "permission": "linear_list_teams",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_templates",
+        "permission": "linear_list_templates",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.list_users",
+        "permission": "linear_list_users",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.search_documentation",
+        "permission": "linear_search_documentation",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.whoami",
+        "permission": "linear_whoami",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
+        "name": "linear.create_attachment",
+        "permission": "linear_create_attachment",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.create_attachment_from_upload",
+        "permission": "linear_create_attachment_from_upload",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.create_initiative_label",
+        "permission": "linear_create_initiative_label",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.create_issue_label",
+        "permission": "linear_create_issue_label",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.delete_attachment",
+        "permission": "linear_delete_attachment",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.delete_comment",
+        "permission": "linear_delete_comment",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.delete_diff_comment",
+        "permission": "linear_delete_diff_comment",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.delete_status_update",
+        "permission": "linear_delete_status_update",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.mark_notification",
+        "permission": "linear_mark_notification",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.merge_diff",
+        "permission": "linear_merge_diff",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.prepare_attachment_upload",
+        "permission": "linear_prepare_attachment_upload",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.prepare_file_upload",
+        "permission": "linear_prepare_file_upload",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.resolve_diff_thread",
+        "permission": "linear_resolve_diff_thread",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.restore_initiative_label",
+        "permission": "linear_restore_initiative_label",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.restore_issue_label",
+        "permission": "linear_restore_issue_label",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.restore_project_label",
+        "permission": "linear_restore_project_label",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.retire_initiative_label",
+        "permission": "linear_retire_initiative_label",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.retire_issue_label",
+        "permission": "linear_retire_issue_label",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.retire_project_label",
+        "permission": "linear_retire_project_label",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.save_comment",
+        "permission": "linear_save_comment",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.save_diff_comment",
+        "permission": "linear_save_diff_comment",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.save_document",
+        "permission": "linear_save_document",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.save_initiative",
+        "permission": "linear_save_initiative",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.save_initiative_label",
+        "permission": "linear_save_initiative_label",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.save_issue",
+        "permission": "linear_save_issue",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.save_issue_label",
+        "permission": "linear_save_issue_label",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.save_milestone",
+        "permission": "linear_save_milestone",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.save_project",
+        "permission": "linear_save_project",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.save_project_label",
+        "permission": "linear_save_project_label",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.save_release",
+        "permission": "linear_save_release",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.save_release_note",
+        "permission": "linear_save_release_note",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.save_status_update",
+        "permission": "linear_save_status_update",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.share_issue",
+        "permission": "linear_share_issue",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.submit_diff_review",
+        "permission": "linear_submit_diff_review",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.unshare_issue",
+        "permission": "linear_unshare_issue",
+        "effect": "ask",
+        "readOnly": false
+      },
+      {
+        "name": "linear.update_diff",
+        "permission": "linear_update_diff",
+        "effect": "ask",
+        "readOnly": false
+      }
+    ],
+    "skills": [
+      "linear",
+      "linear-write"
+    ],
+    "rpc": [],
+    "views": [
+      {
+        "v": 1,
+        "id": "issues",
+        "place": "tool-result",
+        "tools": [
+          "linear_issues"
+        ],
+        "title": "Linear issues",
+        "card": {
+          "template": "table"
+        }
+      }
+    ],
+    "contributes": {
+      "homeFeeds": [
+        {
+          "id": "linear.my-issues",
+          "label": "My Linear issues",
+          "description": "Your assigned, unfinished issues.",
+          "keywords": [
+            "linear",
+            "my linear issues"
+          ],
+          "feed": {
+            "title": "My Linear issues",
+            "size": "l",
+            "template": "list",
+            "cadence": 900,
+            "mode": "looking",
+            "preview": "desktop-only",
+            "tools": [
+              "linear.issues"
+            ],
+            "script": "const result = await tools.linear.issues({}); return {items: result.rows.map(row => ({id: row.identifier, text: (row.identifier + ': ' + row.title).slice(0, 200)})), editable: false};"
+          }
+        }
+      ],
+      "homeWidgets": [],
+      "workKinds": [],
+      "settings": []
+    }
   }
 }
