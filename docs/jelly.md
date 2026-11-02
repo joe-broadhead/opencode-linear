@@ -4,6 +4,8 @@
 package's `package.json` as JSON, without loading the plugin, when a person reviews the exact
 version, and uses it as follows.
 
+Jelly names the plugin **Linear** (`jelly.title`), with the package name and version beneath.
+
 ## Tools and permissions
 
 79 tools are declared (43 read-only). Jelly's agents have no base "allow everything"
@@ -34,14 +36,9 @@ skill ids collide with another plugin's or the agent's own.
 
 ## Signing in
 
-Linear's MCP server `linear` signs in with OpenCode's MCP OAuth; read and write access are separate sign-ins. Jelly shows the card `mcp:linear`.
+`jelly.signIns` declares one sign-in, `linear`, for Linear's MCP server `linear`, which signs in with OpenCode's MCP OAuth. Read and write access are different servers with different tokens, so changing `access` needs a new sign-in, and the row says Not signed in until then.
 
-<!-- AUTH-PLACEHOLDER (Jelly rd152): settings and secrets for signing in from Jelly are being
-designed by Jelly's auth lane. Until that lands this package declares no `contributes.settings`;
-add the auth declarations here and in package.json when that design is agreed. -->
-**Not yet declared for Jelly.** How this plugin's sign-in appears in Jelly (desktop and web,
-expiry, reconnect and sign-out) is still being designed; this section and
-`jelly.contributes.settings` will say it once it is.
+Jelly folds the declared sign-ins into this plugin's one card, which shows each as Connected, Not signed in or Sign in again (expired or revoked), and starts, renews and signs out of each. An agent's `jelly_connection_request`, or a tool result that names this plugin's "Run /connect and choose …" next step, opens the same card. The plugin still signs in through OpenCode, as it does without Jelly; the declaration only tells Jelly which of the engine's integrations and servers are this plugin's.
 
 ## Versions
 
