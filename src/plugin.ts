@@ -2,6 +2,7 @@ import { Plugin, type Mcp } from "@opencode/plugin"
 import { errorText, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { checkHost } from "./host-version.js"
 import { watchIntegration } from "./integration.js"
+import { registerIssuesTool } from "./issues.js"
 import { parseOptions, type Access } from "./options.js"
 import { defaultRules, registerDefaultRules } from "./permissions.js"
 import { loadSkills, registerSkills } from "./skills.js"
@@ -77,6 +78,7 @@ export function createLinearPlugin(seam: LinearSeam) {
         report("server")(problem)
       })
       await registerDefaultRules(ctx.agent, defaultRules(), report("rules"))
+      await registerIssuesTool(ctx.tool)
       await registerSkills(ctx.skill, skills)
       const read = () => readStatus(ctx, { ...(source ? { source } : {}), access: options.access, host, problems: [...problems.values()] })
       await registerStatusCommand(ctx, read)

@@ -18,8 +18,9 @@ opencode plugin add @joe-broadhead/opencode-linear
 ```
 
 Restart OpenCode if it is running. The plugin registers Linear's MCP server under the name `linear`, adds default
-permission rules, the `/linear-status` command, the `/linear` status view and two skills. It adds no tools of its own:
-the tools are Linear's, and OpenCode handles the connection, the sign-in and the stored credentials.
+permission rules, the `/linear-status` command, the `/linear` status view, two skills and one tool of its own,
+`linear_issues`, which reads your assigned issues as a table through Linear's own `list_issues`. Every other tool is
+Linear's, and OpenCode handles the connection, the sign-in and the stored credentials.
 
 ## Sign in
 
