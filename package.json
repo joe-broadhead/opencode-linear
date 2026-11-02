@@ -53,6 +53,7 @@
     "typescript": "5.9.3"
   },
   "jelly": {
+    "title": "Linear",
     "tools": [
       {
         "name": "linear.issues",
@@ -546,6 +547,13 @@
         "card": {
           "template": "table"
         }
+      }
+    ],
+    "signIns": [
+      {
+        "id": "linear",
+        "label": "Linear",
+        "server": "linear"
       }
     ],
     "contributes": {

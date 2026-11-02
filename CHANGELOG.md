@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - A `jelly` section in `package.json`: each tool with its permission, its default effect and whether it only reads, the skill ids, views. Jelly reads it without loading the plugin and applies the declared asks, because its agents have no base allow rule for this plugin's own default rules to follow. `docs/jelly.md` explains it.
+- `title` and `signIns` in the `jelly` section: the name Jelly shows on the plugin's card, and what the plugin signs in to, so that one card can say whether each sign-in is connected and start, renew or end it. `docs/jelly.md` lists them.
 - `linear_issues`: your assigned issues as a table (identifier, title, state, priority, link), read through the host's `linear_list_issues`; a direct tool that runs without asking. Jelly draws it as a table and offers it as a Home feed.
 
 ## [0.0.0] - 2026-11-01
