@@ -1,6 +1,7 @@
 import type { Plugin, Rpc } from "@opencode/plugin"
 import { errorText, PLUGIN_ID, SERVER_NAME, SUPPORTED_HOST } from "./constants.js"
 import type { HostCheck } from "./host-version.js"
+import { ISSUES_TOOL } from "./issues.js"
 import { classify } from "./linear-tools.js"
 import type { Access } from "./options.js"
 import { defaultRules, unguardedAgents, type Rule } from "./permissions.js"
@@ -56,7 +57,8 @@ export const NOTHING_TO_DO = "Nothing to do."
 
 export function buildStatus(facts: StatusFacts): Status {
   const connection: Connection = !facts.server ? "not_configured" : facts.server.status === "needs_auth" ? "needs_sign_in" : facts.server.status
-  const unknownTools = (facts.tools ?? []).filter((tool) => classify(tool) === "unknown")
+  // linear_issues is the plugin's own tool in the server's namespace, not one the server added.
+  const unknownTools = (facts.tools ?? []).filter((tool) => tool !== ISSUES_TOOL && classify(tool) === "unknown")
   const agentsWithoutRules = unguardedAgents(facts.agents ?? [])
   const problems = facts.problems ?? []
   const status = {

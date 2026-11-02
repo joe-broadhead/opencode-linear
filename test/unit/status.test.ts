@@ -65,6 +65,12 @@ describe("buildStatus", () => {
     expect(formatStatus(status)).toContain("- Tools: 4 available, 2 unknown: shiny_new_tool, create_issue (unknown tools ask before running)")
   })
 
+  test("counts linear_issues as the plugin's own tool, not an unknown one", () => {
+    const status = buildStatus({ ...base, tools: ["list_issues", "issues"] })
+    expect(status.tools).toBe(2)
+    expect(status.unknownTools).toEqual([])
+  })
+
   test("names agents without the default rules, with the block to paste, and points the next step at it", () => {
     const status = buildStatus({ ...base, access: "write", agents: [guarded, { id: "reviewer", permissions: [allow("*")] }] })
     expect(status.agentsWithoutRules).toEqual(["reviewer"])
