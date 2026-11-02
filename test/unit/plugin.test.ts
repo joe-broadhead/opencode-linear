@@ -89,6 +89,7 @@ function context(options: unknown, version = "2.2.3") {
   const agent = transforms<Parameters<Parameters<Plugin.Context["agent"]["transform"]>[0]>[0]>()
   const skill = transforms<Parameters<Parameters<Plugin.Context["skill"]["transform"]>[0]>[0]>()
   const command = transforms<Parameters<Parameters<Plugin.Context["command"]["transform"]>[0]>[0]>()
+  const tool = transforms<Parameters<Parameters<Plugin.Context["tool"]["transform"]>[0]>[0]>()
   const rpc: string[] = []
   const ctx = {
     app: { name: "opencode", version, channel: "latest" },
@@ -97,10 +98,11 @@ function context(options: unknown, version = "2.2.3") {
     agent: { transform: agent.transform },
     skill: { transform: skill.transform },
     command: { transform: command.transform },
+    tool: { transform: tool.transform, list: async () => [] },
     rpc: { register: async (definition: { id: string }) => (rpc.push(definition.id), { dispose: async () => {} }) },
     event: { subscribe: ({ signal }: { signal: AbortSignal }) => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise((resolve) => signal.addEventListener("abort", () => resolve({ done: true, value: undefined }))) }) }) },
   } as unknown as SetupContext
-  return { ctx: ctx as Plugin.Context, mcp, agent, skill, command, rpc }
+  return { ctx: ctx as Plugin.Context, mcp, agent, skill, command, tool, rpc }
 }
 
 describe("setup", () => {
@@ -113,7 +115,7 @@ describe("setup", () => {
     ["read", ["linear"]],
     ["write", ["linear", "linear-write"]],
   ] as const)("%s access registers the server, the rules, the skills %j, the status command and its RPC", async (access, expected) => {
-    const { ctx, mcp, agent, skill, command, rpc } = context({ access })
+    const { ctx, mcp, agent, skill, command, tool, rpc } = context({ access })
     const cleanup = await createLinearPlugin(seam).setup(ctx)
     const { editor, servers } = mcpEditor()
     mcp.run(editor)
@@ -127,6 +129,9 @@ describe("setup", () => {
     const commands: string[] = []
     command.run({ add: (definition: { name: string }) => commands.push(definition.name) })
     expect(commands).toEqual(["linear-status"])
+    const tools: string[] = []
+    tool.run({ add: (info: { name: string }) => tools.push(info.name) } as never)
+    expect(tools).toEqual(["issues"])
     expect(rpc).toEqual(["linear.workspace"])
     expect(typeof cleanup).toBe("function")
     await cleanup!()
@@ -137,7 +142,7 @@ describe("setup", () => {
     await expect(createLinearPlugin(seam).setup(invalid.ctx)).rejects.toThrow("OPTIONS_INVALID")
     const untested = context({}, "0.0.0-dev-1")
     await expect(createLinearPlugin(seam).setup(untested.ctx)).rejects.toThrow("HOST_UNTESTED")
-    for (const item of [invalid, untested]) expect([item.mcp, item.agent, item.skill, item.command].map((t) => t.callbacks.length)).toEqual([0, 0, 0, 0])
+    for (const item of [invalid, untested]) expect([item.mcp, item.agent, item.skill, item.command, item.tool].map((t) => t.callbacks.length)).toEqual([0, 0, 0, 0, 0])
     for (const item of [invalid, untested]) expect(item.rpc).toEqual([])
   })
 
