@@ -29,7 +29,7 @@ const hidden = (rules: readonly Rule[], action: string) => {
 const linearTools = (host: Host) =>
   until("Linear's tools are registered", async () => {
     const ids = (await host.probe().tool.list()).map((tool) => tool.id).filter((id) => id.startsWith("linear_"))
-    return ids.length === 3 && ids.sort()
+    return ids.length === 4 && ids.sort()
   })
 
 async function status(host: Host, sessionID: string) {
@@ -61,7 +61,7 @@ describe(`read access on OpenCode ${HOST_VERSION}`, () => {
     expect(plugins.find((plugin) => plugin.id === "linear.workspace")?.state.status).toBe("active")
     const { data: servers } = await host.client.mcp.list({ location: host.location })
     expect(servers.find((server) => server.name === "linear")?.status).toEqual({ status: "connected" })
-    expect(await linearTools(host)).toEqual(["linear_list_issues", "linear_save_issue", "linear_shiny_new_tool"])
+    expect(await linearTools(host)).toEqual(["linear_issues", "linear_list_issues", "linear_save_issue", "linear_shiny_new_tool"])
     const { data: skills } = await host.client.skill.list({ location: host.location })
     expect(skills.map((skill) => skill.id).filter((id) => id.startsWith("linear"))).toEqual(["linear"])
     const { data: commands } = await host.client.command.list({ location: host.location })
@@ -120,7 +120,7 @@ describe(`read access on OpenCode ${HOST_VERSION}`, () => {
     await linearTools(host)
     const text = await status(host, await session(host))
     expect(text).toContain(`- Connection: connected (${host.fake.endpoints.read}, registered by this plugin)`)
-    expect(text).toContain("- Tools: 3 available, 1 unknown: shiny_new_tool (unknown tools ask before running)\n")
+    expect(text).toContain("- Tools: 4 available, 1 unknown: shiny_new_tool (unknown tools ask before running)\n")
     expect(text).toContain("- Agents without default rules: reviewer.")
     expect(text).toContain(AGENTS_FIX)
     expect(text).toContain(`- Next step: Add the block above to each listed agent's own "permissions".`)
