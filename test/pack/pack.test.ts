@@ -364,15 +364,23 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
   })
 })
 
-/** OPENCODE_BIN_<version>, or the unmodified npm release with its platform binary, installed with scripts disabled. */
+/**
+ * OPENCODE_BIN_<version>, or the unmodified npm release with its platform binary, installed with scripts disabled.
+ * Installed once per version: several describe blocks serve the same release.
+ */
+const installed = new Map<string, string>()
 function stockBinary(version: string): string {
   const given = process.env[`OPENCODE_BIN_${version.replaceAll(".", "_")}`]
   if (given) return given
+  const cached = installed.get(version)
+  if (cached) return cached
   const binary = `@opencode/cli-${platform()}-${arch()}`
   const dir = project(`opencode-${version}`)
   // Only this platform's binary: each one is a few hundred megabytes.
   run("npm", ["install", `@opencode/cli@${version}`, `${binary}@${version}`, "--omit=optional", "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline"], dir)
-  return join(dir, "node_modules", binary, "bin", "opencode")
+  const path = join(dir, "node_modules", binary, "bin", "opencode")
+  installed.set(version, path)
+  return path
 }
 
 async function freePort(): Promise<number> {
