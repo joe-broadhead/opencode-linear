@@ -3,16 +3,21 @@
 // @opencode/plugin, OpenTUI and Solid itself; next to those packages, both entry points also import under Bun.
 // OPENCODE_BIN_2_2_3 and OPENCODE_BIN_2_2_4 name stock binaries; otherwise each release is installed with npm.
 // PACK_TARBALL names a tarball that was already packed, such as the one the release publishes, to test it instead.
-import { afterAll, describe, expect, test } from "bun:test"
+// On each release a script also calls Linear's known reads through the tools RPC, in read and in write access, against
+// a loopback fake Linear.
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { spawn, spawnSync } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { createServer } from "node:net"
 import { arch, platform, tmpdir } from "node:os"
 import { basename, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { ENDPOINTS } from "../../src/constants.js"
+import { TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
+import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 import { defaultRules, type Rule } from "../../src/permissions.js"
+import { NEW_TOOL, startFakeMcp, UPSTREAM_FAILURE, type FakeMcp } from "../host/fake-mcp.js"
 
 const root = fileURLToPath(new URL("../..", import.meta.url))
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
@@ -212,15 +217,170 @@ describe.each(HOST_VERSIONS)("installed alone, in stock OpenCode %s", (version) 
   }, 600_000)
 })
 
-/** OPENCODE_BIN_<version>, or the unmodified npm release with its platform binary, installed with scripts disabled. */
+/** A copy of the installed package whose two Linear URLs point at the fake's read-only and full paths. */
+function pointedAt(fake: FakeMcp, name: string) {
+  const copy = join(work, "pointed", name)
+  cpSync(installedPackage(false), copy, { recursive: true })
+  const entry = join(copy, "dist", "index.js")
+  let text = readFileSync(entry, "utf8")
+  for (const access of ["read", "write"] as const) {
+    const quoted = JSON.stringify(ENDPOINTS[access])
+    expect({ access, found: text.split(quoted).length - 1 }).toEqual({ access, found: 1 })
+    text = text.replace(quoted, JSON.stringify(fake.endpoints[access]))
+  }
+  writeFileSync(entry, text)
+  return copy
+}
+
+const rule = (action: string, effect: Rule["effect"]): Rule => ({ action, resource: "*", effect })
+
+describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => {
+  let fake: FakeMcp
+  let host: Awaited<ReturnType<typeof serve>>
+  // Sessions by name, for each access; a name that is not here is passed as the session id itself.
+  const sessions = { read: {} as Record<string, string>, write: {} as Record<string, string> }
+  const where = (access: "read" | "write") => (access === "read" ? host.directory : host.writeDirectory)
+
+  /** A tools RPC call: its output, or the error's `{ type, code, message }`. */
+  async function script(access: "read" | "write", method: string, input: unknown): Promise<Record<string, any>> {
+    const response = await host.request("POST", `/api/rpc/${TOOLS_RPC_ID}/${method}`, { input }, where(access))
+    const body = response.body as Record<string, any>
+    if (response.ok) return { value: body.output }
+    const error = (body?.error ?? body) as Record<string, any>
+    return { status: response.status, type: error?.type ?? error?._tag, code: error?.data?.code, message: String(error?.message ?? response.text) }
+  }
+  const call = (access: "read" | "write", session: string, method: string, input: unknown) =>
+    script(access, method, { sessionID: sessions[access][session] ?? session, input })
+  /** The tools the fake was asked to run since `from`. */
+  const toolCalls = (from = 0) => fake.calls.slice(from)
+
+  beforeAll(async () => {
+    fake = await startFakeMcp({ catalog: "linear" })
+    host = await serve(version, pointedAt(fake, `tools-${version}`), {
+      name: `tools-${version}`,
+      // Config-only agents get no default rules: their own rules decide, after the host's defaults.
+      agents: { locked: { permissions: [rule("linear_*", "deny")] }, careful: { permissions: [rule("linear_list_issues", "ask")] } },
+    })
+    for (const [access, tools] of [["read", READ_TOOLS.length + 1], ["write", READ_TOOLS.length + WRITE_TOOLS.length + 1]] as const) {
+      await host.until(`linear is connected in ${access} access with its ${tools} tools`, async () => {
+        const { output } = await host.api<{ output: { connection: string; tools: number } }>("POST", "/api/rpc/linear.workspace/status", { input: {} }, where(access))
+        return output.connection === "connected" && output.tools === tools
+      })
+      const create = async (body: Record<string, unknown>) => {
+        const created = await host.api<Record<string, any>>("POST", "/api/session", body, where(access))
+        return (created.id ?? created.data?.id) as string
+      }
+      sessions[access].build = await create({ agent: "build" })
+      sessions[access].locked = await create({ agent: "locked" })
+      sessions[access].careful = await create({ agent: "careful" })
+      sessions[access].agentless = await create({})
+      // Session rules come after the agent's: one narrows build, the other reopens one tool for locked.
+      sessions[access].narrow = await create({ agent: "build", permissions: [rule("linear_list_issues", "deny")] })
+      sessions[access].reopen = await create({ agent: "locked", permissions: [rule("linear_list_issues", "allow")] })
+    }
+  }, 600_000)
+  afterAll(async () => {
+    await host?.close()
+    await fake?.close()
+  }, 60_000)
+
+  test.each(["read", "write"] as const)("in %s access, describes exactly the 42 known reads, each available with its live schema", async (access) => {
+    const { value } = await script(access, "describe", {})
+    expect(value.id).toBe(TOOLS_RPC_ID)
+    expect(value.methods.map((method: { name: string }) => method.name)).toEqual([...READ_TOOLS])
+    for (const method of value.methods) {
+      expect({ name: method.name, kind: method.kind, action: method.action, available: method.available }).toEqual({
+        name: method.name,
+        kind: "mcp",
+        action: `linear_${method.name}`,
+        available: true,
+      })
+      expect(method.input).toEqual({ type: "object", properties: { query: { type: "string" } } })
+    }
+  })
+
+  test.each(["read", "write"] as const)("in %s access, runs a known read as the session's agent, on that access's server, with no model turn", async (access) => {
+    const from = fake.called.length
+    const result = await call(access, "build", "list_issues", { query: "hello" })
+    const path = new URL(fake.endpoints[access]).pathname
+    expect(result).toEqual({ value: { output: { tool: "list_issues", path, arguments: { query: "hello" } }, text: "called list_issues" } })
+    expect(fake.called.slice(from)).toEqual([{ tool: "list_issues", path }])
+    const { data: info } = await host.api<{ data: Record<string, any> }>("GET", `/api/session/${sessions[access].build}`, undefined, where(access))
+    expect(info.tokens).toMatchObject({ input: 0, output: 0 })
+    expect(info.outcome).toBeUndefined()
+  })
+
+  test("never makes a known write or an unknown tool a method, in write access where OpenCode lists them all", async () => {
+    const from = fake.calls.length
+    for (const name of [...WRITE_TOOLS, NEW_TOOL.name]) {
+      const result = await call("write", "build", name, { query: "q" })
+      expect({ name, type: result.type }).toEqual({ name, type: "rpc.method_not_found" })
+    }
+    expect(toolCalls(from)).toEqual([])
+  })
+
+  test("refuses a session whose agent denies Linear, before Linear is called", async () => {
+    const from = fake.calls.length
+    for (const access of ["read", "write"] as const) expect(await call(access, "locked", "list_issues", { query: "q" })).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
+    expect(toolCalls(from)).toEqual([])
+  })
+
+  test("refuses an ask at once, and leaves no approval prompt waiting", async () => {
+    const from = fake.calls.length
+    const started = Date.now()
+    const result = await call("read", "careful", "list_issues", { query: "q" })
+    expect(result).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
+    expect(result.message).toMatch(/cannot answer an approval prompt/)
+    expect(Date.now() - started).toBeLessThan(5000)
+    const { data: pending } = await host.api<{ data: unknown[] }>("GET", "/api/permission/request")
+    expect(pending.filter((request) => JSON.stringify(request).includes(sessions.read.careful!))).toEqual([])
+    expect(toolCalls(from)).toEqual([])
+    // The same agent's other reads have no ask, so they run.
+    expect((await call("read", "careful", "get_issue", { query: "q" })).value).toMatchObject({ output: { tool: "get_issue" } })
+  })
+
+  test("applies the session's rules after the agent's", async () => {
+    expect(await call("read", "narrow", "list_issues", { query: "q" })).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
+    expect((await call("read", "narrow", "get_issue", { query: "q" })).value).toMatchObject({ output: { tool: "get_issue" } })
+    expect((await call("read", "reopen", "list_issues", { query: "q" })).value).toMatchObject({ output: { tool: "list_issues" } })
+    expect(await call("read", "reopen", "get_issue", { query: "q" })).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
+  })
+
+  test("gives Linear's own error as UPSTREAM_ERROR: its first line, with the signed URL redacted", async () => {
+    const result = await call("read", "build", "get_issue", { query: "fail" })
+    expect(result).toMatchObject({ type: "failed", code: "UPSTREAM_ERROR" })
+    expect(result.message).toContain("https://uploads.linear.app/a.png?[redacted]")
+    for (const hidden of ["fake-signature-123", "second line"]) expect(result.message).not.toContain(hidden)
+    expect(UPSTREAM_FAILURE).toContain("fake-signature-123")
+  })
+
+  test("names an unknown session, a session without an agent, and rejects an envelope with extra keys", async () => {
+    expect(await call("read", "ses_does_not_exist", "list_issues", { query: "q" })).toMatchObject({ type: "failed", code: "SESSION_UNKNOWN" })
+    expect(await call("read", "agentless", "list_issues", { query: "q" })).toMatchObject({ type: "failed", code: "SESSION_AGENT_REQUIRED" })
+    const from = fake.calls.length
+    for (const envelope of [{ sessionID: sessions.read.build, input: { query: "q" }, extra: true }, { input: { query: "q" } }, { sessionID: sessions.read.build, input: "q" }])
+      expect(await script("read", "list_issues", envelope)).toMatchObject({ type: "rpc.invalid_input" })
+    expect(toolCalls(from)).toEqual([])
+  })
+})
+
+/**
+ * OPENCODE_BIN_<version>, or the unmodified npm release with its platform binary, installed with scripts disabled.
+ * Installed once per version: several describe blocks serve the same release.
+ */
+const installed = new Map<string, string>()
 function stockBinary(version: string): string {
   const given = process.env[`OPENCODE_BIN_${version.replaceAll(".", "_")}`]
   if (given) return given
+  const cached = installed.get(version)
+  if (cached) return cached
   const binary = `@opencode/cli-${platform()}-${arch()}`
   const dir = project(`opencode-${version}`)
   // Only this platform's binary: each one is a few hundred megabytes.
   run("npm", ["install", `@opencode/cli@${version}`, `${binary}@${version}`, "--omit=optional", "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline"], dir)
-  return join(dir, "node_modules", binary, "bin", "opencode")
+  const path = join(dir, "node_modules", binary, "bin", "opencode")
+  installed.set(version, path)
+  return path
 }
 
 async function freePort(): Promise<number> {
@@ -233,19 +393,19 @@ async function freePort(): Promise<number> {
 
 /**
  * `opencode serve` on its own port and password, in an environment that holds only its temp root and is offline, with
- * a project that loads the installed package and defines one agent only in user config, and a second project that
- * loads it with `access: "write"`.
+ * a project that loads the installed package and defines agents only in user config (by default one, `reviewer`), and
+ * a second project that loads it with `access: "write"` and the same `agents`, when they are given.
  */
-async function serve(version: string, installed: string) {
+async function serve(version: string, installed: string, options: { readonly name?: string; readonly agents?: Record<string, unknown> } = {}) {
   const binary = stockBinary(version)
-  const base = join(work, `stock-${version}`)
+  const base = join(work, options.name ?? `stock-${version}`)
   const directory = join(base, "project")
   const writeDirectory = join(base, "project-write")
   // Keep the built-in local providers from probing their default ports.
   const providers = { lmstudio: { settings: { baseURL: "" } }, ollama: { settings: { baseURL: "" } }, vllm: { settings: { baseURL: "" } } }
   for (const [dir, config] of [
-    [directory, { plugins: [installed], agents: { reviewer: { description: "Reviews changes", mode: "subagent" } }, providers }],
-    [writeDirectory, { plugins: [{ package: installed, options: { access: "write" } }], providers }],
+    [directory, { plugins: [installed], agents: options.agents ?? { reviewer: { description: "Reviews changes", mode: "subagent" } }, providers }],
+    [writeDirectory, { plugins: [{ package: installed, options: { access: "write" } }], ...(options.agents ? { agents: options.agents } : {}), providers }],
   ] as const) {
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, "opencode.json"), JSON.stringify(config))
@@ -267,13 +427,24 @@ async function serve(version: string, installed: string) {
   const exited = new Promise((done) => server.once("exit", done))
 
   const authorization = `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`
-  const api = async <T>(method: string, path: string, body?: unknown, location = directory): Promise<T> => {
+  /** The response's status and parsed body, whatever the status. */
+  const request = async (method: string, path: string, body?: unknown, location = directory) => {
     const url = new URL(path, `http://127.0.0.1:${port}`)
     url.searchParams.set("location[directory]", location)
     const response = await fetch(url, { method, headers: { authorization, "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) })
     const text = await response.text()
-    if (!response.ok) throw new Error(`${method} ${path}: ${response.status} ${text.slice(0, 500)}`)
-    return JSON.parse(text) as T
+    let parsed: unknown = text
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      // Not JSON: keep the text.
+    }
+    return { status: response.status, ok: response.ok, text, body: parsed }
+  }
+  const api = async <T>(method: string, path: string, body?: unknown, location = directory): Promise<T> => {
+    const response = await request(method, path, body, location)
+    if (!response.ok) throw new Error(`${method} ${path}: ${response.status} ${response.text.slice(0, 500)}`)
+    return response.body as T
   }
   /** Polls until `read` returns a value. The server answers before plugins finish loading, more slowly when busy. */
   const until = async <T>(what: string, read: () => Promise<T | false | undefined>, ms = 180_000): Promise<T> => {
@@ -291,7 +462,7 @@ async function serve(version: string, installed: string) {
     await exited
     clearTimeout(timer)
   }
-  return { api, until, close, directory, writeDirectory, log: () => log }
+  return { api, request, until, close, directory, writeDirectory, log: () => log }
 }
 
 // The files a `files` entry should put in the tarball. dist/ must hold exactly the two bundles, so stale or foreign

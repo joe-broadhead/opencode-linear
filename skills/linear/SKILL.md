@@ -61,6 +61,17 @@ build links yourself.
 - By default the plugin connects to Linear's read-only server, which offers no tools that change anything. To allow
   changes, the user sets the plugin option `"access": "write"` and signs in again.
 
+## Scripts
+
+When the user wants a job that runs without you, such as a cron job or a shell script, it can call Linear's read tools
+through the OpenCode server, with no model. The RPC `linear.workspace.tools` has one method per read tool, named
+without the `linear_` prefix, such as `list_issues` or `get_issue`, with the tool's own input, and `describe`, which
+lists them with their input schemas. Each call is `opencode api post /api/rpc/linear.workspace.tools/<method>` with
+the body `{"input":{"sessionID":"<session>","input":<the tool's input>}}`. The script runs as that session's agent,
+under its permission rules, so have the script create its session once with `opencode api post /api/session` and a
+body such as `{"title":"triage digest","agent":"build"}`. An ask is refused, and write tools are never available to
+scripts. The details are in the plugin's `docs/scripting.md`.
+
 ## When Linear is not available
 
 If no Linear tools appear, or a call says that Linear needs sign-in, ask the user to run `/linear-status`. It shows
