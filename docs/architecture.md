@@ -108,9 +108,6 @@ OpenCode answers a bad envelope with `rpc.invalid_input`.
 
 The executor does not run `execute.before` and `execute.after` hooks. Linear has none, so results are unchanged.
 
-The shared module has one parameter property, so `tsconfig.json` cannot set `erasableSyntaxOnly`. The forbidden scan
-refuses enums, namespaces and parameter properties in every other TypeScript file instead.
-
 ## Terminal UI part
 
 `src/tui.ts` uses no JSX, because OpenTUI's JSX transform skips `node_modules`. One global keymap layer provides
