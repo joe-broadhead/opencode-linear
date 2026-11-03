@@ -192,4 +192,5 @@ For example:
 OPTIONS_INVALID: The option "access" must be "read" (the default) or "write", found "admin". Next step: Fix the plugin options in opencode.json, for example "plugins": [{ "package": "@joe-broadhead/opencode-linear", "options": { "access": "write" } }].
 ```
 
-Errors from Linear's server and from OpenCode pass through unchanged.
+Errors from Linear's server and from OpenCode pass through unchanged, except in the tools RPC for scripts, whose codes
+are in [Scripting](scripting.md#errors).

@@ -16,7 +16,8 @@ project.
 ## Data handling
 
 - The plugin adds no tools, runs no network requests of its own and stores nothing. It registers Linear's MCP server
-  with OpenCode, and OpenCode connects, signs in and stores the credentials.
+  with OpenCode, and OpenCode connects, signs in and stores the credentials. The tools RPC for scripts (see
+  [Scripts](#scripts)) runs Linear's tools through OpenCode's own connection, too.
 - The plugin never reads tokens. Status shows only the account label OpenCode reports, if any, and server URLs
   without their query strings.
 - Linear content is untrusted. Issue titles, descriptions, comments and documents are written by other people and can
@@ -57,3 +58,24 @@ Things to know:
 - **Unattended runs refuse prompts.** In `opencode run`, a Linear tool that would ask is refused.
 - **The `linear_*` rule also matches other servers** whose names start with `linear_`. For their tools it only adds
   prompts.
+
+## Scripts
+
+The tools RPC (`linear.workspace.tools`, see
+[docs/scripting.md](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md)) runs Linear's
+known read tools for a script, with no model. It adds no authority:
+
+- A script names a session that names an agent, and runs as them. A tool that the agent's or the session's rules hide
+  from the model is refused. OpenCode's own executor then checks the call against the agent's rules, the session's
+  rules and saved approvals, as it does for the model.
+- An ask on a script's call is denied, not prompted: no one is there to answer it. The plugin's permission hook
+  changes only an ask on one of its own script calls in flight, only to a deny, and leaves every other call alone.
+- Only the 42 known reads are methods. Linear's write tools never are, with either access, and neither is a tool that
+  Linear adds later, even with an allow rule.
+- The call goes through OpenCode's own MCP connection and sign-in. The plugin never sees the token, and returns none.
+- Linear's error text reaches the script only as the first line, at most 300 characters, with tokens and URL query
+  strings removed.
+- OpenCode's `execute.before` and `execute.after` tool hooks, from any plugin, do not run for a script's call, so
+  another plugin's policy hook does not see it. A script's calls are not recorded in the session.
+- The RPC is reachable only by callers of the OpenCode server API, who already hold the server's full authority. The
+  session is not a login: it scopes a script to what its agent may do.
