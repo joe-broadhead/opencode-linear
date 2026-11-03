@@ -9,6 +9,9 @@ const root = fileURLToPath(new URL("..", import.meta.url))
 const self = fileURLToPath(import.meta.url)
 const ROOTS = ["src", "test", "scripts", "dist"]
 const MEMBER = String.raw`\s*(?:\?\.|\.)\s*`
+const PERMISSION_HOOK = new RegExp(String.raw`\bpermission${MEMBER}hook\b`)
+/** The copy of the module shared by several plugins, and the bundle that inlines it. */
+const TOOLS_RPC = ["src/host/tools-rpc.ts", "dist/index.js"]
 
 const RULES = [
   { id: "fork-marker", pattern: /dispatch[-_ ]?lease|catalog[-_ ]?ownership|text[-_ ]?only[-_ ]?respons/i, why: "dispatch-lease, ownership and text-only markers are fork-only" },
@@ -20,8 +23,19 @@ const RULES = [
   { id: "generate-text", pattern: new RegExp(String.raw`\bgenerate${MEMBER}text\b`), why: "ctx.generate.text is deprecated" },
   { id: "experimental-policies", pattern: new RegExp(String.raw`\bexperimental${MEMBER}policies\b`), why: "experimental.policies is deprecated" },
   { id: "opencode-ai-import", pattern: /["'`]@opencode\/ai(?:\/[^"'`]*)?["'`]/, why: "@opencode/ai breaks between patch releases; import only @opencode/plugin" },
-  { id: "permission-hook", pattern: new RegExp(String.raw`\bpermission${MEMBER}hook\b`), why: "no escalating permission hook; default rules go through ctx.agent.transform" },
+  // The tools RPC's evaluate hook only turns an ask on one of its own script calls in flight into a deny, because no one
+  // can answer it. It is allowed there, and in the bundle that inlines it, exactly once (counted below).
+  { id: "permission-hook", pattern: PERMISSION_HOOK, why: "no escalating permission hook; default rules go through ctx.agent.transform", except: TOOLS_RPC },
   { id: "host-source", pattern: /packages\/(?:core|plugin|schema)\/src\b|opencode-[\w-]*-host\b|\bconsumer-host\b/, why: "never reference or import private host source or host checkouts" },
+  // tsconfig cannot enable erasableSyntaxOnly, because the shared tools RPC module has one parameter property. This rule
+  // keeps the rest of the TypeScript erasable, so Node can strip its types, as the drift check does for linear-tools.ts.
+  {
+    id: "non-erasable-syntax",
+    pattern: /^\s*(?:export\s+)?(?:declare\s+)?(?:const\s+)?enum\s+\w+|^\s*(?:export\s+)?(?:declare\s+)?(?:namespace|module)\s+[\w.]+\s*\{|\bconstructor\s*\([^)]*\b(?:public|private|protected|readonly|override)\s+\w/,
+    why: "no enums, namespaces or parameter properties",
+    extensions: [".ts"],
+    except: ["src/host/tools-rpc.ts"],
+  },
   { id: "absolute-path", pattern: /\/Users\/[^/\s"'`]+\/|\/home\/[^/\s"'`]+\/|\/(?:private\/)?var\/folders\/|(?<![\w.:/-])\/tmp\/|[A-Za-z]:\\\\?Users\\/, why: "machine-local home and temp paths do not belong in the repository; use os.tmpdir() or a relative path" },
 ]
 
@@ -36,7 +50,12 @@ for (const top of ROOTS) {
     const buffer = readFileSync(file)
     if (buffer.includes(0)) continue
     const lines = buffer.toString("utf8").split(/\r?\n/)
+    if (TOOLS_RPC.includes(path)) {
+      const hooks = lines.filter((text) => PERMISSION_HOOK.test(text)).length
+      if (hooks !== 1) findings.push({ path, line: 0, id: "permission-hook", why: `the tools RPC must have exactly one permission hook, found ${hooks}` })
+    }
     for (const rule of RULES) {
+      if (rule.except?.includes(path) || (rule.extensions && !rule.extensions.includes(extname(file)))) continue
       lines.forEach((text, index) => {
         if (rule.pattern.test(text)) findings.push({ path, line: index + 1, id: rule.id, why: rule.why, text })
       })

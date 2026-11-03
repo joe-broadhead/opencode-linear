@@ -81,7 +81,7 @@ describe("the linear server", () => {
   })
 })
 
-type SetupContext = Pick<Plugin.Context, "app" | "options" | "mcp" | "agent" | "skill" | "command" | "session" | "tool" | "integration" | "rpc" | "event">
+type SetupContext = Pick<Plugin.Context, "app" | "options" | "mcp" | "agent" | "skill" | "command" | "session" | "tool" | "integration" | "rpc" | "permission" | "location" | "event">
 
 /** A context with only what setup touches. Each transform is collected so the test can replay it. */
 function context(options: unknown, version = "2.2.3") {
@@ -90,17 +90,30 @@ function context(options: unknown, version = "2.2.3") {
   const skill = transforms<Parameters<Parameters<Plugin.Context["skill"]["transform"]>[0]>[0]>()
   const command = transforms<Parameters<Parameters<Plugin.Context["command"]["transform"]>[0]>[0]>()
   const rpc: string[] = []
+  const handlers = new Map<string, Record<string, (input: unknown, context: unknown) => Promise<unknown>>>()
+  const hooks: string[] = []
   const ctx = {
     app: { name: "opencode", version, channel: "latest" },
     options: options as Plugin.Context["options"],
-    mcp: { transform: mcp.transform, list: async () => ({ data: [] }) },
-    agent: { transform: agent.transform },
+    mcp: { transform: mcp.transform, list: async () => ({ data: [{ name: "linear", status: { status: "connected" } }] }) },
     skill: { transform: skill.transform },
     command: { transform: command.transform },
-    rpc: { register: async (definition: { id: string }) => (rpc.push(definition.id), { dispose: async () => {} }) },
+    rpc: {
+      register: async (definition: { id: string }, methods: Record<string, (input: unknown, context: unknown) => Promise<unknown>>) => {
+        rpc.push(definition.id)
+        handlers.set(definition.id, methods)
+        return { dispose: async () => void rpc.splice(rpc.indexOf(definition.id), 1) }
+      },
+    },
+    // A session whose agent allows everything, and one Linear read that answers "ok".
+    session: { get: async () => ({ id: "ses_test", agent: "build", location: { directory: "/projects/linear-test" }, permissions: [] }) },
+    agent: { transform: agent.transform, get: async () => ({ data: { id: "build", permissions: [{ action: "*", resource: "*", effect: "allow" }] } }) },
+    tool: { list: async () => [{ id: "linear_list_issues", execute: async () => ({ content: [{ type: "text", text: "ok" }] }) }] },
+    location: { directory: "/projects/linear-test" },
+    permission: { hook: async (name: string) => (hooks.push(name), { dispose: async () => void hooks.splice(hooks.indexOf(name), 1) }) },
     event: { subscribe: ({ signal }: { signal: AbortSignal }) => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise((resolve) => signal.addEventListener("abort", () => resolve({ done: true, value: undefined }))) }) }) },
   } as unknown as SetupContext
-  return { ctx: ctx as Plugin.Context, mcp, agent, skill, command, rpc }
+  return { ctx: ctx as Plugin.Context, mcp, agent, skill, command, rpc, handlers, hooks }
 }
 
 describe("setup", () => {
@@ -112,8 +125,8 @@ describe("setup", () => {
   test.each([
     ["read", ["linear"]],
     ["write", ["linear", "linear-write"]],
-  ] as const)("%s access registers the server, the rules, the skills %j, the status command and its RPC", async (access, expected) => {
-    const { ctx, mcp, agent, skill, command, rpc } = context({ access })
+  ] as const)("%s access registers the server, the rules, the skills %j, the status command, its RPC and the tools RPC", async (access, expected) => {
+    const { ctx, mcp, agent, skill, command, rpc, hooks } = context({ access })
     const cleanup = await createLinearPlugin(seam).setup(ctx)
     const { editor, servers } = mcpEditor()
     mcp.run(editor)
@@ -127,8 +140,26 @@ describe("setup", () => {
     const commands: string[] = []
     command.run({ add: (definition: { name: string }) => commands.push(definition.name) })
     expect(commands).toEqual(["linear-status"])
-    expect(rpc).toEqual(["linear.workspace"])
+    expect(rpc).toEqual(["linear.workspace", "linear.workspace.tools"])
+    // The tools RPC's one hook: it refuses an ask on its own script calls.
+    expect(hooks).toEqual(["evaluate"])
     expect(typeof cleanup).toBe("function")
+    await cleanup!()
+    expect(rpc).toEqual(["linear.workspace"])
+    expect(hooks).toEqual([])
+  })
+
+  test.each([
+    ["registers its own server", {}, { value: { text: "ok" } }],
+    ["adopts the user's server at the access's URL", { linear: { type: "remote", url: ENDPOINTS.read } }, { value: { text: "ok" } }],
+    ["finds a user server at another URL", { linear: { type: "remote", url: ENDPOINTS.write } }, { code: "SERVER_CONFLICT" }],
+  ] as const)("the tools RPC runs a read when the plugin %s, or refuses with its code", async (_, initial, expected) => {
+    const { ctx, mcp, handlers } = context({})
+    const cleanup = await createLinearPlugin(seam).setup(ctx)
+    mcp.run(mcpEditor(initial as Parameters<typeof mcpEditor>[0]).editor)
+    const rpcContext = { signal: new AbortController().signal, error: (_type: string, _message: string, data: { code: string }) => ({ code: data.code }) }
+    const result = await handlers.get("linear.workspace.tools")!.list_issues!({ sessionID: "ses_test", input: {} }, rpcContext)
+    expect("code" in (result as object) ? result : { value: result }).toEqual(expected)
     await cleanup!()
   })
 
@@ -138,7 +169,7 @@ describe("setup", () => {
     const untested = context({}, "0.0.0-dev-1")
     await expect(createLinearPlugin(seam).setup(untested.ctx)).rejects.toThrow("HOST_UNTESTED")
     for (const item of [invalid, untested]) expect([item.mcp, item.agent, item.skill, item.command].map((t) => t.callbacks.length)).toEqual([0, 0, 0, 0])
-    for (const item of [invalid, untested]) expect(item.rpc).toEqual([])
+    for (const item of [invalid, untested]) expect([item.rpc, item.hooks]).toEqual([[], []])
   })
 
   test("an untested host runs with the override", async () => {

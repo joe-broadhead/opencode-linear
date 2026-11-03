@@ -1,9 +1,9 @@
 # Repository rules
 
 This repository builds `@joe-broadhead/opencode-linear`, an OpenCode plugin that registers Linear's official MCP
-server and adds default permission rules, a status command, a status dialog and two skills. Read
-[docs/architecture.md](docs/architecture.md) before you change code, and [CONTRIBUTING.md](CONTRIBUTING.md) for the
-checks and the release steps.
+server and adds default permission rules, a status command, a status dialog, two skills and a tools RPC for scripts.
+Read [docs/architecture.md](docs/architecture.md) before you change code, and [CONTRIBUTING.md](CONTRIBUTING.md) for
+the checks and the release steps.
 
 ## Rules
 
@@ -25,6 +25,13 @@ checks and the release steps.
   `SKILLS_INVALID`).
 - **`src/linear-tools.ts` has no runtime imports.** The drift script loads it with Node's type stripping.
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.
+  `src/host/tools-rpc.ts` is the one exception: it is a copy of a module shared by several plugins, and has one
+  parameter property. So `tsconfig.json` does not set `erasableSyntaxOnly`, and the forbidden scan enforces this rule
+  in every other TypeScript file.
+- **The tools RPC.** `src/host/tools-rpc.ts` is a copy of a module shared by several plugins. Change only its block
+  between the `PLUGIN-SPECIFIC` markers here; change the rest in the shared copy first. Its methods are `READ_TOOLS`
+  and nothing else: never a write or an unknown tool. Keep the RPC id `linear.workspace.tools` and its method names
+  stable: scripts call them by name.
 - **Tests.** Unit tests use narrow `Pick<Plugin.Context, ...>` fakes. Host tests use the public `@opencode/sdk` with
   `OpenCode.create({ app: { version } })`, a loopback fake server and the temp root from `test/host/isolate.ts`.
   Never sign in to Linear or call its API from a check.
@@ -46,7 +53,10 @@ checks and the release steps.
   `permission.ask`;
 - the deprecated `ctx.generate.text` and `experimental.policies`;
 - importing `@opencode/ai`;
-- an escalating permission hook;
+- a permission hook, except the one `permission.hook("evaluate")` in `src/host/tools-rpc.ts` (and the bundle that
+  inlines it), exactly once each: it turns an `ask` on one of the tools RPC's own script calls in flight into a deny,
+  because no one can answer it, and touches nothing else;
+- enums, namespaces and parameter properties in TypeScript, except in `src/host/tools-rpc.ts`;
 - references to private host source or host checkouts;
 - machine-local home and temp paths;
 - `.tsx` or `.jsx` files in `dist/`.

@@ -2,7 +2,8 @@
 
 The plugin is a thin layer over Linear's official MCP server. OpenCode owns the MCP transport, OAuth, credentials,
 permission prompts and tool output limits. The plugin registers the server, names its `/connect` entry, adds default
-permission rules, reports status and ships two skills. It adds no model tools and has no runtime dependencies.
+permission rules, reports status, ships two skills and lets scripts call the known reads through a tools RPC. It adds
+no model tools and has no runtime dependencies.
 
 ## Layout
 
@@ -17,6 +18,7 @@ permission rules, reports status and ships two skills. It adds no model tools an
 | `src/permissions.ts` | The default rules, their placement, and detection of agents without them |
 | `src/status.ts` | The status model and text, `/linear-status`, and the status RPC method |
 | `src/skills.ts` | Loading and registering the skills |
+| `src/host/tools-rpc.ts` | The tools RPC for scripts, `linear.workspace.tools`; a copy of a module shared by several plugins, with Linear's part in one marked block |
 | `src/tui.ts` | The terminal UI part: the plugin `linear.workspace.tui` and the `/linear` dialog |
 | `src/constants.ts` | IDs, the server name and URLs, the tested host range and the error shape |
 
@@ -37,7 +39,8 @@ typechecks. The package exports `.` (`dist/index.js`) and `./tui` (`dist/tui.js`
    other URL is a conflict: nothing is added, and status reports it.
 5. `ctx.agent.transform` inserts the default rules after each agent's base `* * allow`.
 6. `ctx.skill.transform`, `ctx.command.transform` (`/linear-status`) and `ctx.rpc.register` (`linear.workspace/status`).
-7. `watchIntegration` starts. Setup returns its cleanup.
+7. `registerToolsRpc` registers the tools RPC, `linear.workspace.tools`, and its `evaluate` hook.
+8. `watchIntegration` starts. Setup returns one cleanup that stops it and disposes the tools RPC.
 
 Transforms are synchronous and never throw: a failure is kept as a problem for status, and cleared when the next replay
 succeeds.
@@ -68,6 +71,46 @@ is needed.
   The UI part needs it because on OpenCode 2.2.x it receives no plugin options and cannot see the server part's
   findings.
 
+## Tools RPC
+
+`linear.workspace.tools` lets a script call the known reads with no model; [Scripting](scripting.md) is the user's
+view. Its methods are `describe` and one per name in `READ_TOOLS`, named after the upstream tool. It is an allowlist:
+`WRITE_TOOLS`, and a tool that Linear adds later, which ask on the model path, are never methods. The methods are the
+same with either access: the server is always named `linear`, and both of Linear's servers list every known read.
+
+A call is `{ sessionID, input }`. The module:
+
+1. looks up the session with `ctx.session.get`, and its agent's rules with `ctx.agent.get` in the session's location
+   (`SESSION_UNKNOWN`, `SESSION_AGENT_REQUIRED`);
+2. refuses the tool when the last rule that matches `linear_<tool>` on `*`, in the agent's rules followed by the
+   session's, is a deny: OpenCode hides such a tool from the model (`PERMISSION_DENIED`);
+3. refuses with `SERVER_CONFLICT` while `linear` is a user server at another URL than the one for `access`; an adopted
+   server is the plugin's;
+4. finds the tool's executor in `ctx.tool.list()`, or names the server's connection state (`AUTH_REQUIRED` and so on)
+   or `TOOL_UNAVAILABLE`;
+5. calls `execute(input, { sessionID, agent, messageID, id, signal, progress })` with a new call id. OpenCode's
+   executor checks `linear_<tool>` on `*` itself, with the agent's rules, the session's rules and saved approvals, and
+   sends OpenCode's own credential;
+6. returns `{ output?, text }`: the tool's structured content and its text parts.
+
+While a call runs, its id is live. A `permission.hook("evaluate")` turns an `ask` whose source id is live into a deny,
+so the script gets `PERMISSION_DENIED` at once and no prompt waits. It changes nothing else; this is the plugin's only
+permission hook, and the forbidden scan allows exactly this one.
+
+A `Tool.Error` with a cause is a permission refusal; one without a cause is Linear's own error (`isError`), which
+becomes `UPSTREAM_ERROR` with its first line, at most 300 characters, with tokens and URL queries removed. Any other
+failure is OpenCode's own and passes through.
+
+OpenCode decodes a plain JSON Schema input with Effect, which drops unknown keys of an object that has properties
+instead of refusing them. So the envelope's schema carries a strict Standard Schema validator as a non-enumerable
+`~standard` property, which OpenCode prefers. The contract still reads and serialises as plain JSON Schema, and
+OpenCode answers a bad envelope with `rpc.invalid_input`.
+
+The executor does not run `execute.before` and `execute.after` hooks. Linear has none, so results are unchanged.
+
+The shared module has one parameter property, so `tsconfig.json` cannot set `erasableSyntaxOnly`. The forbidden scan
+refuses enums, namespaces and parameter properties in every other TypeScript file instead.
+
 ## Terminal UI part
 
 `src/tui.ts` uses no JSX, because OpenTUI's JSX transform skips `node_modules`. One global keymap layer provides
@@ -89,3 +132,5 @@ These facts about OpenCode 2.2.3 hold on 2.2.4 too. Links point to the source at
 | MCP integrations | Integration ID `mcp_` + the first 16 hex digits of sha1(`<name>\0<url>`), so credentials are kept per name and URL. | [`mcp/index.ts`](https://github.com/anomalyco/opencode/blob/v2.2.3/packages/core/src/mcp/index.ts) |
 | Code Mode | MCP tools are in Code Mode by default (`tools.linear.<tool>`). A declined prompt is an error the program can catch. | [`codemode/tool.ts`](https://github.com/anomalyco/opencode/blob/v2.2.3/packages/core/src/codemode/tool.ts) |
 | UI part options | The UI part of a plugin listed in `opencode.json` gets no plugin options. | Observed on stock 2.2.3 and 2.2.4 |
+| Tool executors | `ctx.tool.list()` returns each MCP tool with a callable `execute`, which checks `<server>_<tool>` with the agent's and the session's rules and saved approvals, and gives the `evaluate` hook the call's `source`. A deny is a `Tool.Error` with a cause; the server's `isError` is one without. `execute.before` and `execute.after` hooks do not run for it. Not documented as an entry point: the package test checks it on stock 2.2.3 and 2.2.4. | [`tool/mcp.ts`](https://github.com/anomalyco/opencode/blob/v2.2.3/packages/core/src/tool/mcp.ts) |
+| RPC input | An RPC input given as a Standard Schema is validated with it; a plain JSON Schema is decoded with Effect, which drops unknown keys of an object that has properties. The package test checks the envelope on stock 2.2.3 and 2.2.4. | `@opencode/core` 2.2.3, the RPC service's `parse` |
