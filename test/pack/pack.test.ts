@@ -261,7 +261,8 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
       // Config-only agents get no default rules: their own rules decide, after the host's defaults.
       agents: { locked: { permissions: [rule("linear_*", "deny")] }, careful: { permissions: [rule("linear_list_issues", "ask")] } },
     })
-    for (const [access, tools] of [["read", READ_TOOLS.length + 1], ["write", READ_TOOLS.length + WRITE_TOOLS.length + 1]] as const) {
+    // The server's tools and the fake's new one, plus the plugin's own linear_issues in the same namespace.
+    for (const [access, tools] of [["read", READ_TOOLS.length + 2], ["write", READ_TOOLS.length + WRITE_TOOLS.length + 2]] as const) {
       await host.until(`linear is connected in ${access} access with its ${tools} tools`, async () => {
         const { output } = await host.api<{ output: { connection: string; tools: number } }>("POST", "/api/rpc/linear.workspace/status", { input: {} }, where(access))
         return output.connection === "connected" && output.tools === tools
