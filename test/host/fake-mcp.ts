@@ -1,13 +1,34 @@
-// A loopback Streamable-HTTP MCP server with one read, one write and one tool the plugin has never seen.
-// It answers JSON-RPC POSTs with plain JSON (no SSE stream) and records every tool call and request header.
+// A loopback Streamable-HTTP MCP server. By default it lists one read, one write and one tool the plugin has never
+// seen, on both paths. With `catalog: "linear"` it lists what Linear's servers list: the read-only path every known read
+// and the new tool, the full path every known read, every known write and the new tool. It answers JSON-RPC POSTs with
+// plain JSON (no SSE stream) and records every tool call, its path and every request header. A `tools/call` answers
+// with the tool's name, the path and its arguments as structured content, or, for a `query` that starts with "fail",
+// with an upstream error (`isError`) whose first line holds a signed URL.
 import { createServer, type IncomingMessage } from "node:http"
 import type { AddressInfo } from "node:net"
+import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 
+const schema = { type: "object", properties: { query: { type: "string" } } }
+/** A tool the plugin has never seen. */
+export const NEW_TOOL = { name: "shiny_new_tool", description: "A tool added upstream after the tool lists were written", annotations: {} }
 const TOOLS = [
   { name: "list_issues", description: "List issues in the workspace", annotations: { readOnlyHint: true } },
   { name: "save_issue", description: "Create or update an issue", annotations: { readOnlyHint: false, destructiveHint: false } },
-  { name: "shiny_new_tool", description: "A tool added upstream after the tool lists were written", annotations: {} },
+  NEW_TOOL,
 ].map((tool) => ({ ...tool, inputSchema: { type: "object", properties: {} } }))
+const linearTool = (name: string, readOnlyHint: boolean) => ({ name, description: `Linear ${name}`, annotations: { readOnlyHint }, inputSchema: schema })
+const LINEAR = {
+  read: [...READ_TOOLS.map((name) => linearTool(name, true)), { ...NEW_TOOL, inputSchema: schema }],
+  write: [...READ_TOOLS.map((name) => linearTool(name, true)), ...WRITE_TOOLS.map((name) => linearTool(name, false)), { ...NEW_TOOL, inputSchema: schema }],
+}
+
+/** The upstream error a "fail" query gets: two lines, the first with a signed URL. */
+export const UPSTREAM_FAILURE = "Linear refused https://uploads.linear.app/a.png?signature=fake-signature-123 for this input\nTraceback: second line"
+
+export interface FakeMcpOptions {
+  /** `linear` lists Linear's known tools per path, as Linear's read-only and full servers do. */
+  readonly catalog?: "linear"
+}
 
 export interface FakeMcp {
   readonly url: string
@@ -15,26 +36,34 @@ export interface FakeMcp {
   readonly endpoints: { readonly read: string; readonly write: string }
   /** Tool names called, in order. */
   readonly calls: string[]
+  /** Each tool call with the path it was sent to, in order. */
+  readonly called: { readonly tool: string; readonly path: string }[]
   /** The `x-linear-test` header of every request, to tell whose server config the host used. */
   readonly markers: (string | undefined)[]
   close(): Promise<void>
 }
 
-type Message = { jsonrpc: "2.0"; id?: number | string; method: string; params?: { protocolVersion?: string; name?: string } }
+type Message = { jsonrpc: "2.0"; id?: number | string; method: string; params?: { protocolVersion?: string; name?: string; arguments?: { query?: unknown } } }
 
-export async function startFakeMcp(): Promise<FakeMcp> {
+export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMcp> {
   const calls: string[] = []
+  const called: { tool: string; path: string }[] = []
   const markers: (string | undefined)[] = []
-  const answer = (message: Message) => {
+  const answer = (message: Message, path: string) => {
     const reply = (result: unknown) => ({ jsonrpc: "2.0", id: message.id, result })
     switch (message.method) {
       case "initialize":
         return reply({ protocolVersion: message.params?.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "fake-linear", version: "0.0.0" } })
       case "tools/list":
-        return reply({ tools: TOOLS })
-      case "tools/call":
-        calls.push(message.params?.name ?? "")
-        return reply({ content: [{ type: "text", text: `called ${message.params?.name}` }] })
+        return reply({ tools: options.catalog === "linear" ? LINEAR[path.endsWith("/readonly") ? "read" : "write"] : TOOLS })
+      case "tools/call": {
+        const tool = message.params?.name ?? ""
+        calls.push(tool)
+        called.push({ tool, path })
+        const args = message.params?.arguments ?? {}
+        if (String(args.query ?? "").startsWith("fail")) return reply({ content: [{ type: "text", text: UPSTREAM_FAILURE }], isError: true })
+        return reply({ content: [{ type: "text", text: `called ${tool}` }], structuredContent: { tool, path, arguments: args } })
+      }
       case "ping":
         return reply({})
       default:
@@ -44,8 +73,9 @@ export async function startFakeMcp(): Promise<FakeMcp> {
   const server = createServer(async (request, response) => {
     markers.push(header(request, "x-linear-test"))
     if (request.method !== "POST") return void response.writeHead(405, { allow: "POST" }).end()
+    const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname
     const body = JSON.parse(await read(request)) as Message | Message[]
-    const replies = (Array.isArray(body) ? body : [body]).filter((message) => message.id !== undefined).map(answer)
+    const replies = (Array.isArray(body) ? body : [body]).filter((message) => message.id !== undefined).map((message) => answer(message, path))
     if (!replies.length) return void response.writeHead(202).end()
     response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(Array.isArray(body) ? replies : replies[0]))
   })
@@ -55,6 +85,7 @@ export async function startFakeMcp(): Promise<FakeMcp> {
     url: `http://127.0.0.1:${port}/mcp`,
     endpoints: { read: `http://127.0.0.1:${port}/mcp/readonly`, write: `http://127.0.0.1:${port}/mcp` },
     calls,
+    called,
     markers,
     close: () => new Promise((resolve) => (server.closeAllConnections(), server.close(() => resolve()))),
   }

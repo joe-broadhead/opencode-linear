@@ -1,6 +1,7 @@
 import { Plugin, type Mcp } from "@opencode/plugin"
 import { errorText, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { checkHost } from "./host-version.js"
+import { registerToolsRpc } from "./host/tools-rpc.js"
 import { watchIntegration } from "./integration.js"
 import { parseOptions, type Access } from "./options.js"
 import { defaultRules, registerDefaultRules } from "./permissions.js"
@@ -81,7 +82,15 @@ export function createLinearPlugin(seam: LinearSeam) {
       const read = () => readStatus(ctx, { ...(source ? { source } : {}), access: options.access, host, problems: [...problems.values()] })
       await registerStatusCommand(ctx, read)
       await registerStatusRpc(ctx.rpc, read)
-      return watchIntegration(ctx, () => source?.type === "plugin" || source?.type === "adopted")
+      // The plugin's own server, or the user's adopted one; a server at another URL is not Linear's for this access.
+      const owned = () => source?.type === "plugin" || source?.type === "adopted"
+      // Scripts call the known reads with no model, as a session and its agent.
+      const stopTools = await registerToolsRpc(ctx, { mcp: { server: SERVER_NAME, managed: owned } })
+      const stopWatch = watchIntegration(ctx, owned)
+      return async () => {
+        await stopWatch()
+        await stopTools()
+      }
     },
   })
 }
