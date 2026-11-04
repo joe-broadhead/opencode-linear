@@ -12,9 +12,9 @@ describe("Linear's tools RPC", () => {
     expect(TOOLS_RPC_ID).toBe("linear.workspace.tools")
   })
 
-  test("its methods are exactly the 42 known reads, the tools the default rules allow", () => {
+  test("its methods are exactly the 41 known reads, the tools the default rules allow", () => {
     expect([...KNOWN_READS]).toEqual([...READ_TOOLS])
-    expect(KNOWN_READS).toHaveLength(42)
+    expect(KNOWN_READS).toHaveLength(41)
     const allowed = defaultRules().filter((rule) => rule.effect === "allow").map((rule) => rule.action)
     expect(KNOWN_READS.map((name) => `${SERVER_NAME}_${name}`)).toEqual(allowed)
   })
