@@ -23,6 +23,7 @@
   },
   "files": [
     "dist",
+    "assets",
     "skills",
     "README.md",
     "LICENSE",
@@ -54,6 +55,8 @@
   },
   "jelly": {
     "title": "Linear",
+    "summary": "Find and read Linear issues, projects and documents.",
+    "icon": "assets/icon.svg",
     "tools": [
       {
         "name": "linear.issues",
