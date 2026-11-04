@@ -4,13 +4,24 @@
 // module records it already holds for unchanged paths: a new entry must never import an older sibling module.
 // Only the modules the host provides stay external. The build fails if an output imports anything else.
 import { build } from "esbuild"
-import { readdirSync, rmSync } from "node:fs"
+import { readdirSync, readFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const root = fileURLToPath(new URL("..", import.meta.url))
 const HOST = ["@opencode/plugin", "@opencode/plugin/*", "@opentui/*", "solid-js", "solid-js/*"]
 const provided = (path) => path.startsWith("node:") || HOST.some((name) => (name.endsWith("/*") ? path.startsWith(name.slice(0, -1)) : path === name))
+
+/** The plugin's version, from package.json, as one string: the bundles carry nothing else of package.json. */
+const version = {
+  name: "version",
+  setup(editor) {
+    editor.onLoad({ filter: /[\\/]src[\\/]version\.ts$/ }, () => {
+      const { version } = JSON.parse(readFileSync(join(root, "package.json"), "utf8"))
+      return { contents: `export const VERSION = ${JSON.stringify(version)}`, loader: "ts" }
+    })
+  },
+}
 
 rmSync(join(root, "dist"), { recursive: true, force: true })
 const result = await build({
@@ -26,6 +37,7 @@ const result = await build({
   legalComments: "none",
   metafile: true,
   logLevel: "warning",
+  plugins: [version],
 })
 
 const problems = Object.entries(result.metafile.outputs).flatMap(([file, output]) =>

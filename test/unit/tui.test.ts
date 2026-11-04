@@ -119,12 +119,16 @@ describe("status view", () => {
 
   test("an untested host the user allowed shows the warning", () => {
     const untested = status({ host: checkHost("2.3.0", true) })
-    expect(viewMessage({ status: untested })).toContain(`- OpenCode: 2.3.0 (host untested). ${untested.host.warning}`)
+    expect(viewMessage({ status: untested })).toContain("- OpenCode: 2.3.0 (untested; supported range >=2.2.3 <2.3.0). It is outside the supported range;")
   })
 
   test.each([
     [{ type: "rpc.unavailable", message: "x" }, "STATUS_UNAVAILABLE: The Linear plugin is not running on this OpenCode server. Next step: Run /plugins to see why it did not start."],
     [{ type: "rpc.method_not_found", message: "x" }, "STATUS_UNAVAILABLE: The Linear plugin is not running on this OpenCode server. Next step: Run /plugins to see why it did not start."],
+    [
+      { type: "unavailable", message: "STATUS_UNAVAILABLE: Could not read Linear's status (agents unavailable).", data: { nextStep: "Restart OpenCode, then run /linear-status again." } },
+      "STATUS_UNAVAILABLE: Could not read Linear's status (agents unavailable). Next step: Restart OpenCode, then run /linear-status again.",
+    ],
     [new Error("socket closed"), "STATUS_UNAVAILABLE: Could not read Linear's status (socket closed). Next step: Restart OpenCode, then run /linear again."],
     ["timeout", "STATUS_UNAVAILABLE: Could not read Linear's status (timeout). Next step: Restart OpenCode, then run /linear again."],
   ])("a failed status request (%j) shows a coded error with a next step", async (error, message) => {

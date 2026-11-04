@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Plugin } from "@opencode/plugin"
-import { ENDPOINTS } from "../../src/constants.js"
+import { ENDPOINTS, NAMESPACE_DESCRIPTION } from "../../src/constants.js"
 import linear from "../../src/index.js"
 import { createLinearPlugin, displayUrl, registerServer, serverConfig } from "../../src/plugin.js"
 import type { ServerSource } from "../../src/status.js"
@@ -89,6 +89,7 @@ function context(options: unknown, version = "2.2.3") {
   const agent = transforms<Parameters<Parameters<Plugin.Context["agent"]["transform"]>[0]>[0]>()
   const skill = transforms<Parameters<Parameters<Plugin.Context["skill"]["transform"]>[0]>[0]>()
   const command = transforms<Parameters<Parameters<Plugin.Context["command"]["transform"]>[0]>[0]>()
+  const tool = transforms<Parameters<Parameters<Plugin.Context["tool"]["transform"]>[0]>[0]>()
   const rpc: string[] = []
   const handlers = new Map<string, Record<string, (input: unknown, context: unknown) => Promise<unknown>>>()
   const hooks: string[] = []
@@ -108,12 +109,12 @@ function context(options: unknown, version = "2.2.3") {
     // A session whose agent allows everything, and one Linear read that answers "ok".
     session: { get: async () => ({ id: "ses_test", agent: "build", location: { directory: "/projects/linear-test" }, permissions: [] }) },
     agent: { transform: agent.transform, get: async () => ({ data: { id: "build", permissions: [{ action: "*", resource: "*", effect: "allow" }] } }) },
-    tool: { list: async () => [{ id: "linear_list_issues", execute: async () => ({ content: [{ type: "text", text: "ok" }] }) }] },
+    tool: { transform: tool.transform, list: async () => [{ id: "linear_list_issues", execute: async () => ({ content: [{ type: "text", text: "ok" }] }) }] },
     location: { directory: "/projects/linear-test" },
     permission: { hook: async (name: string) => (hooks.push(name), { dispose: async () => void hooks.splice(hooks.indexOf(name), 1) }) },
     event: { subscribe: ({ signal }: { signal: AbortSignal }) => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise((resolve) => signal.addEventListener("abort", () => resolve({ done: true, value: undefined }))) }) }) },
   } as unknown as SetupContext
-  return { ctx: ctx as Plugin.Context, mcp, agent, skill, command, rpc, handlers, hooks }
+  return { ctx: ctx as Plugin.Context, mcp, agent, skill, command, tool, rpc, handlers, hooks }
 }
 
 describe("setup", () => {
@@ -126,7 +127,7 @@ describe("setup", () => {
     ["read", ["linear"]],
     ["write", ["linear", "linear-write"]],
   ] as const)("%s access registers the server, the rules, the skills %j, the status command, its RPC and the tools RPC", async (access, expected) => {
-    const { ctx, mcp, agent, skill, command, rpc, hooks } = context({ access })
+    const { ctx, mcp, agent, skill, command, tool, rpc, hooks } = context({ access })
     const cleanup = await createLinearPlugin(seam).setup(ctx)
     const { editor, servers } = mcpEditor()
     mcp.run(editor)
@@ -140,6 +141,10 @@ describe("setup", () => {
     const commands: string[] = []
     command.run({ add: (definition: { name: string }) => commands.push(definition.name) })
     expect(commands).toEqual(["linear-status"])
+    // Code Mode's catalog describes the linear namespace, with what the access allows.
+    const namespaces: { name: string; description?: string }[] = []
+    tool.run({ namespace: (namespace: { name: string; description?: string }) => void namespaces.push(namespace) } as never)
+    expect(namespaces).toEqual([{ name: "linear", description: NAMESPACE_DESCRIPTION[access] }])
     expect(rpc).toEqual(["linear.workspace", "linear.workspace.tools"])
     // The tools RPC's one hook: it refuses an ask on its own script calls.
     expect(hooks).toEqual(["evaluate"])
@@ -168,14 +173,16 @@ describe("setup", () => {
     await expect(createLinearPlugin(seam).setup(invalid.ctx)).rejects.toThrow("OPTIONS_INVALID")
     const untested = context({}, "0.0.0-dev-1")
     await expect(createLinearPlugin(seam).setup(untested.ctx)).rejects.toThrow("HOST_UNTESTED")
-    for (const item of [invalid, untested]) expect([item.mcp, item.agent, item.skill, item.command].map((t) => t.callbacks.length)).toEqual([0, 0, 0, 0])
+    for (const item of [invalid, untested]) expect([item.mcp, item.agent, item.skill, item.command, item.tool].map((t) => t.callbacks.length)).toEqual([0, 0, 0, 0, 0])
     for (const item of [invalid, untested]) expect([item.rpc, item.hooks]).toEqual([[], []])
   })
 
-  test("an untested host runs with the override", async () => {
-    const { ctx, mcp } = context({ allowUntestedHost: true }, "2.3.0")
-    const cleanup = await createLinearPlugin(seam).setup(ctx)
-    expect(mcp.callbacks).toHaveLength(1)
-    await cleanup!()
+  test("a host outside the range runs with the override, and an untested release inside the range runs without it", async () => {
+    for (const [options, version] of [[{ allowUntestedHost: true }, "2.3.0"], [{}, "2.2.6"]] as const) {
+      const { ctx, mcp } = context(options, version)
+      const cleanup = await createLinearPlugin(seam).setup(ctx)
+      expect(mcp.callbacks).toHaveLength(1)
+      await cleanup!()
+    }
   })
 })

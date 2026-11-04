@@ -18,6 +18,11 @@ function reportOf(result: { readonly status: Status } | { readonly error: unknow
   if ("status" in result) return formatStatus(result.status).split("\n").slice(1).join("\n")
   const { error } = result
   const type = typeof error === "object" && error !== null && "type" in error ? error.type : undefined
+  // The server part could not read the status; it says why and what to do.
+  if (type === "unavailable") {
+    const { message, data } = error as { message?: unknown; data?: { nextStep?: unknown } }
+    if (typeof message === "string" && typeof data?.nextStep === "string") return `${message} Next step: ${data.nextStep}`
+  }
   // No server part answers: the plugin did not start there, and the host's plugin list says why.
   if (type === "rpc.unavailable" || type === "rpc.method_not_found") {
     return errorText("STATUS_UNAVAILABLE", "The Linear plugin is not running on this OpenCode server.", "Run /plugins to see why it did not start.")
