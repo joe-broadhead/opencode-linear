@@ -41,8 +41,12 @@ the checks and the release steps.
   in every session, also when Code Mode holds Linear's other tools, so add no other direct tool without the same
   reason. Its answer keeps Jelly's `table` shape: at most 8 columns, 100 rows and 200 characters a cell.
 - **The `jelly` section** of `package.json` declares every known tool, the skills, the `linear_issues` table card,
-  the Home feed and the sign-in, with only fields that Jelly's released schema accepts: it refuses unknown keys.
+  the Home feed, the sign-in, a one-line `summary` and the `icon`, with only fields that Jelly's declaration schema
+  accepts: it refuses unknown keys, so a Jelly without `summary` and `icon` refuses the declaration (hey-jelly #33).
   `test/unit/jelly.test.ts` keeps it in step with the known tools and the default rules.
+- **The icon** `assets/icon.svg` is a neutral checklist glyph: no Linear logo, shape or brand colour, because the
+  plugin is unofficial. It uses only the drawing elements Jelly's icon cleaner keeps, and no `<title>`, which the
+  cleaner refuses.
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.
 - **The tools RPC.** `src/host/tools-rpc.ts` is a copy of a module shared by several plugins. Change only its block
   between the `PLUGIN-SPECIFIC` markers here; change the rest in the shared copy first. Its methods are `READ_TOOLS`
