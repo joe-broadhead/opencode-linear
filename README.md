@@ -22,8 +22,14 @@ Run `opencode reload`, or restart OpenCode. Then run `/linear-status`: it shows 
 (see [Sign in](#sign-in)).
 
 The plugin registers Linear's MCP server under the name `linear`, adds default permission rules, the `/linear-status`
-command, the `/linear` status view and two skills. It adds no tools of its own: the tools are Linear's, and OpenCode
-handles the connection, the sign-in and the stored credentials.
+command, the `/linear` status view, two skills and one tool of its own, `linear_issues`. Every other tool is Linear's,
+and OpenCode handles the connection, the sign-in and the stored credentials.
+
+`linear_issues` answers the issues assigned to you as a table: identifier, title, state, priority and link. It reads
+them through Linear's own `list_issues`, under that tool's sign-in and permission rules, and holds no credential. It is
+a direct tool, offered to the model even when Code Mode holds Linear's other tools, because
+[Jelly](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/jelly.md) draws a tool's result as a table only
+for a direct call, not for one made inside Code Mode.
 
 **Update** with `opencode plugin update @joe-broadhead/opencode-linear`, then run `opencode reload`. An entry pinned
 to a version, such as `@joe-broadhead/opencode-linear@0.0.1`, does not update: remove the `@version` from its
@@ -88,6 +94,8 @@ The plugin adds these rules to every agent, directly after the agent's base rule
 2. One `allow` rule for each of Linear's 41 read tools, listed in
    [`src/linear-tools.ts`](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/src/linear-tools.ts). These
    run without a prompt.
+3. `{ "action": "linear_issues", "resource": "*", "effect": "allow" }`: the plugin's own `linear_issues`, which only
+   reads, runs without a prompt too. Its call to `list_issues` still follows that tool's rules.
 
 So reads run, and every change asks before it runs. Everything that comes later than these rules still wins: an
 agent's own stricter rules (Plan cannot edit, Explore cannot use Linear), your `permissions` in `opencode.json`, and
@@ -162,6 +170,8 @@ Run `/linear-status` first. Its last line is the next step.
 | `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.3.0`, so the plugin did not start. Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true` to run anyway. |
 | `STATUS_UNAVAILABLE` | The status could not be read, or the plugin is not running. Follow the next step in the message. |
 | `SKILLS_INVALID` | A skill file in the package is missing or broken. Reinstall the plugin. |
+| `AUTH_REQUIRED` from `linear_issues` | OpenCode does not list Linear's `list_issues`, usually because you are not signed in. Run `/connect` and choose Linear; if you are signed in, run `/linear-status`. |
+| `UPSTREAM_UNREADABLE` from `linear_issues` | Linear's `list_issues` answered with something other than a list of issues. Ask for `list_issues` with assignee `me` instead, and update the plugin. |
 
 A script's errors from the tools RPC have their own codes, listed in
 [Scripting](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md#errors).
@@ -187,6 +197,7 @@ configured now.
 ## Links
 
 - [Configuration](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/configuration.md)
+- [In Jelly](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/jelly.md)
 - [Architecture](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/architecture.md)
 - [Contributing](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/CONTRIBUTING.md)
 - [Security](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/SECURITY.md)
