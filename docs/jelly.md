@@ -13,7 +13,8 @@ declaration, because that schema accepts no unknown keys.
 
 ## Tools and permissions
 
-79 tools are declared (43 read-only). Jelly's agents have no base "allow everything"
+78 tools are declared (42 read-only): Linear's 41 reads and 36 writes, and the plugin's own
+`linear_issues`. Jelly's agents have no base "allow everything"
 rule, so this plugin's own default rules, which it puts after that rule, never reach them. Jelly
 writes each declared `ask` or `deny` as that tool's default instead (the person's own choice
 replaces it), and denies a read-only helper every tool not marked `readOnly`. A declared `allow`
@@ -36,8 +37,10 @@ skill ids collide with another plugin's or the agent's own.
 
 - **Linear issues**, Jelly's native `table` card, behind `linear_issues`: the plugin's own read,
   which calls Linear's `list_issues` (assignee `me`) through the host and answers in the table's
-  shape. It is a direct tool, so Jelly sees its result.
-- **My Linear issues**, a Home feed preset that calls `linear.issues` every 15 minutes.
+  shape. It is a direct tool, so Jelly sees its result: Jelly does not see the result of a call made inside
+  Code Mode.
+- **My Linear issues**, a Home feed preset that calls `linear.issues` every 15 minutes and lists your assigned
+  issues in any state, each as `ENG-1: Title`.
 
 ## Signing in
 
@@ -47,5 +50,5 @@ Jelly folds the declared sign-ins into this plugin's one card, which shows each 
 
 ## Versions
 
-Jelly's curated catalogue pins an exact version. `latest` is `0.0.0`; publish each release
-under a new version so a review in Jelly can tell the two apart.
+Jelly's curated catalogue pins an exact version, so publish each release under a new version: a review in Jelly
+can then tell the two apart.

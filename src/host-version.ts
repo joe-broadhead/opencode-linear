@@ -1,10 +1,13 @@
-import { linearError, SUPPORTED_HOST } from "./constants.js"
+import { linearError, SUPPORTED_HOST, TESTED_HOSTS } from "./constants.js"
 
+/** OpenCode's version as status reports it: the `host` fields every plugin of this family shares. */
 export interface HostCheck {
-  readonly version: string
+  /** OpenCode's version, or null when it reports none. */
+  readonly version: string | null
+  /** The supported range, `opencode.host` in package.json. */
+  readonly range: string
+  /** True only for a release every check runs on (TESTED_HOSTS). */
   readonly tested: boolean
-  /** Set when an untested host runs because `allowUntestedHost` is true. */
-  readonly warning?: string
 }
 
 const RELEASE = /^(\d+)\.(\d+)\.(\d+)$/
@@ -12,22 +15,26 @@ const parse = (version: string) => RELEASE.exec(version)?.slice(1).map(Number)
 const [LOWEST, ABOVE] = SUPPORTED_HOST.split(" ").map((bound) => parse(bound.replace(/^[<>]=?/, ""))!)
 const compare = (a: number[], b: number[]) => a[0]! - b[0]! || a[1]! - b[1]! || a[2]! - b[2]!
 
-/** True for a release inside the tested line. Prereleases, dev builds and unparsable versions are untested. */
-export function isTestedHost(version: string) {
+/** True for a release inside the supported range. Prereleases, dev builds and unparsable versions are outside it. */
+export function isSupportedHost(version: string) {
   const parts = parse(version)
   return parts !== undefined && compare(parts, LOWEST!) >= 0 && compare(parts, ABOVE!) < 0
 }
 
-/** Refuses an untested host unless the user opted in, in which case the warning travels to status. */
+/** True only for a release every check runs on. */
+export const isTestedHost = (version: string) => TESTED_HOSTS.includes(version)
+
+/**
+ * Starts on any release inside the supported range; status calls only the tested ones "tested". Refuses a host outside
+ * the range unless the user opted in, in which case status says so.
+ */
 export function checkHost(version: string, allowUntestedHost: boolean): HostCheck {
-  if (isTestedHost(version)) return { version, tested: true }
-  if (!allowUntestedHost) {
+  if (!isSupportedHost(version) && !allowUntestedHost) {
     throw linearError(
       "HOST_UNTESTED",
-      `This plugin supports OpenCode ${SUPPORTED_HOST}, found ${version}.`,
-      "Install a plugin version made for your OpenCode, or set the plugin option allowUntestedHost: true to try anyway.",
+      `This plugin supports OpenCode ${SUPPORTED_HOST}, found ${version || "no version"}.`,
+      `Use OpenCode ${SUPPORTED_HOST}, or set the plugin option "allowUntestedHost": true to run anyway.`,
     )
   }
-  const warning = `OpenCode ${version} is outside the tested line ${SUPPORTED_HOST}. The plugin runs because allowUntestedHost is true; if Linear misbehaves, use a tested OpenCode release.`
-  return { version, tested: false, warning }
+  return { version: version === "" ? null : version, range: SUPPORTED_HOST, tested: isTestedHost(version) }
 }

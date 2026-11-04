@@ -2,8 +2,9 @@
 // seen, on both paths. With `catalog: "linear"` it lists what Linear's servers list: the read-only path every known read
 // and the new tool, the full path every known read, every known write and the new tool. It answers JSON-RPC POSTs with
 // plain JSON (no SSE stream) and records every tool call, its path and every request header. A `tools/call` answers
-// with the tool's name, the path and its arguments as structured content, or, for a `query` that starts with "fail",
-// with an upstream error (`isError`) whose first line holds a signed URL.
+// with the tool's name, the path and its arguments as structured content; for a `query` that starts with "text", with
+// text alone; or, for a `query` that starts with "fail", with an upstream error (`isError`) whose first line holds a
+// signed URL.
 import { createServer, type IncomingMessage } from "node:http"
 import type { AddressInfo } from "node:net"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
@@ -62,6 +63,7 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
         called.push({ tool, path })
         const args = message.params?.arguments ?? {}
         if (String(args.query ?? "").startsWith("fail")) return reply({ content: [{ type: "text", text: UPSTREAM_FAILURE }], isError: true })
+        if (String(args.query ?? "").startsWith("text")) return reply({ content: [{ type: "text", text: `text from ${tool}` }] })
         return reply({ content: [{ type: "text", text: `called ${tool}` }], structuredContent: { tool, path, arguments: args } })
       }
       case "ping":

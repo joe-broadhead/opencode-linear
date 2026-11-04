@@ -50,7 +50,8 @@ describe("linear_issues", () => {
   test("says the server is not signed in, rather than answering an empty table", async () => {
     const tool = { list: async () => [] as never }
     await expect(issuesTool(tool).execute({}, context)).rejects.toThrow(/AUTH_REQUIRED/)
-    expect(() => issueRows("Not a list")).toThrow(/LINEAR_UNREADABLE/)
+    // A code without a service prefix, and a next step that leads somewhere.
+    expect(() => issueRows("Not a list")).toThrow(/^UPSTREAM_UNREADABLE: .* Next step: Ask for list_issues with assignee "me" instead/)
   })
 
   test("cuts a long cell to Jelly's 200 characters", () => {

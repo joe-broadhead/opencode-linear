@@ -62,7 +62,11 @@ export function issueRows(payload: unknown): IssueRow[] {
       ? [payload["issues"], payload["nodes"], payload["data"]].find(Array.isArray)
       : undefined
   if (!Array.isArray(list)) {
-    throw linearError("LINEAR_UNREADABLE", "list_issues did not answer with a list of issues.", "Update the plugin; if it still fails, report it with /linear-status.")
+    throw linearError(
+      "UPSTREAM_UNREADABLE",
+      "Linear's list_issues did not answer with a list of issues.",
+      'Ask for list_issues with assignee "me" instead, which shows Linear\'s answer as it is, and update the plugin.',
+    )
   }
   return list.flatMap((item) => {
     if (!isRecord(item)) return []
@@ -110,7 +114,11 @@ export function issuesTool(tool: Pick<Plugin.Context["tool"], "list">) {
       const limit = Math.min(MAX_LIMIT, Math.max(1, Math.trunc(asked)))
       const list = (await tool.list()).find((entry) => entry.id === LIST)
       if (list === undefined) {
-        throw linearError("AUTH_REQUIRED", `The ${SERVER_NAME} server is not connected, so ${LIST} is unavailable.`, "Run /connect and choose Linear to sign in.")
+        throw linearError(
+          "AUTH_REQUIRED",
+          `The ${SERVER_NAME} server is not connected, so ${LIST} is unavailable.`,
+          "Run /connect and choose Linear to sign in, or run /linear-status if you are signed in already.",
+        )
       }
       const rows = issueRows(resultData(await list.execute({ assignee: "me", limit }, context))).slice(0, limit)
       return { output: { columns: COLUMNS.map((column) => ({ ...column })), rows } }

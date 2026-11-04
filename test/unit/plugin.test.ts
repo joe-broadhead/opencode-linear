@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Plugin } from "@opencode/plugin"
-import { ENDPOINTS } from "../../src/constants.js"
+import { ENDPOINTS, NAMESPACE_DESCRIPTION } from "../../src/constants.js"
 import linear from "../../src/index.js"
 import { createLinearPlugin, displayUrl, registerServer, serverConfig } from "../../src/plugin.js"
 import type { ServerSource } from "../../src/status.js"
@@ -141,9 +141,16 @@ describe("setup", () => {
     const commands: string[] = []
     command.run({ add: (definition: { name: string }) => commands.push(definition.name) })
     expect(commands).toEqual(["linear-status"])
-    const tools: string[] = []
-    tool.run({ add: (info: { name: string }) => tools.push(info.name) } as never)
-    expect(tools).toEqual(["issues"])
+    // Code Mode's catalog describes the linear namespace, with what the access allows.
+    const namespaces: { name: string; description?: string }[] = []
+    const tools: { name: string; options: unknown }[] = []
+    tool.run({
+      namespace: (namespace: { name: string; description?: string }) => void namespaces.push(namespace),
+      add: (info: { name: string; options: unknown }) => void tools.push(info),
+    } as never)
+    expect(namespaces).toEqual([{ name: "linear", description: NAMESPACE_DESCRIPTION[access] }])
+    // linear_issues, a direct tool in the linear namespace, so Jelly can draw its result.
+    expect(tools.map((info) => [info.name, info.options])).toEqual([["issues", { namespace: "linear", codemode: false }]])
     expect(rpc).toEqual(["linear.workspace", "linear.workspace.tools"])
     // The tools RPC's one hook: it refuses an ask on its own script calls.
     expect(hooks).toEqual(["evaluate"])
@@ -176,10 +183,12 @@ describe("setup", () => {
     for (const item of [invalid, untested]) expect([item.rpc, item.hooks]).toEqual([[], []])
   })
 
-  test("an untested host runs with the override", async () => {
-    const { ctx, mcp } = context({ allowUntestedHost: true }, "2.3.0")
-    const cleanup = await createLinearPlugin(seam).setup(ctx)
-    expect(mcp.callbacks).toHaveLength(1)
-    await cleanup!()
+  test("a host outside the range runs with the override, and an untested release inside the range runs without it", async () => {
+    for (const [options, version] of [[{ allowUntestedHost: true }, "2.3.0"], [{}, "2.2.6"]] as const) {
+      const { ctx, mcp } = context(options, version)
+      const cleanup = await createLinearPlugin(seam).setup(ctx)
+      expect(mcp.callbacks).toHaveLength(1)
+      await cleanup!()
+    }
   })
 })

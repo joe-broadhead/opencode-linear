@@ -1,6 +1,6 @@
 {
   "name": "@joe-broadhead/opencode-linear",
-  "version": "0.0.1",
+  "version": "0.0.4",
   "description": "Unofficial OpenCode plugin for Linear: find, read and cite issues, projects and documents through Linear's official MCP server",
   "keywords": [
     "opencode",
@@ -23,7 +23,7 @@
   },
   "files": [
     "dist",
-    "assets",
+    "assets/icon.svg",
     "skills",
     "README.md",
     "LICENSE",
@@ -311,12 +311,6 @@
         "readOnly": true
       },
       {
-        "name": "linear.whoami",
-        "permission": "linear_whoami",
-        "effect": "allow",
-        "readOnly": true
-      },
-      {
         "name": "linear.create_attachment",
         "permission": "linear_create_attachment",
         "effect": "ask",
@@ -564,7 +558,7 @@
         {
           "id": "linear.my-issues",
           "label": "My Linear issues",
-          "description": "Your assigned, unfinished issues.",
+          "description": "Your assigned Linear issues.",
           "keywords": [
             "linear",
             "my linear issues"
