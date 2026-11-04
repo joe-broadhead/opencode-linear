@@ -22,7 +22,8 @@ The methods are exactly Linear's 41 read tools that the plugin knows, the ones i
 
 Each method runs the tool with the same input: Linear's own tool, through OpenCode's own connection and sign-in. The
 plugin never sees the OAuth token. Linear's write tools, such as `save_issue` or `save_comment`, are never methods,
-even with `access: "write"` and an allow rule. Neither is a tool that Linear adds later.
+even with `access: "write"` and an allow rule. Neither is a tool that Linear adds later, nor the plugin's own
+`linear_issues`, a table for the model; a script calls `list_issues` itself.
 
 The methods work the same with either access. With `access: "read"` (the default) they call Linear's read-only
 server, and with `access: "write"` the full one. `describe` shows which methods the server for your access lists now.

@@ -2,8 +2,8 @@
 
 The plugin is a thin layer over Linear's official MCP server. OpenCode owns the MCP transport, OAuth, credentials,
 permission prompts and tool output limits. The plugin registers the server, names its `/connect` entry, adds default
-permission rules, reports status, ships two skills and lets scripts call the known reads through a tools RPC. It adds
-no model tools and has no runtime dependencies.
+permission rules, reports status, ships two skills, adds one read of its own, `linear_issues`, and lets scripts call
+the known reads through a tools RPC. It has no runtime dependencies.
 
 ## Layout
 
@@ -16,6 +16,7 @@ no model tools and has no runtime dependencies.
 | `src/host-version.ts` | The host check: the supported range, and the tested releases |
 | `src/linear-tools.ts` | `READ_TOOLS`, `WRITE_TOOLS` and `classify()`. No runtime imports, so the drift script can load it |
 | `src/permissions.ts` | The default rules, their placement, and detection of agents without them |
+| `src/issues.ts` | `linear_issues`: the issues assigned to you as a table, read through the host's own `linear_list_issues` |
 | `src/status.ts` | The status model and text, `/linear-status`, and the status RPC method |
 | `src/skills.ts` | Loading and registering the skills |
 | `src/host/tools-rpc.ts` | The tools RPC for scripts, `linear.workspace.tools`; a copy of a module shared by several plugins, with Linear's part in one marked block |
@@ -42,9 +43,10 @@ typechecks. The package exports `.` (`dist/index.js`) and `./tui` (`dist/tui.js`
    other URL is a conflict: nothing is added, and status reports it.
 5. `ctx.tool.transform` gives the `linear` namespace its Code Mode description, which says what the access allows.
 6. `ctx.agent.transform` inserts the default rules after each agent's base `* * allow`.
-7. `ctx.skill.transform`, `ctx.command.transform` (`/linear-status`) and `ctx.rpc.register` (`linear.workspace/status`).
-8. `registerToolsRpc` registers the tools RPC, `linear.workspace.tools`, and its `evaluate` hook.
-9. `watchIntegration` starts. Setup returns one cleanup that stops it and disposes the tools RPC.
+7. `ctx.tool.transform` adds `linear_issues`, a direct tool (`codemode: false`) in the `linear` namespace.
+8. `ctx.skill.transform`, `ctx.command.transform` (`/linear-status`) and `ctx.rpc.register` (`linear.workspace/status`).
+9. `registerToolsRpc` registers the tools RPC, `linear.workspace.tools`, and its `evaluate` hook.
+10. `watchIntegration` starts. Setup returns one cleanup that stops it and disposes the tools RPC.
 
 Transforms are synchronous and never throw: a failure is kept as a problem for status, and cleared when the next replay
 succeeds.

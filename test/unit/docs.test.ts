@@ -43,6 +43,32 @@ describe("docs", () => {
     expect(at("opencode plugin remove @joe-broadhead/opencode-linear")).toBeGreaterThan(at("opencode auth list", second))
   })
 
+  // Every code the plugin's own code raises (the tools RPC's are in docs/scripting.md) has no service prefix and a row
+  // in the configuration guide's Errors table.
+  test("the configuration guide documents every error code the plugin raises, none with a service prefix", () => {
+    const sources = readdirSync(join(ROOT, "src")).filter((name) => name.endsWith(".ts"))
+    const codes = new Set(sources.flatMap((name) => [...readFileSync(join(ROOT, "src", name), "utf8").matchAll(/(?:linearError|errorText)\(\s*"([A-Z][A-Z_]+)"/g)].map((match) => match[1]!)))
+    expect([...codes].sort()).toContain("UPSTREAM_UNREADABLE")
+    const errors = /## Errors(.*?)## /.exec(text("docs/configuration.md"))?.[1] ?? ""
+    for (const code of codes) {
+      expect(code).not.toStartWith("LINEAR_")
+      expect(errors).toContain(`| \`${code}\` |`)
+    }
+  })
+
+  test("the README and the configuration guide give linear_issues its allow rule and say why it is a direct tool", () => {
+    for (const file of ["README.md", "docs/configuration.md"]) {
+      expect(text(file)).toContain('{ "action": "linear_issues", "resource": "*", "effect": "allow" }')
+      expect(text(file)).toMatch(/direct tool.*Jelly/)
+    }
+  })
+
+  test("the Jelly guide states the declared tool counts, and no placeholder or version", () => {
+    const tools = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).jelly.tools as { readOnly: boolean }[]
+    expect(text("docs/jelly.md")).toContain(`${tools.length} tools are declared (${tools.filter((tool) => tool.readOnly).length} read-only)`)
+    expect(text("docs/jelly.md")).not.toMatch(/`latest` is|None yet|summary|icon/)
+  })
+
   test("the scripting guide lists exactly the known reads as methods", () => {
     const list = /\(`READ_TOOLS` in `src\/linear-tools\.ts`\): (.*?)\. /.exec(text("docs/scripting.md"))?.[1] ?? ""
     expect([...list.matchAll(/`([a-z_]+)`/g)].map((match) => match[1])).toEqual([...READ_TOOLS])
