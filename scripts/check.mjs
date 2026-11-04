@@ -12,7 +12,7 @@ const env = { ...process.env, PATH: `${join(root, "node_modules", ".bin")}${deli
 const { TESTED_HOSTS } = await import(new URL("../src/constants.ts", import.meta.url).href)
 
 // The approved package shape. Change it here only together with the release policy.
-const FILES = ["dist", "skills", "README.md", "LICENSE", "CHANGELOG.md"]
+const FILES = ["dist", "assets/icon.svg", "skills", "README.md", "LICENSE", "CHANGELOG.md"]
 const EXPORTS = { ".": "index", "./tui": "tui" }
 // dist/ holds one self-contained bundle per export, and nothing else (scripts/build.mjs).
 const DIST = Object.values(EXPORTS).map((base) => `${base}.js`).sort()

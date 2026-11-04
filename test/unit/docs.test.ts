@@ -66,7 +66,8 @@ describe("docs", () => {
   test("the Jelly guide states the declared tool counts, and no placeholder or version", () => {
     const tools = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).jelly.tools as { readOnly: boolean }[]
     expect(text("docs/jelly.md")).toContain(`${tools.length} tools are declared (${tools.filter((tool) => tool.readOnly).length} read-only)`)
-    expect(text("docs/jelly.md")).not.toMatch(/`latest` is|None yet|summary|icon/)
+    expect(text("docs/jelly.md")).not.toMatch(/`latest` is|None yet/)
+    expect(text("docs/jelly.md")).toContain("the one line in `jelly.summary`, and beside it the mark in `jelly.icon`")
   })
 
   test("the scripting guide lists exactly the known reads as methods", () => {
