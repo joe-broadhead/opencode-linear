@@ -56,7 +56,7 @@ range in its `OpenCode` row, for example `2.2.5 (tested; supported range >=2.2.3
 
 - **A tested release:** the plugin starts.
 - **Another release inside the range, such as 2.2.6:** the plugin starts too. Status marks the version `untested`, and
-  the status RPC's `host.tested` is `false`.
+  the status RPC's `host.tested` is `false`. The next step is the same as on a tested release.
 - **Outside the range, including 2.3.0, prereleases and development builds:** the plugin refuses to start, and
   `/plugins` shows:
 
