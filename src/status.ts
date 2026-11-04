@@ -135,7 +135,7 @@ function nextStepOf(status: Omit<Status, "nextStep">): string {
   // A problem reads `CODE: What happened. Next step: What to do.`; its own next step becomes the status's.
   const problem = status.problems[0]?.split(" Next step: ")[1]
   if (problem) return problem
-  if (!status.host.tested) return `If Linear misbehaves, use OpenCode ${TESTED_TEXT}, the tested releases.`
+  // An untested host changes no next step: the OpenCode row says it is untested.
   return NOTHING_TO_DO
 }
 

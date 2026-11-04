@@ -155,11 +155,12 @@ describe("buildStatus", () => {
     expect(formatStatus(status)).toContain(
       `- OpenCode: 2.3.0 (untested; supported range >=2.2.3 <2.3.0). It is outside the supported range; the plugin runs because allowUntestedHost is true. If Linear misbehaves, use OpenCode 2.2.3, 2.2.4 or 2.2.5. ${problem}`,
     )
-    const untested = "If Linear misbehaves, use OpenCode 2.2.3, 2.2.4 or 2.2.5, the tested releases."
-    expect(buildStatus({ ...base, host: outside }).nextStep).toBe(untested)
-    // A release inside the range that the checks do not run on starts, and is called untested.
+    // The OpenCode row carries the warning; the next step stays the working state's.
+    expect(buildStatus({ ...base, host: outside }).nextStep).toBe(NOTHING_TO_DO)
+    // A release inside the range that the checks do not run on starts, is called untested, and changes no next step.
     const inside = buildStatus({ ...base, host: checkHost("2.2.6", false) })
-    expect(inside).toMatchObject({ state: "connected", host: { version: "2.2.6", tested: false }, nextStep: untested })
+    expect(inside).toMatchObject({ state: "connected", host: { version: "2.2.6", tested: false }, nextStep: NOTHING_TO_DO })
+    expect(buildStatus({ ...base, host: checkHost("2.2.6", false), server: { status: "needs_auth" } }).nextStep).toBe(SIGN_IN)
     expect(formatStatus(inside)).toContain("- OpenCode: 2.2.6 (untested; supported range >=2.2.3 <2.3.0)\n")
     expect(formatStatus(buildStatus({ ...base, host: checkHost("2.2.5", false) }))).toContain("- OpenCode: 2.2.5 (tested; supported range >=2.2.3 <2.3.0)\n")
     expect(buildStatus(base).nextStep).toBe(NOTHING_TO_DO)
