@@ -26,7 +26,7 @@ Each tool's own description and input schema are the reference. Do not guess fie
 2. Read one item in full with the matching get tool, such as `linear_get_issue`, `linear_get_project`,
    `linear_get_initiative`, `linear_get_milestone` or `linear_get_document`. Read comments with
    `linear_list_comments`, and a project's updates with `linear_get_status_updates`.
-3. For "me", use `linear_whoami` or `linear_get_user`.
+3. For "me", use `linear_get_user` with `query` "me".
 
 Use `linear_list_issue_statuses`, `linear_list_issue_labels`, `linear_list_project_labels` and `linear_list_cycles`
 to learn a team's real status, label and cycle names before you filter by them. `linear_list_custom_views` lists the
