@@ -50,14 +50,22 @@ Linear's consent page decides the workspace of each one, so the two can be in di
 - Type: `true` or `false`.
 - Default: `false`.
 
-The plugin is tested on OpenCode `>=2.2.3 <2.3.0`. On any other version, including 2.3.0, prereleases and
-development builds, it refuses to start:
+The plugin supports OpenCode `>=2.2.3 <2.3.0`, the range `opencode.host` in `package.json` declares, and every check
+runs on 2.2.3, 2.2.4 and 2.2.5, the tested releases. Status shows the version, whether it is tested and the supported
+range in its `OpenCode` row, for example `2.2.5 (tested; supported range >=2.2.3 <2.3.0)`.
 
-```text
-HOST_UNTESTED: This plugin supports OpenCode >=2.2.3 <2.3.0, found 2.3.0. Next step: Install a plugin version made for your OpenCode, or set the plugin option allowUntestedHost: true to try anyway.
-```
+- **A tested release:** the plugin starts.
+- **Another release inside the range, such as 2.2.6:** the plugin starts too. Status marks the version `untested`, and
+  the status RPC's `host.tested` is `false`.
+- **Outside the range, including 2.3.0, prereleases and development builds:** the plugin refuses to start, and
+  `/plugins` shows:
 
-With `"allowUntestedHost": true`, it starts anyway, and `/linear-status` and `/linear` show a warning.
+  ```text
+  HOST_UNTESTED: This plugin supports OpenCode >=2.2.3 <2.3.0, found 2.3.0. Next step: Use OpenCode >=2.2.3 <2.3.0, or set the plugin option "allowUntestedHost": true to run anyway.
+  ```
+
+- **Outside the range with `"allowUntestedHost": true`:** it starts anyway, and `/linear-status` and `/linear` show a
+  warning.
 
 ## Your own `mcp.servers.linear`
 
@@ -108,12 +116,13 @@ after that rule:
   { "action": "linear_extract_images", "resource": "*", "effect": "allow" },
   { "action": "linear_get_agent_skill", "resource": "*", "effect": "allow" },
   "… one allow rule for each read tool in src/linear-tools.ts …",
-  { "action": "linear_whoami", "resource": "*", "effect": "allow" }
+  { "action": "linear_search_documentation", "resource": "*", "effect": "allow" }
 ]
 ```
 
-`READ_TOOLS` in `src/linear-tools.ts` lists Linear's 42 read tools, and `WRITE_TOOLS` its 36 write tools. Writes and
-tools that Linear adds later match only `linear_*`, so they ask. `/linear-status` names the tools in neither list.
+`READ_TOOLS` in `src/linear-tools.ts` lists Linear's 41 read tools, the tools its read-only server lists, and
+`WRITE_TOOLS` its 36 write tools. Writes and tools that Linear adds later match only `linear_*`, so they ask.
+`/linear-status` names the tools in neither list.
 
 OpenCode uses the last rule that matches, so everything after the plugin's rules wins:
 
@@ -180,8 +189,8 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 | Code | When | Next step |
 | --- | --- | --- |
 | `OPTIONS_INVALID` | Setup: an option is unknown or has a wrong value. `/plugins` shows the message, which names the option and the accepted values. | Fix the plugin options in `opencode.json`. |
-| `HOST_UNTESTED` | Setup: OpenCode is outside `>=2.2.3 <2.3.0`, and `allowUntestedHost` is not set. | Install a plugin version made for your OpenCode, or set `allowUntestedHost: true`. |
-| `STATUS_UNAVAILABLE` | `/linear-status` or `/linear`: the status could not be read, or the plugin is not running on the server. | Restart OpenCode, or run `/plugins` to see why the plugin did not start. |
+| `HOST_UNTESTED` | Setup: OpenCode is outside `>=2.2.3 <2.3.0`, and `allowUntestedHost` is not set. | Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true`. |
+| `STATUS_UNAVAILABLE` | `/linear-status`, `/linear` or the status RPC: the status could not be read, or the plugin is not running on the server. The RPC answers with its error `unavailable`. | Restart OpenCode, or run `/plugins` to see why the plugin did not start. |
 | `SKILLS_INVALID` | Setup: a skill file is missing or broken. The plugin still starts; status shows the problem. | Reinstall the plugin. |
 | `SERVER_NOT_REGISTERED` | Setup: the `linear` server could not be registered. Status shows the problem. | Restart OpenCode. |
 | `RULES_NOT_ADDED` | Setup: the default permission rules could not be added, so Linear tools may run without asking. Status shows the problem. | Restart OpenCode. |
@@ -194,3 +203,27 @@ OPTIONS_INVALID: The option "access" must be "read" (the default) or "write", fo
 
 Errors from Linear's server and from OpenCode pass through unchanged, except in the tools RPC for scripts, whose codes
 are in [Scripting](scripting.md#errors).
+
+## Status and RPC
+
+`/linear-status`, the `/linear` dialog and the RPC method `status` (RPC ID `linear.workspace`) share one status model.
+It holds no token and no URL query. `version`, `host`, `state`, `unguardedAgents` and `nextStep` are the fields every
+plugin of this family shares, with the same names and meanings:
+
+| Field | Content |
+| --- | --- |
+| `version` | The plugin's version |
+| `state` | `connected`, `sign_in_required`, `connecting`, `disabled`, `failed`, `not_configured` or `conflict`. The `Connection` row shows the same states as `connected`, `sign-in required`, `connecting`, `disabled`, `failed`, `not configured` and `conflict`. |
+| `error` | For a failed connection only: OpenCode's reason, on one line of at most 160 characters, with any URL cut before its query. The text for a needed sign-in can hold an authorization URL, so it is never shown. |
+| `account` | The account label OpenCode reports, if any |
+| `access` | `read` or `write` |
+| `source` | `type` (`plugin`, `adopted` or `conflict`), `url`, and for a conflict the `expected` URL |
+| `tools` | How many Linear tools OpenCode lists |
+| `unknownCount`, `unknownTools` | How many of them the plugin does not know, and at most 20 of their names, only those made of lowercase letters, digits and `_` |
+| `unguardedAgents` | Agents where a new Linear tool would run without asking; empty when there are none. An agent whose own rules already ask or deny for every Linear tool is not listed. |
+| `host` | `version` (`null` if OpenCode reports none), `range` (the supported range) and `tested` (true only for 2.2.3, 2.2.4 and 2.2.5) |
+| `problems` | Setup problems, each `CODE: What happened. Next step: What to do.` |
+| `nextStep` | Exactly one next step: the `Next step` row, `Nothing to do.` when nothing is needed |
+
+When the status cannot be read, the method answers with its error `unavailable`: the message
+`STATUS_UNAVAILABLE: Could not read Linear's status (…).` and `data: { nextStep }`.
