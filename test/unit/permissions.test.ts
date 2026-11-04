@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { ISSUES_TOOL } from "../../src/issues.js"
 import { READ_TOOLS } from "../../src/linear-tools.js"
 import { defaultRules, evaluate, hasDefaultRules, insertRules, registerDefaultRules, unguardedAgents, type Rule } from "../../src/permissions.js"
 import { agentEditor, allow, builtInAgents, transforms, type AgentEditor, type FakeAgent } from "./fake.js"
@@ -7,10 +8,10 @@ const ask: Rule = { action: "linear_*", resource: "*", effect: "ask" }
 const effects = (rules: readonly Rule[]) => ["linear_list_issues", "linear_get_workspace", "linear_save_issue", "linear_shiny_new_tool"].map((action) => evaluate(rules, action))
 
 describe("defaultRules", () => {
-  test("ask for every Linear tool, then allow each known read, and deny nothing", () => {
+  test("ask for every Linear tool, then allow each known read and the plugin's own, and deny nothing", () => {
     const rules = defaultRules()
     expect(rules[0]).toEqual(ask)
-    expect(rules.slice(1)).toEqual(READ_TOOLS.map((tool) => ({ action: `linear_${tool}`, resource: "*", effect: "allow" })))
+    expect(rules.slice(1)).toEqual([...READ_TOOLS, ISSUES_TOOL].map((tool) => ({ action: `linear_${tool}`, resource: "*", effect: "allow" })))
     expect(rules.filter((rule) => rule.effect === "deny")).toEqual([])
   })
 

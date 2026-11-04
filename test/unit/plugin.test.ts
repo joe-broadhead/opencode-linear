@@ -126,7 +126,7 @@ describe("setup", () => {
   test.each([
     ["read", ["linear"]],
     ["write", ["linear", "linear-write"]],
-  ] as const)("%s access registers the server, the rules, the skills %j, the status command, its RPC and the tools RPC", async (access, expected) => {
+  ] as const)("%s access registers the server, the rules, the skills %j, the status command, the issues tool, its RPC and the tools RPC", async (access, expected) => {
     const { ctx, mcp, agent, skill, command, tool, rpc, hooks } = context({ access })
     const cleanup = await createLinearPlugin(seam).setup(ctx)
     const { editor, servers } = mcpEditor()
@@ -143,8 +143,14 @@ describe("setup", () => {
     expect(commands).toEqual(["linear-status"])
     // Code Mode's catalog describes the linear namespace, with what the access allows.
     const namespaces: { name: string; description?: string }[] = []
-    tool.run({ namespace: (namespace: { name: string; description?: string }) => void namespaces.push(namespace) } as never)
+    const tools: { name: string; options: unknown }[] = []
+    tool.run({
+      namespace: (namespace: { name: string; description?: string }) => void namespaces.push(namespace),
+      add: (info: { name: string; options: unknown }) => void tools.push(info),
+    } as never)
     expect(namespaces).toEqual([{ name: "linear", description: NAMESPACE_DESCRIPTION[access] }])
+    // linear_issues, a direct tool in the linear namespace, so Jelly can draw its result.
+    expect(tools.map((info) => [info.name, info.options])).toEqual([["issues", { namespace: "linear", codemode: false }]])
     expect(rpc).toEqual(["linear.workspace", "linear.workspace.tools"])
     // The tools RPC's one hook: it refuses an ask on its own script calls.
     expect(hooks).toEqual(["evaluate"])
