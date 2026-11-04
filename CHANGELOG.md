@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `linear_issues`, the plugin's own tool: the Linear issues assigned to you, in any state, as a table of identifier,
+  title, state, priority and link (25 rows by default, at most 100). It reads them through Linear's `list_issues`,
+  holds no credential, and runs without asking, through a new default rule
+  `{ "action": "linear_issues", "resource": "*", "effect": "allow" }`. It is a direct tool, offered even when Code
+  Mode holds Linear's other tools, so that Jelly can draw its result as a table. It is not a method of the tools RPC.
+  Its errors are `AUTH_REQUIRED` and `UPSTREAM_UNREADABLE`, documented in the configuration guide.
+- `/linear-status` and the status RPC count `linear_issues` among the Linear tools, never as an unknown one.
+- A `jelly` section in `package.json` for [Jelly](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/jelly.md): the plugin's title, each of its 78 tools with its
+  permission, default effect and whether it only reads, the skills, the sign-in, a table card for `linear_issues`, and
+  a "My Linear issues" Home feed that refreshes every 15 minutes. Jelly reads it without loading the plugin.
+
 ## [0.0.2] - 2026-11-04
 
 ### Added
