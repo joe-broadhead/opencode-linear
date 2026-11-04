@@ -8,11 +8,14 @@ the checks and the release steps.
 ## Rules
 
 - **Public API only.** Use only the public `@opencode/plugin` 2.2.3 API. `opencode.host` in `package.json` and
-  `SUPPORTED_HOST` in `src/constants.ts` both say exactly `>=2.2.3 <2.3.0`, never `^2.2.3`.
+  `SUPPORTED_HOST` in `src/constants.ts` both say exactly `>=2.2.3 <2.3.0`, never `^2.2.3`. `TESTED_HOSTS` in
+  `src/constants.ts` is the one list of tested releases (2.2.3, 2.2.4 and 2.2.5): status calls only those tested, and
+  the host and pack stages and CI run on each. Inside the range an untested release still starts.
 - **Greenfield.** No legacy, migration code, compatibility shim, dual path or deprecated alias, and nothing dead.
   Delete rather than deprecate.
 - **No peers, no runtime dependencies, no lifecycle scripts.** `@opencode/plugin` and `@opencode/sdk` are
-  devDependencies pinned to exactly `2.2.3`. Do not add another host version to the lockfile.
+  devDependencies pinned to exactly `2.2.3`. Do not add another host version to the lockfile: the host stage installs
+  the other tested SDKs into a temp folder.
 - **Ship prebuilt, one file per entry.** `scripts/build.mjs` bundles `src/index.ts` and `src/tui.ts` with esbuild into
   the self-contained `dist/index.js` and `dist/tui.js`: no chunks, no relative imports, and only host-provided modules
   external. `tsc` only typechecks. No declaration files, `.tsx` or JSX.
@@ -23,7 +26,14 @@ the checks and the release steps.
 - **Errors** read `CODE: What happened. Next step: What to do.`, built by `linearError` or `errorText`. Codes have no
   service prefix; shared failures use the shared names (`HOST_UNTESTED`, `OPTIONS_INVALID`, `STATUS_UNAVAILABLE`,
   `SKILLS_INVALID`).
-- **`src/linear-tools.ts` has no runtime imports.** The drift script loads it with Node's type stripping.
+- **Status.** `src/status.ts` builds one model for `/linear-status`, the `/linear` dialog and the status RPC. The RPC
+  keeps the fields every plugin of this family shares, `version`, `host` (`version`, `range`, `tested`), `state`,
+  `unguardedAgents` and `nextStep`, under those names. It never shows OpenCode's text for a needed sign-in, cuts a
+  failure's reason to one line of 160 characters without URL queries, and names at most 20 unknown tools, plain names
+  only. A status it cannot read is the declared RPC error `unavailable`, with a next step.
+- **`src/linear-tools.ts` and `src/constants.ts` have no runtime imports.** The drift script and `scripts/check.mjs`
+  load them with Node's type stripping. `READ_TOOLS` is exactly what Linear's read-only server lists
+  (`test/unit/linear-catalog.ts`).
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.
 - **The tools RPC.** `src/host/tools-rpc.ts` is a copy of a module shared by several plugins. Change only its block
   between the `PLUGIN-SPECIFIC` markers here; change the rest in the shared copy first. Its methods are `READ_TOOLS`
@@ -31,6 +41,8 @@ the checks and the release steps.
   stable: scripts call them by name.
 - **Tests.** Unit tests use narrow `Pick<Plugin.Context, ...>` fakes. Host tests use the public `@opencode/sdk` with
   `OpenCode.create({ app: { version } })`, a loopback fake server and the temp root from `test/host/isolate.ts`.
+  Every temp root of the host and pack tests is a git repository under the system's `/tmp`, never under `TMPDIR` or
+  `HOME`, so OpenCode never finds a `.opencode` folder of whoever runs them; each stock server has its own port.
   Never sign in to Linear or call its API from a check.
 - **Text.** Model-facing text and docs use plain language and describe what the code does now: no process
   narrative, test counts, machine-local paths, secrets or personal data.

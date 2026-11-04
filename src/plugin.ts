@@ -1,5 +1,5 @@
 import { Plugin, type Mcp } from "@opencode/plugin"
-import { errorText, PLUGIN_ID, SERVER_NAME } from "./constants.js"
+import { errorText, NAMESPACE_DESCRIPTION, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { checkHost } from "./host-version.js"
 import { registerToolsRpc } from "./host/tools-rpc.js"
 import { watchIntegration } from "./integration.js"
@@ -77,6 +77,8 @@ export function createLinearPlugin(seam: LinearSeam) {
         source = next
         report("server")(problem)
       })
+      // Code Mode's catalog describes the server's namespace with this text.
+      await ctx.tool.transform((editor) => editor.namespace({ name: SERVER_NAME, description: NAMESPACE_DESCRIPTION[options.access] }))
       await registerDefaultRules(ctx.agent, defaultRules(), report("rules"))
       await registerSkills(ctx.skill, skills)
       const read = () => readStatus(ctx, { ...(source ? { source } : {}), access: options.access, host, problems: [...problems.values()] })
