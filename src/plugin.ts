@@ -3,6 +3,7 @@ import { errorText, NAMESPACE_DESCRIPTION, PLUGIN_ID, SERVER_NAME } from "./cons
 import { checkHost } from "./host-version.js"
 import { registerToolsRpc } from "./host/tools-rpc.js"
 import { watchIntegration } from "./integration.js"
+import { registerIssuesTool } from "./issues.js"
 import { parseOptions, type Access } from "./options.js"
 import { defaultRules, registerDefaultRules } from "./permissions.js"
 import { loadSkills, registerSkills } from "./skills.js"
@@ -80,6 +81,7 @@ export function createLinearPlugin(seam: LinearSeam) {
       // Code Mode's catalog describes the server's namespace with this text.
       await ctx.tool.transform((editor) => editor.namespace({ name: SERVER_NAME, description: NAMESPACE_DESCRIPTION[options.access] }))
       await registerDefaultRules(ctx.agent, defaultRules(), report("rules"))
+      await registerIssuesTool(ctx.tool)
       await registerSkills(ctx.skill, skills)
       const read = () => readStatus(ctx, { ...(source ? { source } : {}), access: options.access, host, problems: [...problems.values()] })
       await registerStatusCommand(ctx, read)

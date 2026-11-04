@@ -92,6 +92,13 @@ describe("buildStatus", () => {
     expect(formatStatus(status)).toContain("- Tools: 4 available, 2 unknown: shiny_new_tool, create_issue (unknown tools ask before running)")
   })
 
+  test("counts linear_issues as the plugin's own tool, not an unknown one", () => {
+    const status = buildStatus({ ...base, tools: ["list_issues", "issues"] })
+    expect(status.tools).toBe(2)
+    expect([status.unknownCount, status.unknownTools]).toEqual([0, []])
+    expect(formatStatus(status)).toContain("- Tools: 2 available, 0 unknown")
+  })
+
   test("names at most 20 unknown tools, and only plain names, but counts them all", () => {
     const odd = ["Bad Name", "x".repeat(70), "evil\u001b[31m", "-dash"]
     const many = Array.from({ length: 25 }, (_, index) => `new_tool_${index}`)
