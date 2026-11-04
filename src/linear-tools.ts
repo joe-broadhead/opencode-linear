@@ -1,7 +1,7 @@
 // Linear's tool names, without the `linear_` server prefix. Keep this file free of runtime imports:
 // scripts/check-linear-tools.mjs loads it with Node's type stripping to report upstream drift.
 
-/** Known reads. They run without a prompt. */
+/** Known reads: exactly the tools Linear's read-only server lists. They run without a prompt. */
 export const READ_TOOLS: readonly string[] = [
   "extract_images",
   "get_agent_skill",
@@ -44,7 +44,6 @@ export const READ_TOOLS: readonly string[] = [
   "list_templates",
   "list_users",
   "search_documentation",
-  "whoami",
 ]
 
 /** Known writes. They ask before they run; Linear's read-only server does not list them. */

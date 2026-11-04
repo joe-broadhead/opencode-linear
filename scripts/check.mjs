@@ -1,15 +1,18 @@
 // The one local entry point: `npm run check` runs every stage in order and stops at the first failure.
 // `node scripts/check.mjs <stage>...` runs only the named stages, in the order given.
 import { spawnSync } from "node:child_process"
-import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { delimiter, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const root = fileURLToPath(new URL("..", import.meta.url))
 const env = { ...process.env, PATH: `${join(root, "node_modules", ".bin")}${delimiter}${process.env.PATH ?? ""}` }
+// The one list of tested OpenCode releases. Node loads src/constants.ts by stripping its types, so that file keeps to
+// type-only imports.
+const { TESTED_HOSTS } = await import(new URL("../src/constants.ts", import.meta.url).href)
 
 // The approved package shape. Change it here only together with the release policy.
-const FILES = ["dist", "skills", "README.md", "LICENSE", "CHANGELOG.md"]
+const FILES = ["dist", "assets/icon.svg", "skills", "README.md", "LICENSE", "CHANGELOG.md"]
 const EXPORTS = { ".": "index", "./tui": "tui" }
 // dist/ holds one self-contained bundle per export, and nothing else (scripts/build.mjs).
 const DIST = Object.values(EXPORTS).map((base) => `${base}.js`).sort()
@@ -23,7 +26,7 @@ const stages = {
   typecheck: () => run("tsc", ["--noEmit", "-p", "tsconfig.json"]),
   unit: () => run("bun", ["test", "./test/unit"]),
   build: () => run("node", ["scripts/build.mjs"]),
-  host: () => run("bun", ["test", "./test/host"]),
+  host: host,
   pack: () => run("bun", ["test", "./test/pack"]),
   forbidden: () => run("node", ["scripts/check-forbidden.mjs"]),
   whitelist: whitelist,
@@ -46,14 +49,41 @@ for (const name of order) {
 }
 console.log(`\n[check] passed: ${order.join(", ")}`)
 
-function run(command, args) {
-  const result = spawnSync(command, args, { cwd: root, env, stdio: "inherit" })
+function run(command, args, options = {}) {
+  const result = spawnSync(command, args, { cwd: options.cwd ?? root, env: { ...env, ...options.env }, stdio: "inherit" })
   if (result.error?.code === "ENOENT") {
     console.error(`${command} was not found. Run npm ci first; install Bun from https://bun.sh if bun is missing.`)
     return 127
   }
   if (result.error) throw result.error
   return result.status ?? 1
+}
+
+/**
+ * The host suite on each tested release: the locked @opencode/sdk for HOST_DEV_PIN, and the others installed from npm
+ * into a temp folder under the system's /tmp, outside the lockfile, once per run. HOST_SDK_DIR runs only that SDK.
+ */
+function host() {
+  if (process.env.HOST_SDK_DIR) return run("bun", ["test", "./test/host"])
+  for (const version of TESTED_HOSTS) {
+    console.log(`\n[check] host on @opencode/sdk ${version}`)
+    if (version === HOST_DEV_PIN) {
+      const code = run("bun", ["test", "./test/host"])
+      if (code !== 0) return code
+      continue
+    }
+    const dir = mkdtempSync(join(realpathSync("/tmp"), `linear-sdk-${version}-`))
+    try {
+      // Its own package.json, so npm never walks up to another one.
+      writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "linear-host-sdk", private: true }))
+      const code = run("npm", ["install", `@opencode/sdk@${version}`, "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline"], { cwd: dir })
+        || run("bun", ["test", "./test/host"], { env: { HOST_SDK_DIR: dir } })
+      if (code !== 0) return code
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+  return 0
 }
 
 function whitelist() {

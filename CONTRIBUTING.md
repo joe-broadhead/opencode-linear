@@ -6,7 +6,7 @@ Read [AGENTS.md](AGENTS.md) first: it lists the rules for this repository and th
 ## Set up
 
 You need Node.js 22.18 or later, npm, and [Bun](https://bun.sh). CI and the release use Node.js 24 and Bun 1.4.4,
-the Bun inside stock OpenCode 2.2.3 and 2.2.4.
+the Bun inside stock OpenCode 2.2.3, 2.2.4 and 2.2.5.
 
 ```sh
 npm ci --ignore-scripts
@@ -41,8 +41,8 @@ npm run check
 | `typecheck` | `tsc --noEmit` over `src/` and `test/`, strict, with unused names as errors |
 | `unit` | `bun test ./test/unit`: options, host check, tool classification, rules, status, skills and the UI view |
 | `build` | `node scripts/build.mjs`: deletes `dist/` and bundles `src/index.ts` and `src/tui.ts` with esbuild into the self-contained `dist/index.js` and `dist/tui.js`. Fails if a bundle imports anything the host does not provide |
-| `host` | `bun test ./test/host`: the plugin inside an embedded OpenCode host |
-| `pack` | `bun test ./test/pack`: builds, packs and installs the package, imports both entry points, and loads it in stock OpenCode 2.2.3 and 2.2.4 |
+| `host` | `bun test ./test/host`: the plugin inside an embedded OpenCode host, once on each tested release (`@opencode/sdk` 2.2.3, 2.2.4 and 2.2.5) |
+| `pack` | `bun test ./test/pack`: builds, packs and installs the package, imports both entry points, and loads it in stock OpenCode 2.2.3, 2.2.4 and 2.2.5 |
 | `forbidden` | `node scripts/check-forbidden.mjs`: scans `src/`, `test/`, `scripts/` and `dist/` for forbidden APIs and machine-local paths |
 | `whitelist` | Checks `package.json` against the approved package shape, and that `dist/` holds exactly `index.js` and `tui.js` |
 
@@ -55,32 +55,44 @@ node scripts/check.mjs typecheck unit
 Shortcuts: `npm run typecheck`, `npm run build`, `npm test` (the `unit` stage), `npm run test:host`,
 `npm run test:pack` and `npm run lint` (the `forbidden` stage).
 
-The host stage starts `@opencode/sdk` 2.2.3 in a temporary home folder, with a local fake of Linear's MCP server. A
-request to any address other than the local machine fails the test. To run the host stage on another OpenCode 2.2.x,
-install that SDK in a separate folder, outside this repository's lockfile, and point `HOST_SDK_DIR` at it:
+`TESTED_HOSTS` in `src/constants.ts` is the one list of tested OpenCode releases: 2.2.3, 2.2.4 and 2.2.5. The host
+and pack stages, status and CI all take their versions from it. Add a release there, and to the README's
+requirements, when every check passes on it.
+
+The host stage starts an embedded OpenCode host in a temporary home folder, with a local fake of Linear's MCP server,
+once for each tested release. A request to any address other than the local machine fails the test. 2.2.3 is the
+locked `@opencode/sdk`; the stage installs the others from npm, outside this repository's lockfile, into a temporary
+folder that it deletes afterwards (about 370 MB each, from npm's cache after the first run). To run the host stage on
+one other OpenCode 2.2.x only, install that SDK in a separate folder and point `HOST_SDK_DIR` at it:
 
 ```sh
-mkdir ../sdk-2.2.4 && cd ../sdk-2.2.4 && npm init -y && npm install @opencode/sdk@2.2.4 --ignore-scripts && cd -
-HOST_SDK_DIR=../sdk-2.2.4 node scripts/check.mjs host
+mkdir ../sdk-2.2.6 && cd ../sdk-2.2.6 && npm init -y && npm install @opencode/sdk@2.2.6 --ignore-scripts && cd -
+HOST_SDK_DIR=../sdk-2.2.6 node scripts/check.mjs host
 ```
+
+Every temporary folder of the host and pack stages is a git repository under the system's `/tmp`, never under
+`TMPDIR` or your home folder. OpenCode looks for `.opencode` folders and project config upwards from a project, and
+stops at a repository's root, so it never picks up your own agents or skills. Each stock server listens on its own
+free port.
 
 The pack stage needs network access to the npm registry. It checks that the tarball contains exactly the `files`
 whitelist, with fewer than 30 entries and at most 100 KB; that `dist/` holds only `index.js` and `tui.js`, with no
 relative import, dynamic `import()` or `require()`; and that they import only modules OpenCode provides. It
 installs the tarball next to the host packages that OpenCode 2.2.3 provides and imports both entry points under Bun.
-Then it installs the tarball alone and loads it with `opencode serve` from stock OpenCode 2.2.3 and 2.2.4. Each server
+Then it installs the tarball alone and loads it with `opencode serve` from stock OpenCode 2.2.3, 2.2.4 and 2.2.5. Each server
 runs offline, in its own temporary home, on its own port with a password. The stage checks that every path in
 `opencode debug paths` is inside that home, that the plugin is active, that the `linear` server and the default rules
 are registered for both access modes, that `/connect` lists the server as "Linear", and that the status RPC answers.
 
-To use `opencode` binaries you already have, set `OPENCODE_BIN_2_2_3` and `OPENCODE_BIN_2_2_4`:
+To use `opencode` binaries you already have, set `OPENCODE_BIN_2_2_3`, `OPENCODE_BIN_2_2_4` and `OPENCODE_BIN_2_2_5`:
 
 ```sh
-OPENCODE_BIN_2_2_3=/path/to/opencode-2.2.3 OPENCODE_BIN_2_2_4=/path/to/opencode-2.2.4 node scripts/check.mjs pack
+OPENCODE_BIN_2_2_3=/path/to/opencode-2.2.3 OPENCODE_BIN_2_2_4=/path/to/opencode-2.2.4 \
+  OPENCODE_BIN_2_2_5=/path/to/opencode-2.2.5 node scripts/check.mjs pack
 ```
 
 Otherwise the stage installs `@opencode/cli` with the binary for your platform (macOS or Linux, arm64 or x64), a few
-hundred megabytes per version, into a temporary folder that it deletes afterwards.
+hundred megabytes per version, once per run, into a temporary folder that it deletes afterwards.
 
 CI (`.github/workflows/ci.yml`) runs `npm ci --ignore-scripts` and `npm run check` on Linux and macOS.
 
@@ -106,6 +118,9 @@ LINEAR_API_KEY=<read-only key> npm run drift -- --strict --endpoint <url>
 - `--endpoint` takes another HTTPS URL, or plain HTTP on a loopback address.
 - Exit codes: `0` for no drift, or drift without `--strict`; `1` for drift with `--strict`; `2` for a usage, sign-in
   or connection error.
+- Without a key, compare `READ_TOOLS` with the tools OpenCode lists for a signed-in `linear` server instead: the Code
+  Mode catalog's `linear` namespace. With `access: "read"` that is Linear's read-only list, which `READ_TOOLS` must
+  equal (`test/unit/linear-catalog.ts` records it); with `access: "write"` it is the full list.
 
 ### Updating the tool lists
 
@@ -115,7 +130,9 @@ LINEAR_API_KEY=<read-only key> npm run drift -- --strict --endpoint <url>
    each one is also a method of the tools RPC for scripts. Add tools that change anything to `WRITE_TOOLS`. Leave a
    tool out if you are not sure: it then asks before every call, and scripts cannot call it.
 4. Remove names that Linear no longer serves.
-5. Run `npm run check`. The skills test fails if a skill names a tool that is in neither list.
+5. Update `test/unit/linear-catalog.ts` to the read-only server's list, and the counts in the docs. Run
+   `npm run check`. The tool-list test fails if `READ_TOOLS` differs from that list, the docs test fails on a stale
+   count or method list, and the skills test fails if a skill names a tool that is in neither list.
 6. Record the change in `CHANGELOG.md`. Moving a tool between the lists changes the default rules and the tools RPC's
    methods, which are part of the plugin's contract. Update the counts in `README.md`, `docs/configuration.md`,
    `docs/scripting.md` and `SECURITY.md` too.

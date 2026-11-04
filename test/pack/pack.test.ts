@@ -1,7 +1,9 @@
 // Pack, install and load the published shape. The tarball holds exactly the files whitelist and installs with
 // lifecycle scripts disabled. Installed alone, it loads in each stock OpenCode release it is tested on, which provides
 // @opencode/plugin, OpenTUI and Solid itself; next to those packages, both entry points also import under Bun.
-// OPENCODE_BIN_2_2_3 and OPENCODE_BIN_2_2_4 name stock binaries; otherwise each release is installed with npm.
+// OPENCODE_BIN_2_2_3, OPENCODE_BIN_2_2_4 and OPENCODE_BIN_2_2_5 name stock binaries; otherwise each release is
+// installed with npm, once per run. Every temp folder is a git repository under the system's /tmp, never under TMPDIR
+// or HOME, so OpenCode's upward search for `.opencode` folders never reaches the agents of whoever runs the test.
 // PACK_TARBALL names a tarball that was already packed, such as the one the release publishes, to test it instead.
 // On each release a script also calls Linear's known reads through the tools RPC, in read and in write access, against
 // a loopback fake Linear.
@@ -10,10 +12,10 @@ import { spawn, spawnSync } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
 import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { createServer } from "node:net"
-import { arch, platform, tmpdir } from "node:os"
+import { arch, platform } from "node:os"
 import { basename, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
-import { ENDPOINTS } from "../../src/constants.js"
+import { ENDPOINTS, SUPPORTED_HOST, TESTED_HOSTS } from "../../src/constants.js"
 import { TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 import { defaultRules, type Rule } from "../../src/permissions.js"
@@ -22,12 +24,15 @@ import { NEW_TOOL, startFakeMcp, UPSTREAM_FAILURE, type FakeMcp } from "../host/
 const root = fileURLToPath(new URL("../..", import.meta.url))
 const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
   name: string
+  version: string
   files: string[]
   exports: Record<string, string>
   devDependencies: Record<string, string>
 }
 // Outside the repository, so nothing resolves from the repository's own node_modules.
-const work = realpathSync(mkdtempSync(join(tmpdir(), "linear-pack-")))
+const work = realpathSync(mkdtempSync(join(realpathSync("/tmp"), "linear-pack-")))
+// A repository root, where OpenCode's search for `.opencode` folders and project config stops.
+run("git", ["init", "--quiet", work], root)
 // Removing the installed packages and binaries can take longer than the default hook timeout.
 afterAll(() => rmSync(work, { recursive: true, force: true }), { timeout: 120_000 })
 
@@ -43,8 +48,10 @@ const SERVER_HOST_MODULES = [/^node:/, /^@opencode\/plugin(?:\/|$)/]
 const TUI_HOST_MODULES = [/^node:/, /^@opencode\/plugin(?:\/|$)/, /^@opentui\//, /^solid-js(?:\/|$)/]
 // The host packages OpenCode 2.2.3 ships; the versions come from devDependencies.
 const HOST_PACKAGES = ["@opencode/plugin", "@opentui/core", "@opentui/solid", "solid-js"]
-// The stock OpenCode releases the package is tested on.
-const HOST_VERSIONS = ["2.2.3", "2.2.4"]
+// The stock OpenCode releases the package is tested on: the one list in src/constants.ts.
+const HOST_VERSIONS = TESTED_HOSTS
+// OpenCode's own agents.
+const BUILT_IN_AGENTS = ["build", "general", "explore", "compaction", "title", "summary", "plan"]
 // Anything a stock host tries on the network goes to a closed port, except loopback.
 const OFFLINE = {
   HTTP_PROXY: "http://127.0.0.1:9",
@@ -201,12 +208,17 @@ describe.each(HOST_VERSIONS)("installed alone, in stock OpenCode %s", (version) 
 
       const { output } = await host.api<{ output: Record<string, unknown> }>("POST", "/api/rpc/linear.workspace/status", { input: {} })
       expect(output).toMatchObject({
+        version: pkg.version,
         access: "read",
         source: { type: "plugin", url: ENDPOINTS.read },
-        agentsWithoutRules: ["reviewer"],
-        host: { version, tested: true },
+        unguardedAgents: ["reviewer"],
+        host: { version, range: SUPPORTED_HOST, tested: true },
         problems: [],
       })
+      // The project's agents are exactly OpenCode's own and the one its config defines: nothing came from a folder
+      // above the temp root.
+      const { data: agents } = await host.api<{ data: { id: string }[] }>("GET", "/api/agent")
+      expect(agents.map((agent) => agent.id).filter((id) => !BUILT_IN_AGENTS.includes(id))).toEqual(["reviewer"])
       const { data: skills } = await host.api<{ data: { id: string; path: string }[] }>("GET", "/api/skill")
       expect(skills.filter((skill) => skill.id.startsWith("linear"))).toMatchObject([{ id: "linear", path: join(installed, "skills", "linear", "SKILL.md") }])
     } catch (error) {
@@ -264,8 +276,9 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     // The server's tools and the fake's new one, plus the plugin's own linear_issues in the same namespace.
     for (const [access, tools] of [["read", READ_TOOLS.length + 2], ["write", READ_TOOLS.length + WRITE_TOOLS.length + 2]] as const) {
       await host.until(`linear is connected in ${access} access with its ${tools} tools`, async () => {
-        const { output } = await host.api<{ output: { connection: string; tools: number } }>("POST", "/api/rpc/linear.workspace/status", { input: {} }, where(access))
-        return output.connection === "connected" && output.tools === tools
+        const { output } = await host.api<{ output: { state: string; tools: number; unknownCount: number } }>("POST", "/api/rpc/linear.workspace/status", { input: {} }, where(access))
+        // Only the fake's new tool is unknown: linear_issues is the plugin's own.
+        return output.state === "connected" && output.tools === tools && output.unknownCount === 1
       })
       const create = async (body: Record<string, unknown>) => {
         const created = await host.api<Record<string, any>>("POST", "/api/session", body, where(access))
@@ -285,7 +298,7 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     await fake?.close()
   }, 60_000)
 
-  test.each(["read", "write"] as const)("in %s access, describes exactly the 42 known reads, each available with its live schema", async (access) => {
+  test.each(["read", "write"] as const)("in %s access, describes exactly the 41 known reads, each available with its live schema", async (access) => {
     const { value } = await script(access, "describe", {})
     expect(value.id).toBe(TOOLS_RPC_ID)
     expect(value.methods.map((method: { name: string }) => method.name)).toEqual([...READ_TOOLS])
@@ -309,6 +322,10 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     const { data: info } = await host.api<{ data: Record<string, any> }>("GET", `/api/session/${sessions[access].build}`, undefined, where(access))
     expect(info.tokens).toMatchObject({ input: 0, output: 0 })
     expect(info.outcome).toBeUndefined()
+  })
+
+  test("gives a result with only text that text as its output too, as docs/scripting.md says", async () => {
+    expect(await call("read", "build", "get_issue", { query: "text" })).toEqual({ value: { output: "text from get_issue", text: "text from get_issue" } })
   })
 
   test("never makes a known write or an unknown tool a method, in write access where OpenCode lists them all", async () => {
