@@ -2,6 +2,61 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- OpenCode 2.2.5 is a tested release, next to 2.2.3 and 2.2.4.
+- Code Mode's catalog now describes the `linear` namespace: what Linear's tools do, whether changes are available and
+  ask first, and that Linear content is untrusted.
+- The status RPC has `version`, the plugin's version, and `host.range`, the supported range.
+- The status RPC declares the error `unavailable`. When status cannot be read, it answers
+  `STATUS_UNAVAILABLE: Could not read Linear's status (…).` with a next step, instead of OpenCode's bare error, and the
+  `/linear` dialog shows both.
+
+### Changed
+
+- The status RPC (`linear.workspace` `status`) uses the field names every plugin of this family shares. Scripts that
+  read it need these changes:
+  - `connection` is now `state`, with the shared states: `pending` is now `connecting`, `needs_sign_in` is now
+    `sign_in_required`, and a `linear` server at another URL than your `access` uses is now `conflict`;
+  - `agentsWithoutRules` is now `unguardedAgents`;
+  - `host.warning` is gone, and the `OpenCode` row says why an untested host runs; `host.version` is `null` when
+    OpenCode reports no version; `host.tested` is true only for 2.2.3, 2.2.4 and 2.2.5;
+  - `unknownTools` holds at most 20 names, only those made of lowercase letters, digits and `_`, and the new
+    `unknownCount` counts every unknown tool;
+  - `error` is set only for a failed connection: OpenCode's reason on one line of at most 160 characters, with any URL
+    cut before its query. Status no longer shows OpenCode's text for a needed sign-in, which can hold an
+    authorization URL.
+- On a release inside `>=2.2.3 <2.3.0` other than 2.2.3, 2.2.4 and 2.2.5, Linear starts as before, and status calls
+  the version untested. The `OpenCode` row reads, for example, `2.2.5 (tested; supported range >=2.2.3 <2.3.0)`.
+- `HOST_UNTESTED`'s next step is now `Use OpenCode >=2.2.3 <2.3.0, or set the plugin option "allowUntestedHost": true
+  to run anyway.`
+- While agents lack the default rules, the next step says the whole fix: put the block first in each listed agent's
+  own `permissions`, followed by your top-level rules for `linear_*` tools. Scripts reading only `nextStep` get it too.
+- The tools RPC's `describe` accepts only `{}` or nothing, and otherwise answers `describe takes no input`. An envelope
+  that is not an object gets one plain message, a refusal names the action that was refused, and a call during which
+  Linear reconnects answers `CONNECTING` instead of `CONNECTION_FAILED`. `docs/scripting.md` lists the envelope
+  messages.
+
+### Fixed
+
+- Linear's read-only server no longer lists `whoami`, but the plugin still counted it as one of 42 known reads: the
+  tools RPC's `whoami` method always answered `TOOL_UNAVAILABLE`, and the `linear` skill told the model to call it.
+  The known reads are now exactly the 41 tools that server lists, so `whoami` is no longer a method of the tools RPC
+  or allowed by the default rules; if Linear serves it again, it asks before it runs. The skill and the docs use
+  `get_user` with `query` `"me"` for the signed-in user, and `describe` shows which methods the server for your access
+  lists now.
+- The README's Uninstall steps failed: once the plugin was removed and OpenCode reloaded, `opencode mcp logout linear`
+  answered "MCP server not found", and the sign-ins stayed in OpenCode's credential store, including the other
+  access's, which that command never reaches. Uninstall now signs out first, of both accesses, checks with
+  `opencode auth list`, then removes the plugin.
+- The README now says what to do after `opencode plugin add` (run `opencode reload`, then `/linear-status`) and how to
+  update the plugin.
+- `docs/scripting.md` said `opencode api` runs in the directory you call it from. It runs in the OpenCode service's
+  default location, your home directory; the doc now says how to target a project. It also says that `opencode api`
+  exits with status 1 for an RPC error, and that a result with only text has that text as its `output`.
+
 ## [0.0.1] - 2026-11-03
 
 ### Added
