@@ -7,7 +7,8 @@ Unofficial; not affiliated with Linear.
 
 ## Requirements
 
-- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3 and 2.2.4.
+- OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4 and 2.2.5. Outside that range the plugin does not start, unless
+  you set `allowUntestedHost`.
 - macOS or Linux.
 - A Linear account.
 
@@ -17,9 +18,16 @@ Unofficial; not affiliated with Linear.
 opencode plugin add @joe-broadhead/opencode-linear
 ```
 
-Restart OpenCode if it is running. The plugin registers Linear's MCP server under the name `linear`, adds default
-permission rules, the `/linear-status` command, the `/linear` status view and two skills. It adds no tools of its own:
-the tools are Linear's, and OpenCode handles the connection, the sign-in and the stored credentials.
+Run `opencode reload`, or restart OpenCode. Then run `/linear-status`: it shows `sign-in required` until you sign in
+(see [Sign in](#sign-in)).
+
+The plugin registers Linear's MCP server under the name `linear`, adds default permission rules, the `/linear-status`
+command, the `/linear` status view and two skills. It adds no tools of its own: the tools are Linear's, and OpenCode
+handles the connection, the sign-in and the stored credentials.
+
+**Update** with `opencode plugin update @joe-broadhead/opencode-linear`, then run `opencode reload`. An entry pinned
+to a version, such as `@joe-broadhead/opencode-linear@0.0.1`, does not update: remove the `@version` from its
+`plugins` entry first.
 
 ## Sign in
 
@@ -38,7 +46,8 @@ OpenCode shows its "MCP server needs authentication" notice.
 
 To sign out, or to change workspace, run `opencode mcp logout linear` while the access you want to change is the one
 configured. It removes the stored sign-ins for that access only. Or remove the account in `/connect` → Linear. Then
-sign in again and pick the workspace on Linear's consent page.
+sign in again and pick the workspace on Linear's consent page. To sign out of both before you remove the plugin, see
+[Uninstall](#uninstall).
 
 ## Use
 
@@ -76,7 +85,7 @@ The plugin adds these rules to every agent, directly after the agent's base rule
 
 1. `{ "action": "linear_*", "resource": "*", "effect": "ask" }`: every Linear tool asks, including tools Linear adds
    later.
-2. One `allow` rule for each of Linear's 42 read tools, listed in
+2. One `allow` rule for each of Linear's 41 read tools, listed in
    [`src/linear-tools.ts`](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/src/linear-tools.ts). These
    run without a prompt.
 
@@ -103,7 +112,7 @@ Set options with the object form of the plugin entry:
 | Option | Values | Default | Effect |
 | --- | --- | --- | --- |
 | `access` | `"read"` or `"write"` | `"read"` | `"read"` uses Linear's read-only server and the `read` scope. `"write"` uses `https://mcp.linear.app/mcp` with `read write`, and adds the `linear-write` skill. |
-| `allowUntestedHost` | `true` or `false` | `false` | Starts on an OpenCode version outside the tested line, with a warning in status. |
+| `allowUntestedHost` | `true` or `false` | `false` | Starts on an OpenCode version outside `>=2.2.3 <2.3.0`, with a warning in status. |
 
 Switching `access` changes the server address, and read and write access each have their own sign-in. If you have
 never signed in with the new access, run `/connect` and choose Linear, then press `o` or Enter to open the link. If you
@@ -145,12 +154,12 @@ Run `/linear-status` first. Its last line is the next step.
 | Connection: conflict | Your config has an `mcp.servers.linear` entry with a URL other than the one your `access` uses. Point it at that URL or remove it, then restart OpenCode. |
 | Tools: unknown | Linear added tools the plugin does not know yet. They ask before they run. |
 | Agents without default rules | Put the printed block first in each listed agent's own `permissions`, followed by your top-level rules for `linear_*` tools. |
-| OpenCode: host untested | OpenCode is outside `>=2.2.3 <2.3.0` and `allowUntestedHost` is set. If Linear misbehaves, use a tested OpenCode. |
+| OpenCode: untested | OpenCode is not 2.2.3, 2.2.4 or 2.2.5. Inside `>=2.2.3 <2.3.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If Linear misbehaves, use a tested release. |
 | Signed in to the wrong workspace, for example after switching `access` | Read and write access each have their own sign-in, and Linear's consent page decides the workspace. With the wrong access still configured, run `opencode mcp logout linear` (or remove the account in `/connect` → Linear), then sign in again and pick the workspace. |
 | A Linear tool is refused in `opencode run` | Nobody could answer its prompt. Add an `allow` rule for that tool. |
 | `/linear` is missing | The plugin did not start. Run `/plugins` to see the error. |
 | `OPTIONS_INVALID` | An option is unknown or has a wrong value. The message names the option and the accepted values. |
-| `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.3.0`. Use a tested OpenCode, or set `"allowUntestedHost": true` to try anyway. |
+| `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.3.0`, so the plugin did not start. Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true` to run anyway. |
 | `STATUS_UNAVAILABLE` | The status could not be read, or the plugin is not running. Follow the next step in the message. |
 | `SKILLS_INVALID` | A skill file in the package is missing or broken. Reinstall the plugin. |
 
@@ -159,10 +168,21 @@ A script's errors from the tools RPC have their own codes, listed in
 
 ## Uninstall
 
-```sh
-opencode plugin remove @joe-broadhead/opencode-linear
-opencode mcp logout linear
-```
+Sign out while the plugin is still installed: once it is removed, OpenCode no longer knows the `linear` server, so
+`opencode mcp logout linear` fails with `MCP server not found: linear` and the sign-ins stay in OpenCode's credential
+store. Read access and write access each have their own sign-in, and OpenCode signs out only the one for the `access`
+configured now.
+
+1. Sign out: `opencode mcp logout linear`. Right after OpenCode starts or reloads, it can answer
+   `MCP server not found: linear` for a few seconds; wait, then run it again.
+2. If you ever used the other access, sign out of it too. Set `"access"` in the plugin's `plugins` entry in
+   `opencode.json` to the other value (`"write"`, or `"read"`, the default), for example
+   `{ "package": "@joe-broadhead/opencode-linear", "options": { "access": "write" } }`, run `opencode reload`, then
+   run `opencode mcp logout linear` again.
+3. Check: `opencode auth list` no longer lists **Linear**.
+4. Remove the plugin: `opencode plugin remove @joe-broadhead/opencode-linear`, then `opencode reload`.
+   `opencode mcp list` no longer lists `linear`.
+5. Remove any Linear rules you copied into your agents' own `permissions`.
 
 ## Links
 

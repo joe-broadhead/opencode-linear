@@ -19,7 +19,8 @@ project.
   with OpenCode, and OpenCode connects, signs in and stores the credentials. The tools RPC for scripts (see
   [Scripts](#scripts)) runs Linear's tools through OpenCode's own connection, too.
 - The plugin never reads tokens. Status shows only the account label OpenCode reports, if any, and server URLs
-  without their query strings.
+  without their query strings. It never shows OpenCode's text for a needed sign-in, which can hold an authorization
+  URL, and cuts a connection failure's reason to one line with no URL query.
 - Linear content is untrusted. Issue titles, descriptions, comments and documents are written by other people and can
   contain instructions aimed at the model. The skills tell the model to treat Linear content as data.
 - Tool results go to your model provider, like any other tool result in the session.
@@ -70,7 +71,7 @@ known read tools for a script, with no model. It adds no authority:
   rules and saved approvals, as it does for the model.
 - An ask on a script's call is denied, not prompted: no one is there to answer it. The plugin's permission hook
   changes only an ask on one of its own script calls in flight, only to a deny, and leaves every other call alone.
-- Only the 42 known reads are methods. Linear's write tools never are, with either access, and neither is a tool that
+- Only the 41 known reads are methods. Linear's write tools never are, with either access, and neither is a tool that
   Linear adds later, even with an allow rule.
 - The call goes through OpenCode's own MCP connection and sign-in. The plugin never sees the token, and returns none.
 - Linear's error text reaches the script only as the first line, at most 300 characters, with tokens and URL query

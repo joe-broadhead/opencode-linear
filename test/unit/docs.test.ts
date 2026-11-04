@@ -1,0 +1,50 @@
+// The docs and skills state the tool counts and list the tools RPC's methods. They must match src/linear-tools.ts, so
+// a change to the tool lists cannot leave a stale count or method behind.
+import { describe, expect, test } from "bun:test"
+import { readdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
+
+const ROOT = fileURLToPath(new URL("../..", import.meta.url))
+// Everything a user or the model reads about the current release. CHANGELOG keeps the counts of past releases.
+const FILES = [
+  "README.md",
+  "SECURITY.md",
+  "CONTRIBUTING.md",
+  ...readdirSync(join(ROOT, "docs")).map((name) => `docs/${name}`),
+  ...readdirSync(join(ROOT, "skills")).map((name) => `skills/${name}/SKILL.md`),
+]
+const text = (file: string) => readFileSync(join(ROOT, file), "utf8").replace(/\s+/g, " ")
+
+describe("docs", () => {
+  test.each(FILES)("%s states the current number of read and write tools", (file) => {
+    const reads = [...text(file).matchAll(/\b(\d+) (?:known )?read(?:s| tools)\b/g)].map((match) => Number(match[1]))
+    const writes = [...text(file).matchAll(/\b(\d+) (?:known )?write(?:s| tools)\b/g)].map((match) => Number(match[1]))
+    expect(reads.filter((count) => count !== READ_TOOLS.length)).toEqual([])
+    expect(writes.filter((count) => count !== WRITE_TOOLS.length)).toEqual([])
+  })
+
+  test.each(FILES)("%s names no tool Linear no longer serves", (file) => {
+    expect(text(file).match(/whoami/g) ?? []).toEqual([])
+  })
+
+  // Once the plugin is removed and OpenCode reloads, `mcp logout linear` finds no server, and each access keeps its own
+  // sign-in: the README signs out of both first, then removes the plugin.
+  test("the README's Uninstall signs out of both accesses before it removes the plugin", () => {
+    const uninstall = /## Uninstall(.*?)## Links/.exec(text("README.md"))?.[1] ?? ""
+    const at = (needle: string, from = 0) => uninstall.indexOf(needle, from)
+    const first = at("opencode mcp logout linear")
+    const other = at('"access"', first)
+    const second = at("opencode mcp logout linear", other)
+    expect([first, other, second].every((index) => index >= 0)).toBe(true)
+    expect(at("opencode reload", other)).toBeLessThan(second)
+    expect(at("opencode auth list", second)).toBeGreaterThan(second)
+    expect(at("opencode plugin remove @joe-broadhead/opencode-linear")).toBeGreaterThan(at("opencode auth list", second))
+  })
+
+  test("the scripting guide lists exactly the known reads as methods", () => {
+    const list = /\(`READ_TOOLS` in `src\/linear-tools\.ts`\): (.*?)\. /.exec(text("docs/scripting.md"))?.[1] ?? ""
+    expect([...list.matchAll(/`([a-z_]+)`/g)].map((match) => match[1])).toEqual([...READ_TOOLS])
+  })
+})

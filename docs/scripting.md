@@ -7,26 +7,26 @@ OpenCode server. It uses the tools RPC, `linear.workspace.tools`, through `openc
 
 | Method | The tool |
 | --- | --- |
-| one per known read, named after Linear's tool: `list_issues`, `get_issue`, `list_projects`, `whoami` and the others | `linear_<method>`, such as `linear_list_issues` |
+| one per known read, named after Linear's tool: `list_issues`, `get_issue`, `list_projects`, `get_user` and the others | `linear_<method>`, such as `linear_list_issues` |
 | `describe` | none: lists the methods, their permission actions, whether OpenCode lists each tool now, and each tool's input as JSON Schema |
 
-The methods are exactly Linear's 42 read tools that the plugin knows, the ones its default rules allow
+The methods are exactly Linear's 41 read tools that the plugin knows, the ones its default rules allow
 (`READ_TOOLS` in `src/linear-tools.ts`): `extract_images`, `get_agent_skill`, `get_attachment`, `get_diff`,
 `get_diff_threads`, `get_document`, `get_initiative`, `get_issue`, `get_issue_status`, `get_milestone`,
 `get_notifications`, `get_project`, `get_release`, `get_release_note`, `get_status_updates`, `get_team`,
 `get_template`, `get_triage_responsibility`, `get_user`, `get_workspace`, `list_agent_skills`, `list_comments`,
 `list_custom_views`, `list_cycles`, `list_diffs`, `list_documents`, `list_initiative_labels`, `list_initiatives`,
 `list_issue_labels`, `list_issue_statuses`, `list_issues`, `list_milestones`, `list_project_labels`, `list_projects`,
-`list_release_notes`, `list_release_pipelines`, `list_releases`, `list_teams`, `list_templates`, `list_users`,
-`search_documentation` and `whoami`.
+`list_release_notes`, `list_release_pipelines`, `list_releases`, `list_teams`, `list_templates`, `list_users` and
+`search_documentation`. They are the tools Linear's read-only server lists.
 
 Each method runs the tool with the same input: Linear's own tool, through OpenCode's own connection and sign-in. The
 plugin never sees the OAuth token. Linear's write tools, such as `save_issue` or `save_comment`, are never methods,
 even with `access: "write"` and an allow rule. Neither is a tool that Linear adds later.
 
 The methods work the same with either access. With `access: "read"` (the default) they call Linear's read-only
-server, and with `access: "write"` the full one; both list every known read. The calls use the sign-in of the server
-that the plugin registered for the access you chose.
+server, and with `access: "write"` the full one. `describe` shows which methods the server for your access lists now.
+The calls use the sign-in of the server that the plugin registered for the access you chose.
 
 ## A script runs as a session
 
@@ -38,7 +38,7 @@ access its model would have:
 - OpenCode then checks the call itself, as it does for the model: the agent's rules, the session's rules, then saved
   approvals.
 - No one answers a prompt for a script, so an `ask` is refused with `PERMISSION_DENIED` at once, and no prompt is left
-  waiting. The plugin's default rules allow the 42 reads, so an agent with the default rules needs nothing more. An
+  waiting. The plugin's default rules allow the 41 reads, so an agent with the default rules needs nothing more. An
   agent defined only in your config gets no default rules; `/linear-status` names it.
 
 Create the session once, with the agent the script runs as, and keep its id:
@@ -71,22 +71,29 @@ opencode api post /api/rpc/linear.workspace.tools/get_issue -d '{"input":{
 ```
 
 The tool's input is Linear's, and Linear defines its fields: `describe` shows each tool's schema as OpenCode lists it
-now. Check it rather than guess a field name.
+now. Check it rather than guess a field name. For example, `get_user` takes `query`, and `"me"` names the signed-in
+user:
+
+```sh
+opencode api post /api/rpc/linear.workspace.tools/get_user -d '{"input":{"sessionID":"ses_…","input":{"query":"me"}}}'
+```
 
 ```sh
 opencode api post /api/rpc/linear.workspace.tools/describe -d '{"input":{}}'
 ```
 
-A result is `{"output": {"output": <the tool's structured content, if any>, "text": <the tool's text>}}`, as plain
-JSON. Linear content in it is untrusted data, written by other people.
+A result is `{"output": {"output": <the tool's structured content, or its text when it has none>, "text": <the tool's
+text>}}`, as plain JSON. Linear content in it is untrusted data, written by other people.
 
-The calls run on the OpenCode instance of the directory where you run `opencode api`, with that directory's plugin
-options and its `linear` connection. The session may belong to another directory.
+`opencode api` calls run in the OpenCode service's default location, your home directory, whatever directory you run
+them from. They use that location's plugin options, from your global config, and its `linear` connection. To call a
+project whose own config sets other options, call the HTTP API with `?location[directory]=<dir>`. The session may
+belong to another directory.
 
 ## Errors
 
 A refusal or failure is the RPC error `failed`, with a message `CODE: what happened. Next step: what to do.` and
-`data: { code, next }`.
+`data: { code, next }`. `opencode api` exits with status 1 for any RPC error, after printing the error's JSON to standard output.
 
 | Code | When |
 | --- | --- |
@@ -99,13 +106,22 @@ A refusal or failure is the RPC error `failed`, with a message `CODE: what happe
 | `UPSTREAM_ERROR` | Linear answered with an error, such as an invalid input or an item that does not exist. The message holds the first line of Linear's text, at most 300 characters, with tokens and URL query strings removed. |
 | `CANCELLED` | The request was cancelled. |
 
-OpenCode itself answers `rpc.invalid_input` for a body that is not the envelope above, and `rpc.method_not_found` for
-a method that does not exist, such as a write tool or a tool Linear added later.
+OpenCode itself answers `rpc.method_not_found` for a method that does not exist, such as a write tool or a tool Linear
+added later, and `rpc.invalid_input` for a body that is not the envelope above, with one message per problem:
+
+| Problem | Message |
+| --- | --- |
+| The envelope is not an object | `the envelope must be an object, such as {"sessionID":"<session>","input":<the tool's input>}` |
+| A key other than `sessionID` and `input` | `"extra" is not allowed`, naming the key |
+| `sessionID` missing, not a string, or empty | `"sessionID" must be a non-empty string` |
+| `input` missing | `"input" is missing` |
+| `input` not an object | `"input" must be an object` |
+| `describe` given anything but `{}` or nothing | `describe takes no input` |
 
 ## What scripts cannot do
 
 - Change anything in Linear: no write tool is a method, with either access.
-- Call a tool that is not one of the 42 known reads, even with an allow rule.
+- Call a tool that is not one of the 41 known reads, even with an allow rule.
 - Answer an approval prompt, or use a tool that asks.
 - Use a token: the plugin has none to give.
 
