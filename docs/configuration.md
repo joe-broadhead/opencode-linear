@@ -39,7 +39,7 @@ Linear's consent page decides the workspace of each one, so the two can be in di
 - Switching to an access you have never signed in with: run `/connect` and choose Linear, then press `o` or Enter to
   open the link. In a terminal, `opencode mcp auth linear` opens it automatically.
 - Switching to an access you signed in with before: OpenCode reuses that sign-in without asking, in whatever
-  workspace it was made. `/linear-status` shows the account.
+  workspace it was made. Ask the model which Linear workspace it is connected to; Linear's `get_workspace` answers.
 - Changing the workspace of one access: with that access configured, run `opencode mcp logout linear` in the project
   where the plugin is configured. It removes every stored sign-in for the current `linear` address, and leaves the
   other access's sign-in alone. Or remove the account in `/connect` → Linear. Then sign in again and pick the
@@ -202,7 +202,7 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 | --- | --- | --- |
 | `OPTIONS_INVALID` | Setup: an option is unknown or has a wrong value. `/plugins` shows the message, which names the option and the accepted values. | Fix the plugin options in `opencode.json`. |
 | `HOST_UNTESTED` | Setup: OpenCode is outside `>=2.2.3 <2.3.0`, and `allowUntestedHost` is not set. | Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true`. |
-| `STATUS_UNAVAILABLE` | `/linear-status`, `/linear` or the status RPC: the status could not be read, or the plugin is not running on the server. The RPC answers with its error `unavailable`. | Restart OpenCode, or run `/plugins` to see why the plugin did not start. |
+| `STATUS_UNAVAILABLE` | `/linear-status`, `/linear` or the status RPC: the status could not be read, or the plugin is not running on the server. The RPC answers with its error `unavailable`. | The message's own next step: restart OpenCode and run the command again, or, when the plugin is not running, run `/plugins` to see why. |
 | `SKILLS_INVALID` | Setup: a skill file is missing or broken. The plugin still starts; status shows the problem. | Reinstall the plugin. |
 | `SERVER_NOT_REGISTERED` | Setup: the `linear` server could not be registered. Status shows the problem. | Restart OpenCode. |
 | `RULES_NOT_ADDED` | Setup: the default permission rules could not be added, so Linear tools may run without asking. Status shows the problem. | Restart OpenCode. |

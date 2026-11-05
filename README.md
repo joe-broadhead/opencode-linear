@@ -124,8 +124,8 @@ Set options with the object form of the plugin entry:
 
 Switching `access` changes the server address, and read and write access each have their own sign-in. If you have
 never signed in with the new access, run `/connect` and choose Linear, then press `o` or Enter to open the link. If you
-have, OpenCode reuses that sign-in, which may be in another workspace: check the account with `/linear-status`, and
-see [Sign in](#sign-in) to change it.
+have, OpenCode reuses that sign-in, which may be in another workspace. Ask the model which Linear workspace it is
+connected to; Linear's `get_workspace` answers. See [Sign in](#sign-in) to change it.
 
 [docs/configuration.md](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/configuration.md) has the
 details, including your own `mcp.servers.linear` entry, permission recipes and every error.

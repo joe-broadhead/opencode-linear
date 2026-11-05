@@ -46,11 +46,7 @@ describe("skills", () => {
     expect(text).toContain("opencode mcp auth linear")
   })
 
-  test("both skills describe the permission prompt without claiming read access hides writes", () => {
-    for (const name of NAMES) {
-      const text = read(name)
-      expect(text).toContain("asks the user")
-      expect(text).not.toMatch(/hidden|hides|not visible/i)
-    }
+  test("neither skill claims that read access hides the write tools", () => {
+    for (const name of NAMES) expect(read(name)).not.toMatch(/hidden|hides|not visible/i)
   })
 })

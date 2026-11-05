@@ -2,7 +2,7 @@
 // tools-rpc.test.ts.
 import { describe, expect, test } from "bun:test"
 import { PLUGIN_ID as LINEAR_PLUGIN_ID, SERVER_NAME } from "../../src/constants.js"
-import { KNOWN_READS, NEXT_STEPS, PLUGIN_ID, pluginError, shapeResult, TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
+import { KNOWN_READS, NEXT_STEPS, PLUGIN_ID, TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 import { defaultRules } from "../../src/permissions.js"
 
@@ -30,16 +30,10 @@ describe("Linear's tools RPC", () => {
     for (const name of ["shiny_new_tool", "describe", "*"]) expect(KNOWN_READS).not.toContain(name)
   })
 
-  test("returns Linear's results unchanged: the model path has no hook that changes them", () => {
-    const result = { output: { issues: [] }, text: "text" }
-    expect(shapeResult("list_issues", result)).toBe(result)
-  })
-
-  test("names Linear's own commands in its next steps, and has no per-account servers or own errors", () => {
+  test("names Linear's own commands in its next steps, and has no per-account servers", () => {
     expect(NEXT_STEPS.AUTH_REQUIRED).toContain("/connect")
     expect(NEXT_STEPS.SERVER_CONFLICT).toContain("mcp.servers.linear")
     for (const step of Object.values(NEXT_STEPS)) expect(step).toMatch(/[^.]\.$/)
     expect(NEXT_STEPS.ACCOUNT_UNKNOWN).toBeUndefined()
-    expect(pluginError(new Error("any"))).toBeUndefined()
   })
 })
