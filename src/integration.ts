@@ -10,7 +10,7 @@ export interface IntegrationContext {
 type Registration = Awaited<ReturnType<Plugin.Context["integration"]["transform"]>>
 
 /** What `/connect` shows on the account while Linear's server needs a new sign-in. */
-export const SIGN_IN_AGAIN = "Linear needs a new sign-in. Choose this account to sign in again."
+const SIGN_IN_AGAIN = "Linear needs a new sign-in. Choose this account to sign in again."
 
 const STARTUP_POLL_MS = 250
 const STARTUP_WINDOW_MS = 10_000

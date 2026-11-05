@@ -1,7 +1,7 @@
 // The /connect entry: renamed "Linear" once the host has registered it and again after the host resets it, and the
 // account marked for a new sign-in while the server needs one. Against a narrow fake of the members the watcher uses.
 import { describe, expect, test } from "bun:test"
-import { SIGN_IN_AGAIN, watchIntegration, type IntegrationContext } from "../../src/integration.js"
+import { watchIntegration, type IntegrationContext } from "../../src/integration.js"
 
 type Editor = Parameters<Parameters<IntegrationContext["integration"]["transform"]>[0]>[0]
 type Connection = { type: "credential"; id: string; label: string; method: "oauth"; status?: { status: "needs_auth"; message: string } }
@@ -63,6 +63,8 @@ function fake(initial: { server?: string; integrationID?: string } = {}) {
   const settle = () => new Promise((resolve) => setTimeout(resolve, 30))
   return { ctx, state, transforms, reported, name, emit: () => push?.(), settle }
 }
+
+const SIGN_IN_AGAIN = "Linear needs a new sign-in. Choose this account to sign in again."
 
 describe("watchIntegration", () => {
   test("names the server's /connect entry Linear once the host has registered it", async () => {

@@ -2,8 +2,10 @@
 // the server's RPC, refreshes while open, and cleanup.
 import { describe, expect, test } from "bun:test"
 import { checkHost } from "../../src/host-version.js"
-import { buildStatus, formatStatus, SIGN_IN, StatusRpc, type Status } from "../../src/status.js"
-import tui, { setupView, TUI_ID, viewMessage, type ViewContext } from "../../src/tui.js"
+import { buildStatus, formatStatus, StatusRpc, type Status } from "../../src/status.js"
+import tui, { setupView, viewMessage, type ViewContext } from "../../src/tui.js"
+
+const SIGN_IN = "Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth linear opens it automatically)."
 
 const status = (overrides: Partial<Parameters<typeof buildStatus>[0]> = {}): Status =>
   buildStatus({ server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp/readonly" }, access: "read", host: checkHost("2.2.3", false), ...overrides })
@@ -62,7 +64,6 @@ const refreshKey = (layers: unknown[]) => (layers[0] as { commands: Command[] })
 describe("TUI plugin", () => {
   test("the TUI entry is the status view with its stable ID", () => {
     expect(tui.id).toBe("linear.workspace.tui")
-    expect(TUI_ID).toBe("linear.workspace.tui")
     expect(tui.setup).toBe(setupView as never)
   })
 

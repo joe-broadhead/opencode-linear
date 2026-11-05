@@ -11,15 +11,13 @@ import type { Status } from "./status.js"
  */
 
 export const ISSUES_TOOL = "issues"
-/** The tool's id and permission action. */
-export const ISSUES_ACTION = `${SERVER_NAME}_${ISSUES_TOOL}`
 const LIST = `${SERVER_NAME}_list_issues`
 const DEFAULT_LIMIT = 25
 const MAX_LIMIT = 100
 /** Only what the table shows: Linear otherwise sends every issue's description and dates. */
-export const FIELDS = ["id", "title", "status", "priority", "url"]
+const FIELDS = ["id", "title", "status", "priority", "url"]
 
-export const COLUMNS = [
+const COLUMNS = [
   { key: "identifier", label: "Issue" },
   { key: "title", label: "Title" },
   { key: "state", label: "State" },
@@ -27,7 +25,7 @@ export const COLUMNS = [
   { key: "url", label: "Link" },
 ] as const
 
-export type IssueRow = { identifier: string; title: string; state: string | null; priority: string | null; url: string | null }
+type IssueRow = { identifier: string; title: string; state: string | null; priority: string | null; url: string | null }
 
 type ToolList = Plugin.Context["tool"]["list"]
 type Executor = Awaited<ReturnType<ToolList>>[number]
@@ -72,7 +70,7 @@ export function issueRows(output: unknown): { rows: IssueRow[]; more: boolean } 
 }
 
 /** What the model reads: one line per row, and whether this is all of them. Jelly draws the structured output. */
-export function issuesText(rows: readonly IssueRow[], more: boolean) {
+function issuesText(rows: readonly IssueRow[], more: boolean) {
   const lines = rows.map((row) => [row.identifier, row.title, row.state ?? "no state", row.priority ?? "no priority", row.url ?? "no link"].join(" | "))
   const tail = more
     ? `Linear has more assigned issues than these ${rows.length}, the most recently updated. This is not a count: for totals or one state, call list_issues with assignee "me" and the filters, and page until hasNextPage is false.`
@@ -92,7 +90,7 @@ async function unavailable(status: () => Promise<Status>) {
   return linearError("TOOL_UNAVAILABLE", `OpenCode does not list Linear's list_issues${state}.`, next)
 }
 
-export interface IssuesToolOptions {
+interface IssuesToolOptions {
   readonly tool: Pick<Plugin.Context["tool"], "list">
   /** False while `linear` is a server of the user's that is not Linear's for this access. */
   readonly owned: () => boolean
