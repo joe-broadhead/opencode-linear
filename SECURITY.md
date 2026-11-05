@@ -15,9 +15,10 @@ project.
 
 ## Data handling
 
-- The plugin adds no tools, runs no network requests of its own and stores nothing. It registers Linear's MCP server
-  with OpenCode, and OpenCode connects, signs in and stores the credentials. The tools RPC for scripts (see
-  [Scripts](#scripts)) runs Linear's tools through OpenCode's own connection, too.
+- The plugin adds one read tool, `linear_issues`, which calls Linear's `list_issues` through OpenCode. It runs no
+  network requests of its own and stores nothing. It registers Linear's MCP server with OpenCode, and OpenCode
+  connects, signs in and stores the credentials. The tools RPC for scripts (see [Scripts](#scripts)) runs Linear's
+  tools through OpenCode's own connection, too.
 - The plugin never reads tokens. Status shows only the account label OpenCode reports, if any, and server URLs
   without their query strings. It never shows OpenCode's text for a needed sign-in, which can hold an authorization
   URL, and cuts a connection failure's reason to one line with no URL query.
@@ -40,8 +41,9 @@ What the model can do in Linear is limited by three layers, in this order:
    The two servers have different addresses, so each needs its own sign-in. If you define `mcp.servers.linear`
    yourself, the plugin adopts it only at the URL for your `access`.
 2. **Default permission rules.** Every Linear tool asks before it runs, except Linear's read tools listed in
-   `src/linear-tools.ts`. Reads, `linear_extract_images` included, run without a prompt. To review each image fetch,
-   add `{ "action": "linear_extract_images", "resource": "*", "effect": "ask" }` to your `permissions`.
+   `src/linear-tools.ts`, and the plugin's own `linear_issues`. Reads, `linear_extract_images` included, run without a
+   prompt. To review each image fetch, add `{ "action": "linear_extract_images", "resource": "*", "effect": "ask" }`
+   to your `permissions`.
 3. **Your OpenCode permissions.** Your `permissions` rules and saved "Always allow" answers override the default
    rules. A `deny` you configure always wins.
 

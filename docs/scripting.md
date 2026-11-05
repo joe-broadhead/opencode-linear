@@ -1,7 +1,5 @@
 # Scripting
 
-Unofficial plugin. Not affiliated with Linear.
-
 A script can call Linear's read tools with no model: a cron job, a shell script, or any program that can reach the
 OpenCode server. It uses the tools RPC, `linear.workspace.tools`, through `opencode api` or an OpenCode client.
 
