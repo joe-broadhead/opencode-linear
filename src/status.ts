@@ -60,14 +60,14 @@ export interface Status {
 
 export const SIGN_IN = `Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth ${SERVER_NAME} opens it automatically).`
 
-/** The fix for agents defined only in user config, which never receive the inserted rules: the block, one rule a line. */
-export const AGENTS_FIX = [
-  `Put this block first in each listed agent's own "permissions" (agents.<id>.permissions in opencode.json, or the agent file's frontmatter), followed by your top-level "permissions" rules for linear_* tools:`,
-  ...defaultRules().map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`),
-].join("\n")
+/** The default rules to paste into an agent's own permissions, one rule a line, as a JSON array body. */
+export const AGENT_RULES = defaultRules()
+  .map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`)
+  .join("\n")
 
-/** The next step while agents lack the rules. It stands alone in the RPC, so it repeats the fix's order. */
-export const AGENTS_NEXT_STEP = `Put the block first in each listed agent's own "permissions", followed by your top-level rules for linear_* tools.`
+/** The next step while agents lack the rules: the family's one fixed sentence. */
+export const AGENTS_NEXT_STEP =
+  "Put the default rules shown by /linear-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Linear tools."
 
 export const NOTHING_TO_DO = "Nothing to do."
 
@@ -188,7 +188,7 @@ export function formatStatus(status: Status) {
     `- Account: ${status.account ?? "account name not reported by Linear's MCP"}`,
     `- Access: ${ACCESS_TEXT[status.access]}`,
     `- Tools: ${toolsText(status)}`,
-    `- Agents without default rules: ${agents.length ? `${agents.join(", ")}. Linear tools run there without asking. ${AGENTS_FIX}` : "none"}`,
+    `- Agents without default rules: ${agents.length ? `${agents.join(", ")}\n${AGENT_RULES}` : "none"}`,
     `- OpenCode: ${hostText(status)}`,
     `- Next step: ${status.nextStep}`,
   ].join("\n")

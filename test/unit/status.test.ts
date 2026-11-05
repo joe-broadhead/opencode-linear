@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { checkHost } from "../../src/host-version.js"
 import { defaultRules } from "../../src/permissions.js"
-import { AGENTS_FIX, AGENTS_NEXT_STEP, buildStatus, NOTHING_TO_DO, formatStatus, readStatus, registerStatusCommand, registerStatusRpc, shortReason, SIGN_IN, StatusRpc, type Status, type StatusContext, type StatusFacts } from "../../src/status.js"
+import { AGENT_RULES, AGENTS_NEXT_STEP, buildStatus, NOTHING_TO_DO, formatStatus, readStatus, registerStatusCommand, registerStatusRpc, shortReason, SIGN_IN, StatusRpc, type Status, type StatusContext, type StatusFacts } from "../../src/status.js"
 import { VERSION } from "../../src/version.js"
 import { allow } from "./fake.js"
 
@@ -112,14 +112,15 @@ describe("buildStatus", () => {
   test("names agents without the default rules, with the block to paste, and points the next step at it", () => {
     const status = buildStatus({ ...base, access: "write", agents: [guarded, { id: "reviewer", permissions: [allow("*")] }] })
     expect(status.unguardedAgents).toEqual(["reviewer"])
-    expect(status.nextStep).toBe(`Put the block first in each listed agent's own "permissions", followed by your top-level rules for linear_* tools.`)
+    expect(status.nextStep).toBe(
+      "Put the default rules shown by /linear-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Linear tools.",
+    )
     expect(status.nextStep).toBe(AGENTS_NEXT_STEP)
-    expect(AGENTS_FIX).toContain(`first in each listed agent's own "permissions"`)
-    expect(AGENTS_FIX).toContain(`followed by your top-level "permissions" rules for linear_* tools`)
     // One rule a line, as a JSON array body that pastes into a permissions list.
-    expect(JSON.parse(`[${AGENTS_FIX.split("\n").slice(1).join("\n")}]`)).toEqual(defaultRules())
+    expect(JSON.parse(`[${AGENT_RULES}]`)).toEqual(defaultRules())
     const text = formatStatus(status)
-    expect(text).toContain(`- Agents without default rules: reviewer. Linear tools run there without asking. ${AGENTS_FIX}\n`)
+    // The row lists the names only, then the rules.
+    expect(text).toContain(`- Agents without default rules: reviewer\n${AGENT_RULES}\n- OpenCode:`)
     expect(text.indexOf("- Agents without")).toBeLessThan(text.indexOf("- OpenCode:"))
     expect(text.indexOf("- Tools:")).toBeLessThan(text.indexOf("- Agents without"))
   })
@@ -138,7 +139,7 @@ describe("buildStatus", () => {
     expect(status.nextStep).toBe(SIGN_IN)
     const text = formatStatus(status)
     expect(text).toContain(`- Connection: sign-in required (${READ_URL}, registered by this plugin)`)
-    expect(text).toContain("- Agents without default rules: reviewer.")
+    expect(text).toContain("- Agents without default rules: reviewer\n")
     expect(text.match(/Next step/g)).toHaveLength(1)
   })
 

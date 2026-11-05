@@ -102,8 +102,8 @@ agent's own stricter rules (Plan cannot edit, Explore cannot use Linear), your `
 your saved "Always allow" answers. In an unattended run such as `opencode run`, a tool that asks is refused.
 
 Agents that exist only in your own config, and agents added by plugins that load later, are created after the plugin
-adds its rules, so Linear tools run there without asking. `/linear-status` and `/linear` name those agents and print
-the block to put first in each one's own `permissions`. Do not put it in the top-level `permissions`, which would
+adds its rules, so Linear tools run there without asking. `/linear-status` and `/linear` name those agents and show
+the default rules to put first in each one's own `permissions`. Do not put them in the top-level `permissions`, which would
 loosen Explore. [Configuration](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/configuration.md#permissions)
 has a worked example and permission recipes.
 
@@ -161,7 +161,7 @@ Run `/linear-status` first. Its last line is the next step.
 | Connection: not configured | An organisation policy (`mcp.use`) or another plugin removes the `linear` server. Ask your administrator, then restart OpenCode. |
 | Connection: conflict | Your config has an `mcp.servers.linear` entry with a URL other than the one your `access` uses. Point it at that URL or remove it, then restart OpenCode. |
 | Tools: unknown | Linear added tools the plugin does not know yet. They ask before they run. |
-| Agents without default rules | Put the printed block first in each listed agent's own `permissions`, followed by your top-level rules for `linear_*` tools. |
+| Agents without default rules | Put the default rules shown by `/linear-status` first in each listed agent's own permissions, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Linear tools. |
 | OpenCode: untested | OpenCode is not 2.2.3, 2.2.4 or 2.2.5. Inside `>=2.2.3 <2.3.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If Linear misbehaves, use a tested release. |
 | Signed in to the wrong workspace, for example after switching `access` | Read and write access each have their own sign-in, and Linear's consent page decides the workspace. With the wrong access still configured, run `opencode mcp logout linear` (or remove the account in `/connect` → Linear), then sign in again and pick the workspace. |
 | A Linear tool is refused in `opencode run` | Nobody could answer its prompt. Add an `allow` rule for that tool. |

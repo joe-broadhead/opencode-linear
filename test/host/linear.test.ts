@@ -9,7 +9,7 @@ import { join, sep } from "node:path"
 import { Plugin } from "@opencode/plugin"
 import { defaultRules, type Rule } from "../../src/permissions.js"
 import { SUPPORTED_HOST, TESTED_HOSTS } from "../../src/constants.js"
-import { AGENTS_FIX, AGENTS_NEXT_STEP } from "../../src/status.js"
+import { AGENT_RULES, AGENTS_NEXT_STEP } from "../../src/status.js"
 import { ASSIGNED } from "./fake-mcp.js"
 import { agentRules, attempt, cleanup, effect, HOST_VERSION, session, startHost, until, type Host } from "./harness.js"
 
@@ -143,8 +143,7 @@ describe(`read access on OpenCode ${HOST_VERSION}`, () => {
     const text = await status(host, await session(host))
     expect(text).toContain(`- Connection: connected (${host.fake.endpoints.read}, registered by this plugin)`)
     expect(text).toContain("- Tools: 4 available, 1 unknown: shiny_new_tool (unknown tools ask before running)\n")
-    expect(text).toContain("- Agents without default rules: reviewer.")
-    expect(text).toContain(AGENTS_FIX)
+    expect(text).toContain(`- Agents without default rules: reviewer\n${AGENT_RULES}\n`)
     expect(text).toContain(`- Next step: ${AGENTS_NEXT_STEP}`)
     expect(text).toContain(`- OpenCode: ${HOST_VERSION} (${TESTED_HOSTS.includes(HOST_VERSION) ? "tested" : "untested"}; supported range ${SUPPORTED_HOST})`)
   })

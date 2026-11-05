@@ -53,9 +53,9 @@ Things to know:
   project, so an approval saved there may apply in other such folders too.
 - **Some agents get no default rules.** Agents defined only in your own config, and agents added by plugins that load
   after this one, are created after the plugin inserts its rules, and agents without a base allow get none. Linear
-  tools may run there without asking. `/linear-status` names these agents and gives the fix: put the block first in
-  that agent's own `permissions`, followed by your top-level rules for `linear_*` tools. Do not put it in the
-  top-level `permissions`, which would loosen Explore.
+  tools may run there without asking. `/linear-status` names these agents and gives the fix: put the default rules it
+  shows first in that agent's own `permissions`, followed by your top-level rules for Linear tools. Do not put them in
+  the top-level `permissions`, which would loosen Explore.
 - **Unattended runs refuse prompts.** In `opencode run`, a Linear tool that would ask is refused.
 - **The `linear_*` rule also matches other servers** whose names start with `linear_`. For their tools it only adds
   prompts.

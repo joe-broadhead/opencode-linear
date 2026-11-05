@@ -163,7 +163,11 @@ Run one write tool without a prompt (or answer "Always allow" once):
 OpenCode creates agents that exist only in your config after plugins add their rules, so those agents get no Linear
 rules; agents that a later plugin adds are in the same position. An agent counts as guarded when the `linear_*` ask
 rule appears anywhere after its base allow. `/linear-status` and `/linear` list every other agent where a new Linear
-tool would run without asking, followed by the block to paste.
+tool would run without asking, by name, followed by the default rules to paste. The next step reads:
+
+```text
+Put the default rules shown by /linear-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Linear tools.
+```
 
 Put the block first in that agent's own `permissions`, then repeat after it any top-level rules you have for
 `linear_*` tools, so yours keep winning. Never put the block in the top-level `permissions`: top-level rules come
