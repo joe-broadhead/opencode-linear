@@ -1,6 +1,6 @@
 {
   "name": "@joe-broadhead/opencode-linear",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Unofficial OpenCode plugin for Linear: find, read and cite issues, projects and documents through Linear's official MCP server",
   "keywords": [
     "opencode",
@@ -43,6 +43,7 @@
     "drift": "node scripts/check-linear-tools.mjs"
   },
   "devDependencies": {
+    "@opencode/client": "2.2.3",
     "@opencode/plugin": "2.2.3",
     "@opencode/sdk": "2.2.3",
     "@opentui/core": "0.8.0",

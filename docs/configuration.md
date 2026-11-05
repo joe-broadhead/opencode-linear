@@ -39,7 +39,7 @@ Linear's consent page decides the workspace of each one, so the two can be in di
 - Switching to an access you have never signed in with: run `/connect` and choose Linear, then press `o` or Enter to
   open the link. In a terminal, `opencode mcp auth linear` opens it automatically.
 - Switching to an access you signed in with before: OpenCode reuses that sign-in without asking, in whatever
-  workspace it was made. `/linear-status` shows the account.
+  workspace it was made. Ask the model which Linear workspace it is connected to; Linear's `get_workspace` answers.
 - Changing the workspace of one access: with that access configured, run `opencode mcp logout linear` in the project
   where the plugin is configured. It removes every stored sign-in for the current `linear` address, and leaves the
   other access's sign-in alone. Or remove the account in `/connect` → Linear. Then sign in again and pick the
@@ -56,7 +56,7 @@ range in its `OpenCode` row, for example `2.2.5 (tested; supported range >=2.2.3
 
 - **A tested release:** the plugin starts.
 - **Another release inside the range, such as 2.2.6:** the plugin starts too. Status marks the version `untested`, and
-  the status RPC's `host.tested` is `false`.
+  the status RPC's `host.tested` is `false`. The next step is the same as on a tested release.
 - **Outside the range, including 2.3.0, prereleases and development builds:** the plugin refuses to start, and
   `/plugins` shows:
 
@@ -126,7 +126,9 @@ after that rule:
 `/linear-status` names the tools in neither list.
 
 The last rule is for the plugin's own tool, `linear_issues`: the issues assigned to you, as a table of identifier,
-title, state, priority and link (25 rows by default, at most 100). It only reads, through Linear's `list_issues` with
+title, state, priority and link, in every state, most recently updated first (25 rows by default, at most 100). It
+asks Linear for those five fields only. Jelly draws the table; the model reads the same rows as text, with a last line
+that says whether Linear has more, because the rows are a sample and not a count. It only reads, through Linear's `list_issues` with
 assignee `me`, so `list_issues`'s own rules apply to that call as well, and the plugin holds no credential. It is a
 direct tool, set with `codemode: false`: the model is offered it directly even when Code Mode holds Linear's other
 tools, because [Jelly](jelly.md) draws its result as a table only for a direct call. `/linear-status` counts it among
@@ -163,7 +165,11 @@ Run one write tool without a prompt (or answer "Always allow" once):
 OpenCode creates agents that exist only in your config after plugins add their rules, so those agents get no Linear
 rules; agents that a later plugin adds are in the same position. An agent counts as guarded when the `linear_*` ask
 rule appears anywhere after its base allow. `/linear-status` and `/linear` list every other agent where a new Linear
-tool would run without asking, followed by the block to paste.
+tool would run without asking, by name, followed by the default rules to paste. The next step reads:
+
+```text
+Put the default rules shown by /linear-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Linear tools.
+```
 
 Put the block first in that agent's own `permissions`, then repeat after it any top-level rules you have for
 `linear_*` tools, so yours keep winning. Never put the block in the top-level `permissions`: top-level rules come
@@ -198,12 +204,14 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 | --- | --- | --- |
 | `OPTIONS_INVALID` | Setup: an option is unknown or has a wrong value. `/plugins` shows the message, which names the option and the accepted values. | Fix the plugin options in `opencode.json`. |
 | `HOST_UNTESTED` | Setup: OpenCode is outside `>=2.2.3 <2.3.0`, and `allowUntestedHost` is not set. | Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true`. |
-| `STATUS_UNAVAILABLE` | `/linear-status`, `/linear` or the status RPC: the status could not be read, or the plugin is not running on the server. The RPC answers with its error `unavailable`. | Restart OpenCode, or run `/plugins` to see why the plugin did not start. |
+| `STATUS_UNAVAILABLE` | `/linear-status`, `/linear` or the status RPC: the status could not be read, or the plugin is not running on the server. The RPC answers with its error `unavailable`. | The message's own next step: restart OpenCode and run the command again, or, when the plugin is not running, run `/plugins` to see why. |
 | `SKILLS_INVALID` | Setup: a skill file is missing or broken. The plugin still starts; status shows the problem. | Reinstall the plugin. |
 | `SERVER_NOT_REGISTERED` | Setup: the `linear` server could not be registered. Status shows the problem. | Restart OpenCode. |
 | `RULES_NOT_ADDED` | Setup: the default permission rules could not be added, so Linear tools may run without asking. Status shows the problem. | Restart OpenCode. |
-| `AUTH_REQUIRED` | `linear_issues`: OpenCode does not list Linear's `list_issues`, usually because the `linear` server needs a sign-in. | Run `/connect` and choose Linear to sign in, or run `/linear-status` if you are signed in already. |
-| `UPSTREAM_UNREADABLE` | `linear_issues`: Linear's `list_issues` answered with something other than a list of issues. | Ask for `list_issues` with assignee `me` instead, which shows Linear's answer as it is, and update the plugin. |
+| `AUTH_REQUIRED` | `linear_issues`: Linear's `list_issues` is unavailable because the `linear` server needs a sign-in. | Run `/connect` and choose Linear, then press `o` or Enter to open the link. |
+| `SERVER_CONFLICT` | `linear_issues`: your own `mcp.servers.linear` points at another URL than your `access` uses, so `linear_issues` does not call it. | Point it at the URL status names, or remove it, then restart OpenCode. |
+| `TOOL_UNAVAILABLE` | `linear_issues`: OpenCode does not list Linear's `list_issues`, because the `linear` server is connecting, disabled, failed or missing, or has not listed its tools yet. The message names the state. | Status's next step for that state; when connected, wait a few seconds and run `/linear-status`. |
+| `UPSTREAM_UNREADABLE` | `linear_issues`: Linear's `list_issues` answered with something other than a list of issues. | Call `list_issues` with assignee `me` instead, which returns Linear's answer as it is. |
 
 For example:
 

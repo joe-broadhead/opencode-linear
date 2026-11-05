@@ -36,7 +36,9 @@ describe("skills", () => {
 
   test.each(NAMES)("%s names only Linear tools the plugin knows", (name) => {
     const named = [...read(name).matchAll(/\blinear_([a-z_]+)\b|\btools\.linear\.([a-z_]+)\b/g)].map((match) => (match[1] ?? match[2])!)
-    expect(named.filter((tool) => ![...READ_TOOLS, ...WRITE_TOOLS].includes(tool))).toEqual([])
+    // The plugin's own linear_issues is a direct tool, never tools.linear.issues in Code Mode.
+    expect(named.filter((tool) => ![...READ_TOOLS, ...WRITE_TOOLS, "issues"].includes(tool))).toEqual([])
+    expect(read(name)).not.toContain("tools.linear.issues")
   })
 
   test("linear sends the user to /linear-status and the sign-in step when Linear is missing", () => {
@@ -46,11 +48,7 @@ describe("skills", () => {
     expect(text).toContain("opencode mcp auth linear")
   })
 
-  test("both skills describe the permission prompt without claiming read access hides writes", () => {
-    for (const name of NAMES) {
-      const text = read(name)
-      expect(text).toContain("asks the user")
-      expect(text).not.toMatch(/hidden|hides|not visible/i)
-    }
+  test("neither skill claims that read access hides the write tools", () => {
+    for (const name of NAMES) expect(read(name)).not.toMatch(/hidden|hides|not visible/i)
   })
 })

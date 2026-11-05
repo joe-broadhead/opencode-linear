@@ -8,7 +8,7 @@ import { defaultRules, unguardedAgents, type Rule } from "./permissions.js"
 import { VERSION } from "./version.js"
 
 /** The shared status labels in machine form; `/linear-status` shows them as `sign-in required` and so on. */
-export type State = "connected" | "sign_in_required" | "connecting" | "disabled" | "failed" | "not_configured" | "conflict"
+type State = "connected" | "sign_in_required" | "connecting" | "disabled" | "failed" | "not_configured" | "conflict"
 /**
  * Who owns the `linear` server: this plugin, the user's own config (adopted unchanged), or a server at another URL than
  * the one the chosen access uses (`expected`). URLs are shown as origin and path only.
@@ -58,18 +58,18 @@ export interface Status {
   readonly nextStep: string
 }
 
-export const SIGN_IN = `Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth ${SERVER_NAME} opens it automatically).`
+const SIGN_IN = `Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth ${SERVER_NAME} opens it automatically).`
 
-/** The fix for agents defined only in user config, which never receive the inserted rules: the block, one rule a line. */
-export const AGENTS_FIX = [
-  `Put this block first in each listed agent's own "permissions" (agents.<id>.permissions in opencode.json, or the agent file's frontmatter), followed by your top-level "permissions" rules for linear_* tools:`,
-  ...defaultRules().map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`),
-].join("\n")
+/** The default rules to paste into an agent's own permissions, one rule a line, as a JSON array body. */
+const AGENT_RULES = defaultRules()
+  .map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`)
+  .join("\n")
 
-/** The next step while agents lack the rules. It stands alone in the RPC, so it repeats the fix's order. */
-export const AGENTS_NEXT_STEP = `Put the block first in each listed agent's own "permissions", followed by your top-level rules for linear_* tools.`
+/** The next step while agents lack the rules: the family's one fixed sentence. */
+const AGENTS_NEXT_STEP =
+  "Put the default rules shown by /linear-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Linear tools."
 
-export const NOTHING_TO_DO = "Nothing to do."
+const NOTHING_TO_DO = "Nothing to do."
 
 const TESTED_TEXT = `${TESTED_HOSTS.slice(0, -1).join(", ")} or ${TESTED_HOSTS.at(-1)}`
 const LISTED_UNKNOWN = 20
@@ -135,7 +135,7 @@ function nextStepOf(status: Omit<Status, "nextStep">): string {
   // A problem reads `CODE: What happened. Next step: What to do.`; its own next step becomes the status's.
   const problem = status.problems[0]?.split(" Next step: ")[1]
   if (problem) return problem
-  if (!status.host.tested) return `If Linear misbehaves, use OpenCode ${TESTED_TEXT}, the tested releases.`
+  // An untested host changes no next step: the OpenCode row says it is untested.
   return NOTHING_TO_DO
 }
 
@@ -188,7 +188,7 @@ export function formatStatus(status: Status) {
     `- Account: ${status.account ?? "account name not reported by Linear's MCP"}`,
     `- Access: ${ACCESS_TEXT[status.access]}`,
     `- Tools: ${toolsText(status)}`,
-    `- Agents without default rules: ${agents.length ? `${agents.join(", ")}. Linear tools run there without asking. ${AGENTS_FIX}` : "none"}`,
+    `- Agents without default rules: ${agents.length ? `${agents.join(", ")}\n${AGENT_RULES}` : "none"}`,
     `- OpenCode: ${hostText(status)}`,
     `- Next step: ${status.nextStep}`,
   ].join("\n")
@@ -216,7 +216,7 @@ export async function readStatus(ctx: StatusContext, facts: Pick<StatusFacts, "s
 }
 
 /** Why status could not be read: a coded message and its next step. The reason is cut like a failure's. */
-export function unavailable(error: unknown) {
+function unavailable(error: unknown) {
   const reason = shortReason(error instanceof Error ? error.message : String(error))
   return {
     message: `STATUS_UNAVAILABLE: Could not read Linear's status${reason ? ` (${reason})` : ""}.`,

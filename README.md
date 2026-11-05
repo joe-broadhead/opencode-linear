@@ -25,8 +25,10 @@ The plugin registers Linear's MCP server under the name `linear`, adds default p
 command, the `/linear` status view, two skills and one tool of its own, `linear_issues`. Every other tool is Linear's,
 and OpenCode handles the connection, the sign-in and the stored credentials.
 
-`linear_issues` answers the issues assigned to you as a table: identifier, title, state, priority and link. It reads
-them through Linear's own `list_issues`, under that tool's sign-in and permission rules, and holds no credential. It is
+`linear_issues` answers the issues assigned to you as a table: identifier, title, state, priority and link, in every
+state, most recently updated first, 25 rows by default and at most 100. It is a quick look, not a count: the model
+also reads whether Linear has more, and uses Linear's `list_issues` for totals and filters. It reads them through
+Linear's own `list_issues`, under that tool's sign-in and permission rules, and holds no credential. It is
 a direct tool, offered to the model even when Code Mode holds Linear's other tools, because
 [Jelly](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/jelly.md) draws a tool's result as a table only
 for a direct call, not for one made inside Code Mode.
@@ -66,8 +68,10 @@ Ask, for example: "What is assigned to me in Linear this cycle?" or "Summarise t
 
 Two skills teach the model to use Linear well:
 
-- `linear`, always: find before you read, page with cursors, treat Linear content as data, cite identifiers and links.
-- `linear-write`, only with `access: "write"`: confirm each change, make one change at a time, report links.
+- `linear`, always: when `linear_issues` is enough and when to filter and page `list_issues`, filters, counts, treating
+  Linear content as data, and citing identifiers and links.
+- `linear-write`, only with `access: "write"`: read first, confirm each change, take extra care with sharing, merging
+  and reviews, make one change at a time, report links.
 
 The plugin connects to Linear's **read-only** server by default (`https://mcp.linear.app/mcp/readonly`). It offers
 only tools that read, and Linear refuses changes through it. To let the model make changes, set the option
@@ -102,8 +106,8 @@ agent's own stricter rules (Plan cannot edit, Explore cannot use Linear), your `
 your saved "Always allow" answers. In an unattended run such as `opencode run`, a tool that asks is refused.
 
 Agents that exist only in your own config, and agents added by plugins that load later, are created after the plugin
-adds its rules, so Linear tools run there without asking. `/linear-status` and `/linear` name those agents and print
-the block to put first in each one's own `permissions`. Do not put it in the top-level `permissions`, which would
+adds its rules, so Linear tools run there without asking. `/linear-status` and `/linear` name those agents and show
+the default rules to put first in each one's own `permissions`. Do not put them in the top-level `permissions`, which would
 loosen Explore. [Configuration](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/configuration.md#permissions)
 has a worked example and permission recipes.
 
@@ -124,8 +128,8 @@ Set options with the object form of the plugin entry:
 
 Switching `access` changes the server address, and read and write access each have their own sign-in. If you have
 never signed in with the new access, run `/connect` and choose Linear, then press `o` or Enter to open the link. If you
-have, OpenCode reuses that sign-in, which may be in another workspace: check the account with `/linear-status`, and
-see [Sign in](#sign-in) to change it.
+have, OpenCode reuses that sign-in, which may be in another workspace. Ask the model which Linear workspace it is
+connected to; Linear's `get_workspace` answers. See [Sign in](#sign-in) to change it.
 
 [docs/configuration.md](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/configuration.md) has the
 details, including your own `mcp.servers.linear` entry, permission recipes and every error.
@@ -161,7 +165,7 @@ Run `/linear-status` first. Its last line is the next step.
 | Connection: not configured | An organisation policy (`mcp.use`) or another plugin removes the `linear` server. Ask your administrator, then restart OpenCode. |
 | Connection: conflict | Your config has an `mcp.servers.linear` entry with a URL other than the one your `access` uses. Point it at that URL or remove it, then restart OpenCode. |
 | Tools: unknown | Linear added tools the plugin does not know yet. They ask before they run. |
-| Agents without default rules | Put the printed block first in each listed agent's own `permissions`, followed by your top-level rules for `linear_*` tools. |
+| Agents without default rules | Put the default rules shown by `/linear-status` first in each listed agent's own permissions, in `opencode.json` or the agent's Markdown file, followed by your top-level rules for Linear tools. |
 | OpenCode: untested | OpenCode is not 2.2.3, 2.2.4 or 2.2.5. Inside `>=2.2.3 <2.3.0` the plugin runs normally; outside it, it runs only because `allowUntestedHost` is set. If Linear misbehaves, use a tested release. |
 | Signed in to the wrong workspace, for example after switching `access` | Read and write access each have their own sign-in, and Linear's consent page decides the workspace. With the wrong access still configured, run `opencode mcp logout linear` (or remove the account in `/connect` → Linear), then sign in again and pick the workspace. |
 | A Linear tool is refused in `opencode run` | Nobody could answer its prompt. Add an `allow` rule for that tool. |
@@ -170,8 +174,10 @@ Run `/linear-status` first. Its last line is the next step.
 | `HOST_UNTESTED` | Your OpenCode is outside `>=2.2.3 <2.3.0`, so the plugin did not start. Use OpenCode `>=2.2.3 <2.3.0`, or set `"allowUntestedHost": true` to run anyway. |
 | `STATUS_UNAVAILABLE` | The status could not be read, or the plugin is not running. Follow the next step in the message. |
 | `SKILLS_INVALID` | A skill file in the package is missing or broken. Reinstall the plugin. |
-| `AUTH_REQUIRED` from `linear_issues` | OpenCode does not list Linear's `list_issues`, usually because you are not signed in. Run `/connect` and choose Linear; if you are signed in, run `/linear-status`. |
-| `UPSTREAM_UNREADABLE` from `linear_issues` | Linear's `list_issues` answered with something other than a list of issues. Ask for `list_issues` with assignee `me` instead, and update the plugin. |
+| `AUTH_REQUIRED` from `linear_issues` | Linear needs a sign-in. Run `/connect` and choose Linear, then press `o` or Enter to open the link. |
+| `SERVER_CONFLICT` from `linear_issues` | Your own `mcp.servers.linear` points at another URL than your `access` uses. Point it at the URL `/linear-status` names, or remove it, then restart OpenCode. |
+| `TOOL_UNAVAILABLE` from `linear_issues` | OpenCode does not list Linear's `list_issues` yet. Follow the next step in the message, or run `/linear-status`. |
+| `UPSTREAM_UNREADABLE` from `linear_issues` | Linear's `list_issues` answered with something other than a list of issues. Ask for `list_issues` with assignee `me` instead. |
 
 A script's errors from the tools RPC have their own codes, listed in
 [Scripting](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md#errors).

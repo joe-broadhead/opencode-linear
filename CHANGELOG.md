@@ -2,6 +2,51 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.5] - 2026-11-05
+
+### Added
+
+- `linear_issues` tells the model whether Linear has more assigned issues than the rows it shows, in a last line of
+  its text. Jelly's table is unchanged.
+- `linear_issues` has two new errors: `SERVER_CONFLICT` when your own `mcp.servers.linear` is not Linear's server for
+  your `access`, and `TOOL_UNAVAILABLE`, which names the server's state, when OpenCode does not list Linear's
+  `list_issues`. Each gives the next step `/linear-status` would give.
+- Code Mode's description of the `linear` namespace says to read the `linear` skill first, to cite each item by its
+  identifier and the link Linear returns, and, with read access, how to allow changes (`"access": "write"` and a new
+  sign-in).
+
+### Changed
+
+- `linear_issues` asks Linear only for the five fields its table shows, instead of every issue's full record, and
+  its description says it is a sample, not a count: every state, most recently updated first, 25 rows by default and
+  at most 100. For totals or one state, use `list_issues` with assignee `me` and page to the end.
+- `AUTH_REQUIRED` from `linear_issues` now means only that Linear needs a sign-in. A disabled, connecting or failed
+  server is `TOOL_UNAVAILABLE` with that state's next step.
+- `UPSTREAM_UNREADABLE`'s next step is one step: `Call list_issues with assignee "me" instead, which returns Linear's
+  answer as it is.`
+- On an untested OpenCode release inside `>=2.2.3 <2.3.0`, such as 2.2.6, the next step is the same as on a tested
+  release, usually `Nothing to do.`; the `OpenCode` row still says `untested`. So is it outside the range with
+  `allowUntestedHost`, where the `OpenCode` row keeps its warning.
+- While agents lack the default rules, the next step (the `Next step` row and the status RPC's `nextStep`) reads `Put
+  the default rules shown by /linear-status first in each listed agent's own permissions, in opencode.json or the
+  agent's Markdown file, followed by your top-level rules for Linear tools.` The `Agents without default rules` row
+  lists the agents' names, then the rules.
+- The tools RPC for scripts: a `PERMISSION_DENIED` from a deny rule names the denied action, such as
+  `linear_get_issue`, and its next step says to remove or narrow that rule, add a later allow rule to the session, or
+  use a session whose agent allows it.
+- The `linear` skill is read before the first Linear call, `linear_issues` included. It teaches when `linear_issues`
+  is enough and when to filter and page `list_issues`, that filters take names and `"me"`, state types, date
+  filters, `fields` for smaller results, counts inside one Code Mode call, `get_issue` for an identifier and
+  `list_comments` for its discussion, and empty cycles. Its link to the scripting guide works outside the repository.
+- The `linear-write` skill reads the team's real statuses, labels and templates before a change, and covers the
+  changes that reach beyond the item: sharing an issue, merging a diff, publishing a review and uploads.
+
+### Fixed
+
+- The README and the configuration guide no longer say `/linear-status` shows which workspace you are signed in to;
+  it cannot. Ask the model, and Linear's `get_workspace` answers.
+- SECURITY.md said the plugin adds no tools. It adds one read, `linear_issues`.
+
 ## [0.0.4] - 2026-11-04
 
 ### Added

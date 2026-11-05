@@ -25,8 +25,9 @@ describe("docs", () => {
     expect(writes.filter((count) => count !== WRITE_TOOLS.length)).toEqual([])
   })
 
-  test.each(FILES)("%s names no tool Linear no longer serves", (file) => {
-    expect(text(file).match(/whoami/g) ?? []).toEqual([])
+  test.each(FILES)("%s names only Linear tools the plugin knows, and its own linear_issues", (file) => {
+    const named = [...text(file).matchAll(/\blinear_([a-z][a-z_]*)(?![\w*])/g)].map((match) => match[1]!)
+    expect(named.filter((tool) => ![...READ_TOOLS, ...WRITE_TOOLS, "issues"].includes(tool))).toEqual([])
   })
 
   // Once the plugin is removed and OpenCode reloads, `mcp logout linear` finds no server, and each access keeps its own
@@ -54,6 +55,15 @@ describe("docs", () => {
       expect(code).not.toStartWith("LINEAR_")
       expect(errors).toContain(`| \`${code}\` |`)
     }
+  })
+
+  test("the configuration guide's Errors table lists only codes the plugin raises", () => {
+    const sources = readdirSync(join(ROOT, "src")).filter((name) => name.endsWith(".ts") && name !== "tools-rpc.ts")
+    const raised = sources.map((name) => readFileSync(join(ROOT, "src", name), "utf8")).join("\n")
+    const errors = /## Errors(.*?)## /.exec(text("docs/configuration.md"))?.[1] ?? ""
+    const documented = [...errors.matchAll(/\| `([A-Z][A-Z_]+)` \|/g)].map((match) => match[1]!)
+    expect(documented.length).toBeGreaterThan(5)
+    expect(documented.filter((code) => !raised.includes(`"${code}"`) && !raised.includes(`${code}:`))).toEqual([])
   })
 
   test("the README and the configuration guide give linear_issues its allow rule and say why it is a direct tool", () => {

@@ -94,7 +94,7 @@ function whitelist() {
   for (const field of ABSENT_FIELDS) if (field in pkg) problems.push(`Remove "${field}": the package ships no runtime dependencies, no host peers and no engine pins.`)
   for (const script of LIFECYCLE_SCRIPTS) if (pkg.scripts?.[script] !== undefined) problems.push(`Remove the "${script}" script: OpenCode installs with lifecycle scripts disabled.`)
   if (pkg.opencode?.host !== HOST_RANGE) problems.push(`"opencode.host" must be "${HOST_RANGE}", the tested OpenCode line.`)
-  for (const name of ["@opencode/plugin", "@opencode/sdk"]) {
+  for (const name of ["@opencode/client", "@opencode/plugin", "@opencode/sdk"]) {
     if (pkg.devDependencies?.[name] !== HOST_DEV_PIN) problems.push(`devDependency "${name}" must be exactly ${HOST_DEV_PIN}, the tested host.`)
   }
   const exportsSeen = Object.keys(pkg.exports ?? {})
