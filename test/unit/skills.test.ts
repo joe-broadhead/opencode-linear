@@ -48,6 +48,17 @@ describe("skills", () => {
     expect(text).toContain("opencode mcp auth linear")
   })
 
+  test.each(NAMES)("%s links only to plain files an agent can read, never to a GitHub page", (name) => {
+    const links = read(name).match(/https?:\/\/[^\s)>]*[^\s)>.,]/g) ?? []
+    for (const link of links) expect(link).toMatch(/^https:\/\/raw\.githubusercontent\.com\/joe-broadhead\/opencode-linear\/HEAD\//)
+  })
+
+  test("linear's scripts section creates a session for the script and never borrows one", () => {
+    const scripts = read("linear").split("## Scripts")[1]?.split("\n## ")[0] ?? ""
+    expect(scripts).toContain("opencode api post /api/session")
+    expect(scripts).toMatch(/never borrow/i)
+  })
+
   test("neither skill claims that read access hides the write tools", () => {
     for (const name of NAMES) expect(read(name)).not.toMatch(/hidden|hides|not visible/i)
   })
