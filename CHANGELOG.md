@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The `linear` skill says that `id` is an issue's identifier, such as ENG-123 (there is no `identifier` field), and
+  lists the other useful `fields` values, so a `list_issues` call no longer fails on a guessed field.
+- The `linear` skill computes every number an answer states, group totals included, in the first Code Mode call, and
+  returns only those numbers and the few issues it names, also for "what am I working on".
+- The `linear` skill finds the team for "this cycle" with `list_teams` when you name none, and calls `list_cycles`
+  once without `type` to tell "no cycles" from "no current cycle".
+- The `linear` skill's scripts section says a script uses a session created for it, never one borrowed from history
+  or a list, and links the scripting guide as a plain file.
+
 ## [0.0.5] - 2026-11-05
 
 ### Added
