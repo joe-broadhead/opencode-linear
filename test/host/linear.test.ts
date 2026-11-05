@@ -9,9 +9,11 @@ import { join, sep } from "node:path"
 import { Plugin } from "@opencode/plugin"
 import { defaultRules, type Rule } from "../../src/permissions.js"
 import { SUPPORTED_HOST, TESTED_HOSTS } from "../../src/constants.js"
-import { AGENT_RULES, AGENTS_NEXT_STEP } from "../../src/status.js"
 import { ASSIGNED } from "./fake-mcp.js"
 import { agentRules, attempt, cleanup, effect, HOST_VERSION, session, startHost, until, type Host } from "./harness.js"
+
+const AGENT_RULES = defaultRules().map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`).join("\n")
+const AGENTS_NEXT_STEP = "Put the default rules shown by /linear-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Linear tools."
 
 // Starting a host takes several seconds, more on a busy machine.
 setDefaultTimeout(120_000)

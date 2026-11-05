@@ -3,7 +3,7 @@ import { createSignal } from "solid-js"
 import { errorText, SERVER_NAME } from "./constants.js"
 import { formatStatus, StatusRpc, type Status } from "./status.js"
 
-export const TUI_ID = "linear.workspace.tui"
+const TUI_ID = "linear.workspace.tui"
 const TITLE = "Linear status"
 const KEYS = "r refresh · esc close"
 

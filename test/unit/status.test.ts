@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import { checkHost } from "../../src/host-version.js"
 import { defaultRules } from "../../src/permissions.js"
-import { AGENT_RULES, AGENTS_NEXT_STEP, buildStatus, NOTHING_TO_DO, formatStatus, readStatus, registerStatusCommand, registerStatusRpc, shortReason, SIGN_IN, StatusRpc, type Status, type StatusContext, type StatusFacts } from "../../src/status.js"
+import { buildStatus, formatStatus, readStatus, registerStatusCommand, registerStatusRpc, shortReason, StatusRpc, type Status, type StatusContext, type StatusFacts } from "../../src/status.js"
 import { VERSION } from "../../src/version.js"
 import { allow } from "./fake.js"
+
+const SIGN_IN = "Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth linear opens it automatically)."
+const NOTHING_TO_DO = "Nothing to do."
+/** The default rules as /linear-status shows them: one rule a line, a JSON array body. */
+const AGENT_RULES = defaultRules().map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`).join("\n")
 
 const host = checkHost("2.2.3", false)
 const READ_URL = "https://mcp.linear.app/mcp/readonly"
@@ -115,7 +120,6 @@ describe("buildStatus", () => {
     expect(status.nextStep).toBe(
       "Put the default rules shown by /linear-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Linear tools.",
     )
-    expect(status.nextStep).toBe(AGENTS_NEXT_STEP)
     // One rule a line, as a JSON array body that pastes into a permissions list.
     expect(JSON.parse(`[${AGENT_RULES}]`)).toEqual(defaultRules())
     const text = formatStatus(status)

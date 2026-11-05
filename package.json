@@ -43,6 +43,7 @@
     "drift": "node scripts/check-linear-tools.mjs"
   },
   "devDependencies": {
+    "@opencode/client": "2.2.3",
     "@opencode/plugin": "2.2.3",
     "@opencode/sdk": "2.2.3",
     "@opentui/core": "0.8.0",

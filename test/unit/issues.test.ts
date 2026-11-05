@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { checkHost } from "../../src/host-version.js"
-import { COLUMNS, FIELDS, ISSUES_ACTION, issueRows, issuesTool, registerIssuesTool } from "../../src/issues.js"
+import { issueRows, issuesTool, registerIssuesTool } from "../../src/issues.js"
 import { defaultRules, evaluate } from "../../src/permissions.js"
-import { buildStatus, SIGN_IN, type StatusFacts } from "../../src/status.js"
+import { buildStatus, type StatusFacts } from "../../src/status.js"
 
 /** Linear's live `list_issues` answer: `id` is the identifier, `status` a name and `priority` `{ value, name }`. */
 const issue = (n: number, extra: Record<string, unknown> = {}) => ({
@@ -33,6 +33,7 @@ function host(answer: unknown) {
 const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp/readonly" }, access: "read", host: checkHost("2.2.3", false) }
 const status = (more: Partial<StatusFacts> = {}) => async () => buildStatus({ ...facts, ...more })
 const owned = () => true
+const SIGN_IN = "Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth linear opens it automatically)."
 const context = { sessionID: "ses_1", agent: "build", messageID: "msg_1", id: "call_1", signal: new AbortController().signal } as never
 
 describe("linear_issues", () => {
@@ -43,10 +44,15 @@ describe("linear_issues", () => {
     })
     const result = await issuesTool({ tool, owned, status: status() }).execute({ limit: 10 }, context)
     expect(calls).toEqual([{ assignee: "me", limit: 10, fields: ["id", "title", "status", "priority", "url"] }])
-    expect(FIELDS).toEqual(["id", "title", "status", "priority", "url"])
     // Jelly's table template is strict: exactly these two keys, at most 8 columns.
     expect(Object.keys(result.output)).toEqual(["columns", "rows"])
-    expect(result.output.columns).toEqual(COLUMNS.map((column) => ({ ...column })))
+    expect(result.output.columns).toEqual([
+      { key: "identifier", label: "Issue" },
+      { key: "title", label: "Title" },
+      { key: "state", label: "State" },
+      { key: "priority", label: "Priority" },
+      { key: "url", label: "Link" },
+    ])
     expect(result.output.rows).toEqual([
       { identifier: "ENG-1", title: "Issue 1", state: "In Progress", priority: "High", url: "https://linear.app/acme/issue/ENG-1" },
       { identifier: "ENG-2", title: "Issue 2", state: "Todo", priority: "No priority", url: null },
@@ -135,6 +141,6 @@ describe("linear_issues", () => {
       status: status(),
     })
     expect(added.map((tool) => [tool.name, tool.options])).toEqual([["issues", { namespace: "linear", codemode: false }]])
-    expect(evaluate([{ action: "*", resource: "*", effect: "allow" }, ...defaultRules()], ISSUES_ACTION)).toBe("allow")
+    expect(evaluate([{ action: "*", resource: "*", effect: "allow" }, ...defaultRules()], "linear_issues")).toBe("allow")
   })
 })

@@ -8,7 +8,7 @@ import { defaultRules, unguardedAgents, type Rule } from "./permissions.js"
 import { VERSION } from "./version.js"
 
 /** The shared status labels in machine form; `/linear-status` shows them as `sign-in required` and so on. */
-export type State = "connected" | "sign_in_required" | "connecting" | "disabled" | "failed" | "not_configured" | "conflict"
+type State = "connected" | "sign_in_required" | "connecting" | "disabled" | "failed" | "not_configured" | "conflict"
 /**
  * Who owns the `linear` server: this plugin, the user's own config (adopted unchanged), or a server at another URL than
  * the one the chosen access uses (`expected`). URLs are shown as origin and path only.
@@ -58,18 +58,18 @@ export interface Status {
   readonly nextStep: string
 }
 
-export const SIGN_IN = `Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth ${SERVER_NAME} opens it automatically).`
+const SIGN_IN = `Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth ${SERVER_NAME} opens it automatically).`
 
 /** The default rules to paste into an agent's own permissions, one rule a line, as a JSON array body. */
-export const AGENT_RULES = defaultRules()
+const AGENT_RULES = defaultRules()
   .map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`)
   .join("\n")
 
 /** The next step while agents lack the rules: the family's one fixed sentence. */
-export const AGENTS_NEXT_STEP =
+const AGENTS_NEXT_STEP =
   "Put the default rules shown by /linear-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Linear tools."
 
-export const NOTHING_TO_DO = "Nothing to do."
+const NOTHING_TO_DO = "Nothing to do."
 
 const TESTED_TEXT = `${TESTED_HOSTS.slice(0, -1).join(", ")} or ${TESTED_HOSTS.at(-1)}`
 const LISTED_UNKNOWN = 20
@@ -216,7 +216,7 @@ export async function readStatus(ctx: StatusContext, facts: Pick<StatusFacts, "s
 }
 
 /** Why status could not be read: a coded message and its next step. The reason is cut like a failure's. */
-export function unavailable(error: unknown) {
+function unavailable(error: unknown) {
   const reason = shortReason(error instanceof Error ? error.message : String(error))
   return {
     message: `STATUS_UNAVAILABLE: Could not read Linear's status${reason ? ` (${reason})` : ""}.`,

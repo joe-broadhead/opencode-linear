@@ -3,9 +3,10 @@
 import { describe, expect, test } from "bun:test"
 import { PLUGIN_ID as LINEAR_PLUGIN_ID, SERVER_NAME } from "../../src/constants.js"
 import { KNOWN_READS, NEXT_STEPS, PLUGIN_ID, pluginError, shapeResult, TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
-import { ISSUES_ACTION } from "../../src/issues.js"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 import { defaultRules } from "../../src/permissions.js"
+
+const ISSUES_ACTION = "linear_issues"
 
 describe("Linear's tools RPC", () => {
   test("is linear.workspace.tools, under the plugin's own id", () => {

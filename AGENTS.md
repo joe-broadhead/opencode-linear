@@ -14,8 +14,8 @@ the checks and the release steps.
   the host and pack stages and CI run on each. Inside the range an untested release still starts.
 - **Greenfield.** No legacy, migration code, compatibility shim, dual path or deprecated alias, and nothing dead.
   Delete rather than deprecate.
-- **No peers, no runtime dependencies, no lifecycle scripts.** `@opencode/plugin` and `@opencode/sdk` are
-  devDependencies pinned to exactly `2.2.3`. Do not add another host version to the lockfile: the host stage installs
+- **No peers, no runtime dependencies, no lifecycle scripts.** `@opencode/plugin`, `@opencode/sdk` and
+  `@opencode/client` (whose types the host tests use) are devDependencies pinned to exactly `2.2.3`. Do not add another host version to the lockfile: the host stage installs
   the other tested SDKs into a temp folder.
 - **Ship prebuilt, one file per entry.** `scripts/build.mjs` bundles `src/index.ts` and `src/tui.ts` with esbuild into
   the self-contained `dist/index.js` and `dist/tui.js`: no chunks, no relative imports, and only host-provided modules
