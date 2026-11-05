@@ -100,7 +100,7 @@ A refusal or failure is the RPC error `failed`, with a message `CODE: what happe
 | --- | --- |
 | `SESSION_UNKNOWN` | OpenCode says the session does not exist. Any other failure to look the session up is OpenCode's own error. |
 | `SESSION_AGENT_REQUIRED` | The session names no agent, or an agent that does not exist. |
-| `PERMISSION_DENIED` | The agent's or the session's rules deny the tool, or ask for an approval. |
+| `PERMISSION_DENIED` | The agent's or the session's rules deny the tool, or ask for an approval. A deny names the denied action, such as `linear_get_issue`, and its next step says to remove or narrow that deny rule, add a later allow rule to the session, or use a session whose agent allows it. |
 | `SERVER_CONFLICT` | Your `opencode.json` defines its own `linear` server at a URL other than the one your `access` uses. `/linear-status` names both. |
 | `AUTH_REQUIRED`, `CONNECTING`, `CONNECTION_FAILED`, `DISABLED`, `NOT_REGISTERED` | The `linear` server needs a sign-in, is still connecting, could not connect, is disabled, or is missing. `/linear-status` gives the details. |
 | `TOOL_UNAVAILABLE` | The server is connected, but OpenCode does not list the tool. |
