@@ -81,13 +81,13 @@ export function createLinearPlugin(seam: LinearSeam) {
       // Code Mode's catalog describes the server's namespace with this text.
       await ctx.tool.transform((editor) => editor.namespace({ name: SERVER_NAME, description: NAMESPACE_DESCRIPTION[options.access] }))
       await registerDefaultRules(ctx.agent, defaultRules(), report("rules"))
-      await registerIssuesTool(ctx.tool)
-      await registerSkills(ctx.skill, skills)
       const read = () => readStatus(ctx, { ...(source ? { source } : {}), access: options.access, host, problems: [...problems.values()] })
-      await registerStatusCommand(ctx, read)
-      await registerStatusRpc(ctx.rpc, read)
       // The plugin's own server, or the user's adopted one; a server at another URL is not Linear's for this access.
       const owned = () => source?.type === "plugin" || source?.type === "adopted"
+      await registerIssuesTool({ tool: ctx.tool, owned, status: read })
+      await registerSkills(ctx.skill, skills)
+      await registerStatusCommand(ctx, read)
+      await registerStatusRpc(ctx.rpc, read)
       // Scripts call the known reads with no model, as a session and its agent.
       const stopTools = await registerToolsRpc(ctx, { mcp: { server: SERVER_NAME, managed: owned } })
       const stopWatch = watchIntegration(ctx, owned)

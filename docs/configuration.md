@@ -202,8 +202,10 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 | `SKILLS_INVALID` | Setup: a skill file is missing or broken. The plugin still starts; status shows the problem. | Reinstall the plugin. |
 | `SERVER_NOT_REGISTERED` | Setup: the `linear` server could not be registered. Status shows the problem. | Restart OpenCode. |
 | `RULES_NOT_ADDED` | Setup: the default permission rules could not be added, so Linear tools may run without asking. Status shows the problem. | Restart OpenCode. |
-| `AUTH_REQUIRED` | `linear_issues`: OpenCode does not list Linear's `list_issues`, usually because the `linear` server needs a sign-in. | Run `/connect` and choose Linear to sign in, or run `/linear-status` if you are signed in already. |
-| `UPSTREAM_UNREADABLE` | `linear_issues`: Linear's `list_issues` answered with something other than a list of issues. | Ask for `list_issues` with assignee `me` instead, which shows Linear's answer as it is, and update the plugin. |
+| `AUTH_REQUIRED` | `linear_issues`: Linear's `list_issues` is unavailable because the `linear` server needs a sign-in. | Run `/connect` and choose Linear, then press `o` or Enter to open the link. |
+| `SERVER_CONFLICT` | `linear_issues`: your own `mcp.servers.linear` points at another URL than your `access` uses, so `linear_issues` does not call it. | Point it at the URL status names, or remove it, then restart OpenCode. |
+| `TOOL_UNAVAILABLE` | `linear_issues`: OpenCode does not list Linear's `list_issues`, because the `linear` server is connecting, disabled, failed or missing, or has not listed its tools yet. The message names the state. | Status's next step for that state; when connected, wait a few seconds and run `/linear-status`. |
+| `UPSTREAM_UNREADABLE` | `linear_issues`: Linear's `list_issues` answered with something other than a list of issues. | Call `list_issues` with assignee `me` instead, which returns Linear's answer as it is. |
 
 For example:
 
