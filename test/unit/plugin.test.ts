@@ -108,7 +108,7 @@ function context(options: unknown, version = "2.2.3") {
     },
     // A session whose agent allows everything, and one Linear read that answers "ok".
     session: { get: async () => ({ id: "ses_test", agent: "build", location: { directory: "/projects/linear-test" }, permissions: [] }) },
-    agent: { transform: agent.transform, get: async () => ({ data: { id: "build", permissions: [{ action: "*", resource: "*", effect: "allow" }] } }) },
+    agent: { transform: agent.transform, list: async () => ({ data: [] }), get: async () => ({ data: { id: "build", permissions: [{ action: "*", resource: "*", effect: "allow" }] } }) },
     tool: { transform: tool.transform, list: async () => [{ id: "linear_list_issues", execute: async () => ({ content: [{ type: "text", text: "ok" }] }) }] },
     location: { directory: "/projects/linear-test" },
     permission: { hook: async (name: string) => (hooks.push(name), { dispose: async () => void hooks.splice(hooks.indexOf(name), 1) }) },
@@ -158,6 +158,19 @@ describe("setup", () => {
     await cleanup!()
     expect(rpc).toEqual(["linear.workspace"])
     expect(hooks).toEqual([])
+  })
+
+  test("linear_issues refuses a linear server that is not Linear's for this access, without calling it", async () => {
+    const { ctx, mcp, tool } = context({})
+    const calls: unknown[] = []
+    ;(ctx.tool as { list: unknown }).list = async () => [{ id: "linear_list_issues", execute: async (args: unknown) => (calls.push(args), { output: { issues: [] } }) }]
+    const cleanup = await createLinearPlugin(seam).setup(ctx)
+    mcp.run(mcpEditor({ linear: { type: "remote", url: ENDPOINTS.write } }).editor)
+    const tools: { name: string; execute: (input: unknown, context: unknown) => Promise<unknown> }[] = []
+    tool.run({ namespace: () => undefined, add: (info: (typeof tools)[number]) => void tools.push(info) } as never)
+    await expect(tools[0]!.execute({}, {})).rejects.toThrow(/^SERVER_CONFLICT: .* Next step: Your OpenCode config defines mcp\.servers\.linear with https:\/\/mcp\.linear\.app\/mcp,/)
+    expect(calls).toEqual([])
+    await cleanup!()
   })
 
   test.each([

@@ -4,7 +4,7 @@
 // plain JSON (no SSE stream) and records every tool call, its path and every request header. A `tools/call` answers
 // with the tool's name, the path and its arguments as structured content; for a `query` that starts with "text", with
 // text alone; or, for a `query` that starts with "fail", with an upstream error (`isError`) whose first line holds a
-// signed URL.
+// signed URL. `list_issues` with assignee "me" answers in Linear's live shape: two issues and `hasNextPage`.
 import { createServer, type IncomingMessage } from "node:http"
 import type { AddressInfo } from "node:net"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
@@ -39,16 +39,29 @@ export interface FakeMcp {
   readonly calls: string[]
   /** Each tool call with the path it was sent to, in order. */
   readonly called: { readonly tool: string; readonly path: string }[]
+  /** Each tool call's arguments, in order. */
+  readonly inputs: { readonly tool: string; readonly arguments: unknown }[]
   /** The `x-linear-test` header of every request, to tell whose server config the host used. */
   readonly markers: (string | undefined)[]
   close(): Promise<void>
 }
 
-type Message = { jsonrpc: "2.0"; id?: number | string; method: string; params?: { protocolVersion?: string; name?: string; arguments?: { query?: unknown } } }
+type Message = { jsonrpc: "2.0"; id?: number | string; method: string; params?: { protocolVersion?: string; name?: string; arguments?: { query?: unknown; assignee?: unknown } } }
+
+/** Linear's live `list_issues` answer: `id` is the identifier, `status` a name, `priority` `{ value, name }`. */
+export const ASSIGNED = {
+  issues: [
+    { id: "ENG-1", title: "Fix login", status: "In Progress", priority: { value: 2, name: "High" }, url: "https://linear.app/acme/issue/ENG-1" },
+    { id: "ENG-2", title: "Write docs", status: "Done", priority: { value: 0, name: "No priority" }, url: "https://linear.app/acme/issue/ENG-2" },
+  ],
+  hasNextPage: true,
+  cursor: "fake-cursor",
+}
 
 export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMcp> {
   const calls: string[] = []
   const called: { tool: string; path: string }[] = []
+  const inputs: { tool: string; arguments: unknown }[] = []
   const markers: (string | undefined)[] = []
   const answer = (message: Message, path: string) => {
     const reply = (result: unknown) => ({ jsonrpc: "2.0", id: message.id, result })
@@ -62,6 +75,8 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
         calls.push(tool)
         called.push({ tool, path })
         const args = message.params?.arguments ?? {}
+        inputs.push({ tool, arguments: args })
+        if (tool === "list_issues" && args.assignee === "me") return reply({ content: [{ type: "text", text: JSON.stringify(ASSIGNED) }], structuredContent: ASSIGNED })
         if (String(args.query ?? "").startsWith("fail")) return reply({ content: [{ type: "text", text: UPSTREAM_FAILURE }], isError: true })
         if (String(args.query ?? "").startsWith("text")) return reply({ content: [{ type: "text", text: `text from ${tool}` }] })
         return reply({ content: [{ type: "text", text: `called ${tool}` }], structuredContent: { tool, path, arguments: args } })
@@ -88,6 +103,7 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
     endpoints: { read: `http://127.0.0.1:${port}/mcp/readonly`, write: `http://127.0.0.1:${port}/mcp` },
     calls,
     called,
+    inputs,
     markers,
     close: () => new Promise((resolve) => (server.closeAllConnections(), server.close(() => resolve()))),
   }

@@ -10,6 +10,7 @@ import { Plugin } from "@opencode/plugin"
 import { defaultRules, type Rule } from "../../src/permissions.js"
 import { SUPPORTED_HOST, TESTED_HOSTS } from "../../src/constants.js"
 import { AGENTS_FIX, AGENTS_NEXT_STEP } from "../../src/status.js"
+import { ASSIGNED } from "./fake-mcp.js"
 import { agentRules, attempt, cleanup, effect, HOST_VERSION, session, startHost, until, type Host } from "./harness.js"
 
 // Starting a host takes several seconds, more on a busy machine.
@@ -99,6 +100,26 @@ describe(`read access on OpenCode ${HOST_VERSION}`, () => {
     const build_ = (await agentRules(host)).get("build")!
     expect(["linear_list_issues", "linear_save_issue", "linear_shiny_new_tool"].filter((action) => hidden(build_, action))).toEqual([])
     expect(await effect(host, "build", "linear_shiny_new_tool")).toBe("ask")
+  })
+
+  test("linear_issues runs through the host's own list_issues: its rules, Linear's live shape and the fields it shows", async () => {
+    await linearTools(host)
+    const issues = (await host.probe().tool.list()).find((tool) => tool.id === "linear_issues")!
+    const run = async (sessionID: string) => {
+      const context = { sessionID, agent: "build", messageID: "msg_host_test", id: `call_issues_${sessionID}`, signal: new AbortController().signal, progress: async () => {} }
+      return issues.execute({ limit: 2 }, context as never)
+    }
+    const from = host.fake.inputs.length
+    const result = (await run(await session(host))) as { output: { rows: unknown[] }; content: unknown }
+    expect(host.fake.inputs.slice(from)).toEqual([{ tool: "list_issues", arguments: { assignee: "me", limit: 2, fields: ["id", "title", "status", "priority", "url"] } }])
+    expect(result.output.rows).toEqual(ASSIGNED.issues.map((item) => ({ identifier: item.id, title: item.title, state: item.status, priority: item.priority.name, url: item.url })))
+    expect(JSON.stringify(result.content)).toContain("Linear has more assigned issues than these 2")
+    // A session that denies list_issues alone: linear_issues itself may run, but its nested call is refused.
+    const permissions = [{ action: "linear_list_issues", resource: "*", effect: "deny" as const }]
+    const locked = (await host.client.sessions.create({ agent: "build", location: host.location, permissions })).id
+    const before = host.fake.inputs.length
+    await expect(run(locked)).rejects.toThrow("Permission denied: linear_list_issues")
+    expect(host.fake.inputs.length).toBe(before)
   })
 
   test("P4: a saved 'Always allow' removes the prompt", async () => {
