@@ -149,6 +149,10 @@ describe("setup", () => {
       add: (info: { name: string; options: unknown }) => void tools.push(info),
     } as never)
     expect(namespaces).toEqual([{ name: "linear", description: NAMESPACE_DESCRIPTION[access] }])
+    // The always-visible rules: read the skill, cite the url, and how read access becomes write access.
+    expect(NAMESPACE_DESCRIPTION[access]).toContain("Read the linear skill before the first call")
+    expect(NAMESPACE_DESCRIPTION[access]).toContain("by its identifier and the url Linear returns")
+    if (access === "read") expect(NAMESPACE_DESCRIPTION.read).toContain('the user sets the plugin option "access": "write" and signs in again')
     // linear_issues, a direct tool in the linear namespace, so Jelly can draw its result.
     expect(tools.map((info) => [info.name, info.options])).toEqual([["issues", { namespace: "linear", codemode: false }]])
     expect(rpc).toEqual(["linear.workspace", "linear.workspace.tools"])

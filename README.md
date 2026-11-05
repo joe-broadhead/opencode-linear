@@ -25,8 +25,10 @@ The plugin registers Linear's MCP server under the name `linear`, adds default p
 command, the `/linear` status view, two skills and one tool of its own, `linear_issues`. Every other tool is Linear's,
 and OpenCode handles the connection, the sign-in and the stored credentials.
 
-`linear_issues` answers the issues assigned to you as a table: identifier, title, state, priority and link. It reads
-them through Linear's own `list_issues`, under that tool's sign-in and permission rules, and holds no credential. It is
+`linear_issues` answers the issues assigned to you as a table: identifier, title, state, priority and link, in every
+state, most recently updated first, 25 rows by default and at most 100. It is a quick look, not a count: the model
+also reads whether Linear has more, and uses Linear's `list_issues` for totals and filters. It reads them through
+Linear's own `list_issues`, under that tool's sign-in and permission rules, and holds no credential. It is
 a direct tool, offered to the model even when Code Mode holds Linear's other tools, because
 [Jelly](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/jelly.md) draws a tool's result as a table only
 for a direct call, not for one made inside Code Mode.
