@@ -128,12 +128,12 @@ describe("linear_issues", () => {
   })
 
   test("is a direct tool in the linear namespace, and runs without asking like Linear's reads", async () => {
-    const added: { name: string; options: unknown }[] = []
+    const added: { name: string; options: unknown; description: string }[] = []
     await registerIssuesTool({
       tool: {
         list: async () => [] as never,
         transform: (async (callback: (editor: unknown) => void) => {
-          callback({ add: (tool: { name: string; options: unknown }) => added.push(tool) })
+          callback({ add: (tool: { name: string; options: unknown; description: string }) => added.push(tool) })
           return { dispose: async () => undefined }
         }) as never,
       },
@@ -141,6 +141,9 @@ describe("linear_issues", () => {
       status: status(),
     })
     expect(added.map((tool) => [tool.name, tool.options])).toEqual([["issues", { namespace: "linear", codemode: false }]])
+    // Its description says it is a sample, and where totals and filters come from.
+    expect(added[0]!.description).toMatch(/not a count: every state .* most recently updated first, 25 rows by default and at most 100/)
+    expect(added[0]!.description).toContain('use list_issues with assignee "me" and page until hasNextPage is false')
     expect(evaluate([{ action: "*", resource: "*", effect: "allow" }, ...defaultRules()], "linear_issues")).toBe("allow")
   })
 })

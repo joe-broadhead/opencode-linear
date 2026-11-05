@@ -126,7 +126,9 @@ after that rule:
 `/linear-status` names the tools in neither list.
 
 The last rule is for the plugin's own tool, `linear_issues`: the issues assigned to you, as a table of identifier,
-title, state, priority and link (25 rows by default, at most 100). It only reads, through Linear's `list_issues` with
+title, state, priority and link, in every state, most recently updated first (25 rows by default, at most 100). It
+asks Linear for those five fields only. Jelly draws the table; the model reads the same rows as text, with a last line
+that says whether Linear has more, because the rows are a sample and not a count. It only reads, through Linear's `list_issues` with
 assignee `me`, so `list_issues`'s own rules apply to that call as well, and the plugin holds no credential. It is a
 direct tool, set with `codemode: false`: the model is offered it directly even when Code Mode holds Linear's other
 tools, because [Jelly](jelly.md) draws its result as a table only for a direct call. `/linear-status` counts it among
