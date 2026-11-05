@@ -56,6 +56,15 @@ describe("docs", () => {
     }
   })
 
+  test("the configuration guide's Errors table lists only codes the plugin raises", () => {
+    const sources = readdirSync(join(ROOT, "src")).filter((name) => name.endsWith(".ts") && name !== "tools-rpc.ts")
+    const raised = sources.map((name) => readFileSync(join(ROOT, "src", name), "utf8")).join("\n")
+    const errors = /## Errors(.*?)## /.exec(text("docs/configuration.md"))?.[1] ?? ""
+    const documented = [...errors.matchAll(/\| `([A-Z][A-Z_]+)` \|/g)].map((match) => match[1]!)
+    expect(documented.length).toBeGreaterThan(5)
+    expect(documented.filter((code) => !raised.includes(`"${code}"`) && !raised.includes(`${code}:`))).toEqual([])
+  })
+
   test("the README and the configuration guide give linear_issues its allow rule and say why it is a direct tool", () => {
     for (const file of ["README.md", "docs/configuration.md"]) {
       expect(text(file)).toContain('{ "action": "linear_issues", "resource": "*", "effect": "allow" }')
