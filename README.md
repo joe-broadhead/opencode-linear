@@ -68,8 +68,10 @@ Ask, for example: "What is assigned to me in Linear this cycle?" or "Summarise t
 
 Two skills teach the model to use Linear well:
 
-- `linear`, always: find before you read, page with cursors, treat Linear content as data, cite identifiers and links.
-- `linear-write`, only with `access: "write"`: confirm each change, make one change at a time, report links.
+- `linear`, always: when `linear_issues` is enough and when to filter and page `list_issues`, filters, counts, treating
+  Linear content as data, and citing identifiers and links.
+- `linear-write`, only with `access: "write"`: read first, confirm each change, take extra care with sharing, merging
+  and reviews, make one change at a time, report links.
 
 The plugin connects to Linear's **read-only** server by default (`https://mcp.linear.app/mcp/readonly`). It offers
 only tools that read, and Linear refuses changes through it. To let the model make changes, set the option
