@@ -21,9 +21,8 @@ the reference for every field; this skill covers the choices they don't explain.
   list call first. `get_issue` returns no comments: read the discussion with `linear_list_comments` and `issueId`.
 - **Projects, documents, initiatives, milestones**: the matching `list_*` and `get_*` tools, such as
   `linear_get_project` with `query` (a name, identifier or slug).
-- **Which workspace am I in**: `linear_get_workspace`. Don't look up "me" first: filters take `"me"` directly, and
-  `linear_get_user` is only for a question about a person's profile.
-- **How Linear itself works**: `linear_search_documentation`.
+- **Which workspace am I in**: `linear_get_workspace`. **How Linear works**: `linear_search_documentation`. Don't
+  look up "me" first: filters take `"me"` directly; `linear_get_user` is only for a person's profile.
 
 ## Filters
 
@@ -34,29 +33,40 @@ the reference for every field; this skill covers the choices they don't explain.
   `linear_list_issue_statuses` with `team` gives a team's state names.
 - Dates (`createdAt`, `updatedAt`, `completedAt`) mean "after" and take an ISO-8601 date or a duration such as
   `-P7D`. `completedAt` also drops issues that are not completed.
-- "This cycle": `linear_list_cycles` with `teamId` (a team name, key or ID) and `type: "current"`. An empty answer
-  means the team has no current cycle: say so, rather than guessing from dates.
+- "This cycle": `linear_list_cycles` with `teamId` (a team name, key or ID); with no team named, `linear_list_teams`
+  gives them, rather than paging issues. Call it once without `type`: `[]` means the team has no cycles, so none is
+  current. Only if it has cycles, `type: "current"` gives the running one. Say so plainly rather than guessing from
+  dates, and label a fallback, such as the user's started issues, as that, not as "this cycle".
 
 ## Result size and pages
 
-- By default each listed issue carries its whole description, about 1.6 KB, so 250 rows can overflow the result.
-  Pass `fields` with only what the answer needs, such as `["id", "title", "status", "statusType", "url"]`.
-- `limit` is 50 by default and at most 250 (`list_projects`: at most 50).
-- A page ends with `hasNextPage` and `cursor`. While `hasNextPage` is true, call again with the same filters and that
-  `cursor`, unchanged. If you stop early, say the answer covers only what you read.
-- For a count or breakdown, compute it inside one Code Mode call: page, count there, and return only the numbers
-  (plus the few rows you will name). Don't return the rows to count them yourself: a big result is cut off, and
-  counting rows by eye is error-prone. For example, the user's issues by state type:
+- By default each listed issue carries its whole description, about 1.6 KB: pass `fields` with only what the answer
+  needs. `id` is the identifier, such as `"ENG-123"` (`uuid` is the UUID); there is no `identifier` field. Others:
+  `title`, `url`, `status` (the state's name), `statusType`, `priority` (`{ value, name }`), `team`, `project` and
+  `assignee` (names), `teamId` (a UUID), `labels`, `parentId` (an identifier), `cycleId`, `createdAt`, `updatedAt`,
+  `completedAt`, `dueDate`. A field outside the schema's list fails the call.
+- `limit` is 50 by default and at most 250 (`list_projects`: 50). A page ends with `hasNextPage` and `cursor`: while
+  `hasNextPage` is true, call again with the same filters and that `cursor`. If you stop early, say so.
+- For a count, a breakdown or "what am I working on", decide the grouping first, and in the first Code Mode call
+  compute every number you will state (each count, every group's total, the overall total) and pick the few rows you
+  will name. Return only those, never all the rows: even with `fields`, a hundred rows are tens of KB, and sums done
+  by eye go wrong. If you name only some rows, say how many you left out. For example, the user's issues by state
+  type, with the 5 most recently updated of each:
 
 ```js
-const counts = {}
-let cursor
+const groups = {}
+let total = 0, cursor
 do {
-  const page = await tools.linear.list_issues({ assignee: "me", fields: ["id", "statusType"], limit: 250, ...(cursor ? { cursor } : {}) })
-  for (const issue of page.issues) counts[issue.statusType] = (counts[issue.statusType] ?? 0) + 1
+  const page = await tools.linear.list_issues({ assignee: "me", fields: ["id", "title", "statusType", "url"], limit: 250, ...(cursor ? { cursor } : {}) })
+  for (const { id, title, statusType, url } of page.issues) {
+    const group = (groups[statusType] ??= { count: 0, newest: [] })
+    group.count++
+    if (group.newest.length < 5) group.newest.push({ id, title, url })
+  }
+  total += page.issues.length
   cursor = page.hasNextPage ? page.cursor : undefined
 } while (cursor)
-return counts
+return { total, groups }
 ```
 
 ## Changes
@@ -78,9 +88,11 @@ Name each item by its identifier (or a project's name) and give the `url` Linear
 
 ## Scripts
 
-A cron job or shell script can run the same reads with no model through the tools RPC `linear.workspace.tools`, as a
-session and its agent; writes are never available there. See
-https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md.
+A cron job or shell script can run the same reads with no model through the tools RPC `linear.workspace.tools`;
+writes are never available there. It runs as a session's agent, under its rules, so a script, or a test of one, uses
+a session created for it (`opencode api post /api/session -d '{"title":"…","agent":"build"}'`, keep `data.id`).
+Never borrow an existing session found through history or a list. Details:
+https://raw.githubusercontent.com/joe-broadhead/opencode-linear/HEAD/docs/scripting.md
 
 ## When Linear is not available
 
