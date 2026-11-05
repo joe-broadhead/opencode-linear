@@ -113,7 +113,7 @@ describe("status view", () => {
     expect(view.alerts[0]!.message).toBe(`${formatStatus(answer).split("\n").slice(1).join("\n")}\n\nr refresh · esc close`)
     expect(view.alerts[0]!.message).toContain(`- Next step: ${SIGN_IN}`)
     expect(view.alerts[0]!.message).toContain("- Access: read and write")
-    expect(view.alerts[0]!.message).toContain("- Agents without default rules: reviewer.")
+    expect(view.alerts[0]!.message).toContain("- Agents without default rules: reviewer\n")
     expect(view.sizes.at(-1)).toEqual({ size: "large" })
   })
 
