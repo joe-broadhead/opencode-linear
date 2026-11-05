@@ -21,7 +21,8 @@ the reference for every field; this skill covers the choices they don't explain.
   list call first. `get_issue` returns no comments: read the discussion with `linear_list_comments` and `issueId`.
 - **Projects, documents, initiatives, milestones**: the matching `list_*` and `get_*` tools, such as
   `linear_get_project` with `query` (a name, identifier or slug).
-- **Which workspace am I in**: `linear_get_workspace`. The user's own profile: `linear_get_user` with `query: "me"`.
+- **Which workspace am I in**: `linear_get_workspace`. Don't look up "me" first: filters take `"me"` directly, and
+  `linear_get_user` is only for a question about a person's profile.
 - **How Linear itself works**: `linear_search_documentation`.
 
 ## Filters
@@ -43,8 +44,9 @@ the reference for every field; this skill covers the choices they don't explain.
 - `limit` is 50 by default and at most 250 (`list_projects`: at most 50).
 - A page ends with `hasNextPage` and `cursor`. While `hasNextPage` is true, call again with the same filters and that
   `cursor`, unchanged. If you stop early, say the answer covers only what you read.
-- For a count or breakdown, page inside one Code Mode call and return only the totals, for example the user's
-  issues by state type:
+- For a count or breakdown, compute it inside one Code Mode call: page, count there, and return only the numbers
+  (plus the few rows you will name). Don't return the rows to count them yourself: a big result is cut off, and
+  counting rows by eye is error-prone. For example, the user's issues by state type:
 
 ```js
 const counts = {}
