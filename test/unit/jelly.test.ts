@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
-import { ISSUES_ACTION } from "../../src/issues.js"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
+
+const ISSUES_ACTION = "linear_issues"
 
 /**
  * The `jelly` section of package.json, which Jelly reads without loading the plugin. Jelly writes each declared

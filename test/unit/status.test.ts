@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import { checkHost } from "../../src/host-version.js"
 import { defaultRules } from "../../src/permissions.js"
-import { AGENTS_FIX, AGENTS_NEXT_STEP, buildStatus, NOTHING_TO_DO, formatStatus, readStatus, registerStatusCommand, registerStatusRpc, shortReason, SIGN_IN, StatusRpc, type Status, type StatusContext, type StatusFacts } from "../../src/status.js"
+import { buildStatus, formatStatus, readStatus, registerStatusCommand, registerStatusRpc, shortReason, StatusRpc, type Status, type StatusContext, type StatusFacts } from "../../src/status.js"
 import { VERSION } from "../../src/version.js"
 import { allow } from "./fake.js"
+
+const SIGN_IN = "Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth linear opens it automatically)."
+const NOTHING_TO_DO = "Nothing to do."
+/** The default rules as /linear-status shows them: one rule a line, a JSON array body. */
+const AGENT_RULES = defaultRules().map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`).join("\n")
 
 const host = checkHost("2.2.3", false)
 const READ_URL = "https://mcp.linear.app/mcp/readonly"
@@ -112,14 +117,14 @@ describe("buildStatus", () => {
   test("names agents without the default rules, with the block to paste, and points the next step at it", () => {
     const status = buildStatus({ ...base, access: "write", agents: [guarded, { id: "reviewer", permissions: [allow("*")] }] })
     expect(status.unguardedAgents).toEqual(["reviewer"])
-    expect(status.nextStep).toBe(`Put the block first in each listed agent's own "permissions", followed by your top-level rules for linear_* tools.`)
-    expect(status.nextStep).toBe(AGENTS_NEXT_STEP)
-    expect(AGENTS_FIX).toContain(`first in each listed agent's own "permissions"`)
-    expect(AGENTS_FIX).toContain(`followed by your top-level "permissions" rules for linear_* tools`)
+    expect(status.nextStep).toBe(
+      "Put the default rules shown by /linear-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Linear tools.",
+    )
     // One rule a line, as a JSON array body that pastes into a permissions list.
-    expect(JSON.parse(`[${AGENTS_FIX.split("\n").slice(1).join("\n")}]`)).toEqual(defaultRules())
+    expect(JSON.parse(`[${AGENT_RULES}]`)).toEqual(defaultRules())
     const text = formatStatus(status)
-    expect(text).toContain(`- Agents without default rules: reviewer. Linear tools run there without asking. ${AGENTS_FIX}\n`)
+    // The row lists the names only, then the rules.
+    expect(text).toContain(`- Agents without default rules: reviewer\n${AGENT_RULES}\n- OpenCode:`)
     expect(text.indexOf("- Agents without")).toBeLessThan(text.indexOf("- OpenCode:"))
     expect(text.indexOf("- Tools:")).toBeLessThan(text.indexOf("- Agents without"))
   })
@@ -138,7 +143,7 @@ describe("buildStatus", () => {
     expect(status.nextStep).toBe(SIGN_IN)
     const text = formatStatus(status)
     expect(text).toContain(`- Connection: sign-in required (${READ_URL}, registered by this plugin)`)
-    expect(text).toContain("- Agents without default rules: reviewer.")
+    expect(text).toContain("- Agents without default rules: reviewer\n")
     expect(text.match(/Next step/g)).toHaveLength(1)
   })
 
@@ -155,11 +160,12 @@ describe("buildStatus", () => {
     expect(formatStatus(status)).toContain(
       `- OpenCode: 2.3.0 (untested; supported range >=2.2.3 <2.3.0). It is outside the supported range; the plugin runs because allowUntestedHost is true. If Linear misbehaves, use OpenCode 2.2.3, 2.2.4 or 2.2.5. ${problem}`,
     )
-    const untested = "If Linear misbehaves, use OpenCode 2.2.3, 2.2.4 or 2.2.5, the tested releases."
-    expect(buildStatus({ ...base, host: outside }).nextStep).toBe(untested)
-    // A release inside the range that the checks do not run on starts, and is called untested.
+    // The OpenCode row carries the warning; the next step stays the working state's.
+    expect(buildStatus({ ...base, host: outside }).nextStep).toBe(NOTHING_TO_DO)
+    // A release inside the range that the checks do not run on starts, is called untested, and changes no next step.
     const inside = buildStatus({ ...base, host: checkHost("2.2.6", false) })
-    expect(inside).toMatchObject({ state: "connected", host: { version: "2.2.6", tested: false }, nextStep: untested })
+    expect(inside).toMatchObject({ state: "connected", host: { version: "2.2.6", tested: false }, nextStep: NOTHING_TO_DO })
+    expect(buildStatus({ ...base, host: checkHost("2.2.6", false), server: { status: "needs_auth" } }).nextStep).toBe(SIGN_IN)
     expect(formatStatus(inside)).toContain("- OpenCode: 2.2.6 (untested; supported range >=2.2.3 <2.3.0)\n")
     expect(formatStatus(buildStatus({ ...base, host: checkHost("2.2.5", false) }))).toContain("- OpenCode: 2.2.5 (tested; supported range >=2.2.3 <2.3.0)\n")
     expect(buildStatus(base).nextStep).toBe(NOTHING_TO_DO)

@@ -68,9 +68,9 @@ sign-in is required. It clears only its own report, once the server is connected
 `readStatus` reads the server's state (`ctx.mcp.list()`), the account label (`ctx.integration.connection.active`),
 the `linear` tools (`ctx.tool.list()`, by the namespace `linear`) and every agent's rules (`ctx.agent.list()`).
 `buildStatus` turns them into one model, and `formatStatus` renders it in a fixed order: Connection (state and
-server), Account, Access, Tools (counts and up to 20 unknown names), Agents without default rules (names and the block
-to paste, one rule a line), OpenCode (version, tested or not, the supported range, and setup problems), and exactly one
-Next step, "Nothing to do." when nothing is needed. An agent is listed only when it lacks the block and its own rules
+server), Account, Access, Tools (counts and up to 20 unknown names), Agents without default rules (names, then the
+default rules to paste, one rule a line), OpenCode (version, tested or not, the supported range, and setup problems), and exactly one
+Next step, "Nothing to do." when nothing is needed. An agent is listed only when it lacks the rules and its own rules
 would let a new Linear tool run without asking. OpenCode's text for a needed sign-in is never shown, and a failure's
 reason is cut to one line of 160 characters with no URL query.
 

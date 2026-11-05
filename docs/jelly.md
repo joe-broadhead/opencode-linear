@@ -25,7 +25,7 @@ changes nothing in Jelly.
 - Everything else runs, as the plugin's own rules let it.
 
 A tool the upstream server adds later is not declared, so in Jelly it is not asked about by
-default. Keep `jelly.tools` in step with the known-tool list; `test/**/jelly.test.ts` checks
+default. Keep `jelly.tools` in step with the known-tool list; `test/unit/jelly.test.ts` checks
 each declared effect against the plugin's own default rules.
 
 ## Skills
