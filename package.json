@@ -1,6 +1,6 @@
 {
   "name": "@joe-broadhead/opencode-linear",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Unofficial OpenCode plugin for Linear: find, read and cite issues, projects and documents through Linear's official MCP server",
   "keywords": [
     "opencode",
@@ -56,7 +56,7 @@
   },
   "jelly": {
     "title": "Linear",
-    "summary": "Find and read Linear issues, projects and documents.",
+    "summary": "Your Linear issues, projects and documents.",
     "icon": "assets/icon.svg",
     "tools": [
       {
