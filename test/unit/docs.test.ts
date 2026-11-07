@@ -80,8 +80,11 @@ describe("docs", () => {
     expect(text("docs/jelly.md")).toContain("the one line in `jelly.summary`, and beside it the mark in `jelly.icon`")
   })
 
-  test("the scripting guide lists exactly the known reads as methods", () => {
-    const list = /\(`READ_TOOLS` in `src\/linear-tools\.ts`\): (.*?)\. /.exec(text("docs/scripting.md"))?.[1] ?? ""
-    expect([...list.matchAll(/`([a-z_]+)`/g)].map((match) => match[1])).toEqual([...READ_TOOLS])
+  test("the scripting guide says the methods are every known tool, and names the reads and writes as one table", () => {
+    const guide = text("docs/scripting.md")
+    expect(guide).toContain("(`METHODS` in `src/host/tools-rpc.ts`)")
+    expect(guide).toContain(`${READ_TOOLS.length} reads and the ${WRITE_TOOLS.length}`)
+    expect(guide).toContain("`issues`")
+    expect(guide).toContain("x-opencode-directory")
   })
 })

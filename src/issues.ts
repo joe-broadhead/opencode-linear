@@ -1,5 +1,6 @@
 import type { Plugin } from "@opencode/plugin"
 import { linearError, SERVER_NAME } from "./constants.js"
+import type { PluginMethod } from "./host/tools-rpc.js"
 import type { Status } from "./status.js"
 
 /**
@@ -132,6 +133,25 @@ export function issuesTool({ tool, owned, status }: IssuesToolOptions) {
       const shown = rows.slice(0, limit)
       return { output: { columns: COLUMNS.map((column) => ({ ...column })), rows: shown }, content: issuesText(shown, more || rows.length > limit) }
     },
+  }
+}
+
+/**
+ * `linear_issues` as a tools RPC method, `issues`: the tool's own spec, so the same table and the same read through the
+ * host's `list_issues` executor. It is a direct-only read, as on the model path.
+ */
+export function issuesMethod(options: IssuesToolOptions): PluginMethod {
+  const tool = issuesTool(options)
+  return {
+    kind: "plugin",
+    class: "read",
+    directOnly: true,
+    name: ISSUES_TOOL,
+    action: `${SERVER_NAME}_${ISSUES_TOOL}`,
+    description: tool.description,
+    input: tool.input,
+    output: tool.output,
+    run: async (input, call) => (await tool.execute(input, call as unknown as Context)).output,
   }
 }
 

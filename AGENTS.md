@@ -49,9 +49,10 @@ the checks and the release steps.
   cleaner refuses.
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.
 - **The tools RPC.** `src/host/tools-rpc.ts` is a copy of a module shared by several plugins. Change only its block
-  between the `PLUGIN-SPECIFIC` markers here; change the rest in the shared copy first. Its methods are `READ_TOOLS`
-  and nothing else: never a write or an unknown tool. Keep the RPC id `linear.workspace.tools` and its method names
-  stable: scripts call them by name.
+  between the `PLUGIN-SPECIFIC` markers here; change the rest in the shared copy first. Its methods are every known
+  tool (`READ_TOOLS` and `WRITE_TOOLS`, each with its class) and the owned read `issues`, never an unknown tool. A rule
+  must allow a method before a script runs it: an `ask` is refused, and a saved "Always allow" is not a grant. Keep the
+  RPC id `linear.workspace.tools` and its method names stable: scripts call them by name.
 - **Tests.** Unit tests use narrow `Pick<Plugin.Context, ...>` fakes. Host tests use the public `@opencode/sdk` with
   `OpenCode.create({ app: { version } })`, a loopback fake server and the temp root from `test/host/isolate.ts`.
   Every temp root of the host and pack tests is a git repository under the system's `/tmp`, never under `TMPDIR` or

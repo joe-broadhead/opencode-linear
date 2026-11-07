@@ -65,19 +65,26 @@ Things to know:
 ## Scripts
 
 The tools RPC (`linear.workspace.tools`, see
-[docs/scripting.md](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md)) runs Linear's
-known read tools for a script, with no model. It adds no authority:
+[docs/scripting.md](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md)) calls Linear's tools
+for a script, with no model. Every known tool is a method, with its class, but a method is not a grant:
 
-- A script names a session that names an agent, and runs as them. A tool that the agent's or the session's rules hide
-  from the model is refused. OpenCode's own executor then checks the call against the agent's rules, the session's
-  rules and saved approvals, as it does for the model.
-- An ask on a script's call is denied, not prompted: no one is there to answer it. The plugin's permission hook
-  changes only an ask on one of its own script calls in flight, only to a deny, and leaves every other call alone.
-- Only the 41 known reads are methods. Linear's write tools never are, with either access, and neither is a tool that
-  Linear adds later, even with an allow rule.
+- A script names a session that names an agent, and runs as them. Before any call, the plugin resolves that method's
+  permission action against the agent's rules and then the session's rules, the host's own order. Only `allow` runs: a
+  rule that resolves to `ask` is refused because no one can answer it, and a `deny` is refused. Neither makes a call.
+  The default rules allow the reads and `linear_issues` and ask for every write, so a script writes only with a prior
+  explicit `allow` in the agent's or the session's rules, and with `access: "write"`.
+- A saved "Always allow" is **not** consulted: it lives outside the agent's and session's rules, so an old click does
+  not authorize a new script. A grant is reviewable in config, or in a Jobs one-off's approval.
+- After the resolve, an MCP call runs through OpenCode's own executor, which checks the action again, as it does for
+  the model. `issues` runs the plugin's own `linear_issues` spec, which reads through the host's `linear_list_issues`,
+  so that read's rules apply too. The plugin's permission hook still changes only an `ask` on one of its own script
+  calls in flight, only to a deny, and leaves every other call alone.
+- A tool Linear adds later is not a method, so a script cannot reach it until a release classifies it.
 - The call goes through OpenCode's own MCP connection and sign-in. The plugin never sees the token, and returns none.
 - Linear's error text reaches the script only as the first line, at most 300 characters, with tokens and URL query
   strings removed.
+- A session in another location is `SESSION_UNKNOWN`, and a call that names no location reaches the service's default
+  location: send `x-opencode-directory` with each call.
 - OpenCode's `execute.before` and `execute.after` tool hooks, from any plugin, do not run for a script's call, so
   another plugin's policy hook does not see it. A script's calls are not recorded in the session.
 - The RPC is reachable only by callers of the OpenCode server API, who already hold the server's full authority. The

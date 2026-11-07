@@ -1,9 +1,9 @@
 import { Plugin, type Mcp } from "@opencode/plugin"
 import { errorText, NAMESPACE_DESCRIPTION, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { checkHost } from "./host-version.js"
-import { registerToolsRpc } from "./host/tools-rpc.js"
+import { METHODS, registerToolsRpc } from "./host/tools-rpc.js"
 import { watchIntegration } from "./integration.js"
-import { registerIssuesTool } from "./issues.js"
+import { issuesMethod, registerIssuesTool } from "./issues.js"
 import { parseOptions, type Access } from "./options.js"
 import { defaultRules, registerDefaultRules } from "./permissions.js"
 import { loadSkills, registerSkills } from "./skills.js"
@@ -84,12 +84,14 @@ export function createLinearPlugin(seam: LinearSeam) {
       const read = () => readStatus(ctx, { ...(source ? { source } : {}), access: options.access, host, problems: [...problems.values()] })
       // The plugin's own server, or the user's adopted one; a server at another URL is not Linear's for this access.
       const owned = () => source?.type === "plugin" || source?.type === "adopted"
-      await registerIssuesTool({ tool: ctx.tool, owned, status: read })
+      const issues = { tool: ctx.tool, owned, status: read }
+      await registerIssuesTool(issues)
       await registerSkills(ctx.skill, skills)
       await registerStatusCommand(ctx, read)
       await registerStatusRpc(ctx.rpc, read)
-      // Scripts call the known reads with no model, as a session and its agent.
-      const stopTools = await registerToolsRpc(ctx, { mcp: { server: SERVER_NAME, managed: owned } })
+      // Scripts call every known tool and linear_issues with no model, as a session and its agent: a write needs a
+      // prior allow rule for its action.
+      const stopTools = await registerToolsRpc(ctx, { methods: [...METHODS, issuesMethod(issues)], mcp: { server: SERVER_NAME, managed: owned } })
       const stopWatch = watchIntegration(ctx, owned)
       return async () => {
         await stopWatch()

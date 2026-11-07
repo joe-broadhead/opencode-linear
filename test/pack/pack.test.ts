@@ -254,8 +254,8 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
   const where = (access: "read" | "write") => (access === "read" ? host.directory : host.writeDirectory)
 
   /** A tools RPC call: its output, or the error's `{ type, code, message }`. */
-  async function script(access: "read" | "write", method: string, input: unknown): Promise<Record<string, any>> {
-    const response = await host.request("POST", `/api/rpc/${TOOLS_RPC_ID}/${method}`, { input }, where(access))
+  async function script(access: "read" | "write", method: string, input: unknown, location: string | undefined = where(access)): Promise<Record<string, any>> {
+    const response = await host.request("POST", `/api/rpc/${TOOLS_RPC_ID}/${method}`, { input }, location)
     const body = response.body as Record<string, any>
     if (response.ok) return { value: body.output }
     const error = (body?.error ?? body) as Record<string, any>
@@ -291,6 +291,8 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
       // Session rules come after the agent's: one narrows build, the other reopens one tool for locked.
       sessions[access].narrow = await create({ agent: "build", permissions: [rule("linear_list_issues", "deny")] })
       sessions[access].reopen = await create({ agent: "locked", permissions: [rule("linear_list_issues", "allow")] })
+      // A script's own grant for one write, for that session only.
+      sessions[access].granted = await create({ agent: "build", permissions: [rule("linear_save_issue", "allow")] })
     }
   }, 600_000)
   afterAll(async () => {
@@ -298,19 +300,49 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     await fake?.close()
   }, 60_000)
 
-  test.each(["read", "write"] as const)("in %s access, describes exactly the 41 known reads, each available with its live schema", async (access) => {
+  test.each(["read", "write"] as const)("in %s access, describes every known tool with its class, and the owned issues method", async (access) => {
     const { value } = await script(access, "describe", {})
     expect(value.id).toBe(TOOLS_RPC_ID)
-    expect(value.methods.map((method: { name: string }) => method.name)).toEqual([...READ_TOOLS])
-    for (const method of value.methods) {
-      expect({ name: method.name, kind: method.kind, action: method.action, available: method.available }).toEqual({
-        name: method.name,
+    expect(value.methods.map((method: { name: string }) => method.name)).toEqual([...READ_TOOLS, ...WRITE_TOOLS, "issues"])
+    const listed = new Set(access === "read" ? READ_TOOLS : [...READ_TOOLS, ...WRITE_TOOLS])
+    for (const method of value.methods.slice(0, -1)) {
+      const name = method.name as string
+      expect({ name, kind: method.kind, action: method.action, available: method.available }).toEqual({
+        name,
         kind: "mcp",
-        action: `linear_${method.name}`,
-        available: true,
+        action: `linear_${name}`,
+        available: listed.has(name),
       })
-      expect(method.input).toEqual({ type: "object", properties: { query: { type: "string" } } })
+      expect(method.class).toBe((READ_TOOLS as readonly string[]).includes(name) ? "read" : "write")
+      if (listed.has(name)) expect(method.input).toEqual({ type: "object", properties: { query: { type: "string" } } })
     }
+    // The plugin's own direct read is a method in both access modes.
+    expect(value.methods.at(-1)).toMatchObject({ name: "issues", kind: "plugin", class: "read", action: "linear_issues", available: true })
+    expect(Object.keys(value.methods.at(-1).input.properties)).toEqual(["limit"])
+  })
+
+  test.each(["read", "write"] as const)("in %s access, a deny refuses and a write that would ask is refused before Linear is called", async (access) => {
+    const from = fake.calls.length
+    // `locked` denies Linear; `careful` asks for list_issues in read access, and in write access `build` asks for
+    // every write by the plugin's default rules.
+    const asks = access === "read" ? [["careful", "list_issues"], ["locked", "list_issues"]] : [["build", "save_issue"], ["locked", "save_issue"]]
+    for (const [method, name] of asks) {
+      const refused = await call(access, method!, name!, { query: "q" })
+      expect({ method, name, code: refused.code }).toEqual({ method, name, code: "PERMISSION_DENIED" })
+    }
+    expect(fake.calls.slice(from)).toEqual([])
+    if (access === "write") {
+      expect((await call("write", "granted", "save_issue", { query: "q" })).value).toMatchObject({ output: { tool: "save_issue" } })
+      expect(fake.calls.slice(from)).toEqual(["save_issue"])
+    }
+  })
+
+  test("in read access, the issues method answers with the table linear_issues returns", async () => {
+    const from = fake.called.length
+    const { value } = await call("read", "build", "issues", {})
+    expect(value.columns.map((column: { key: string }) => column.key)).toEqual(["identifier", "title", "state", "priority", "url"])
+    expect(value.rows.length).toBeGreaterThan(0)
+    expect(fake.called.slice(from).map((entry) => entry.tool)).toEqual(["list_issues"])
   })
 
   test.each(["read", "write"] as const)("in %s access, runs a known read as the session's agent, on that access's server, with no model turn", async (access) => {
@@ -328,12 +360,10 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     expect(await call("read", "build", "get_issue", { query: "text" })).toEqual({ value: { output: "text from get_issue", text: "text from get_issue" } })
   })
 
-  test("never makes a known write or an unknown tool a method, in write access where OpenCode lists them all", async () => {
+  test("never makes an unknown tool a method, in write access where OpenCode lists it", async () => {
     const from = fake.calls.length
-    for (const name of [...WRITE_TOOLS, NEW_TOOL.name]) {
-      const result = await call("write", "build", name, { query: "q" })
-      expect({ name, type: result.type }).toEqual({ name, type: "rpc.method_not_found" })
-    }
+    const result = await call("write", "build", NEW_TOOL.name, { query: "q" })
+    expect(result).toMatchObject({ type: "rpc.method_not_found" })
     expect(toolCalls(from)).toEqual([])
   })
 
@@ -348,7 +378,7 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     const started = Date.now()
     const result = await call("read", "careful", "list_issues", { query: "q" })
     expect(result).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
-    expect(result.message).toMatch(/cannot answer an approval prompt/)
+    expect(result.message).toMatch(/would ask for this session's agent, and a script cannot answer/)
     expect(Date.now() - started).toBeLessThan(5000)
     const { data: pending } = await host.api<{ data: unknown[] }>("GET", "/api/permission/request")
     expect(pending.filter((request) => JSON.stringify(request).includes(sessions.read.careful!))).toEqual([])
@@ -372,8 +402,19 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     expect(UPSTREAM_FAILURE).toContain("fake-signature-123")
   })
 
+  test("the location decides: another location answers rpc.unavailable, and the query names this one", async () => {
+    const elsewhere = join(host.base, "elsewhere")
+    mkdirSync(elsewhere, { recursive: true })
+    const refused = await script("read", "list_issues", { sessionID: sessions.read.build, input: {} }, elsewhere)
+    expect(refused.status).toBe(400)
+    expect(refused.message).toMatch(/unavailable/i)
+    expect((await call("read", "build", "list_issues", { query: "q" })).value).toBeDefined()
+  })
+
   test("names an unknown session, a session without an agent, and rejects an envelope with extra keys", async () => {
-    expect(await call("read", "ses_does_not_exist", "list_issues", { query: "q" })).toMatchObject({ type: "failed", code: "SESSION_UNKNOWN" })
+    const unknown = await call("read", "ses_does_not_exist", "list_issues", { query: "q" })
+    expect(unknown).toMatchObject({ type: "failed", code: "SESSION_UNKNOWN" })
+    expect(unknown.message).toContain("x-opencode-directory")
     expect(await call("read", "agentless", "list_issues", { query: "q" })).toMatchObject({ type: "failed", code: "SESSION_AGENT_REQUIRED" })
     const from = fake.calls.length
     for (const envelope of [{ sessionID: sessions.read.build, input: { query: "q" }, extra: true }, { input: { query: "q" } }, { sessionID: sessions.read.build, input: "q" }])
@@ -446,9 +487,9 @@ async function serve(version: string, installed: string, options: { readonly nam
 
   const authorization = `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`
   /** The response's status and parsed body, whatever the status. */
-  const request = async (method: string, path: string, body?: unknown, location = directory) => {
+  const request = async (method: string, path: string, body?: unknown, location: string | undefined = directory) => {
     const url = new URL(path, `http://127.0.0.1:${port}`)
-    url.searchParams.set("location[directory]", location)
+    if (location !== undefined) url.searchParams.set("location[directory]", location)
     const response = await fetch(url, { method, headers: { authorization, "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) })
     const text = await response.text()
     let parsed: unknown = text
@@ -480,7 +521,7 @@ async function serve(version: string, installed: string, options: { readonly nam
     await exited
     clearTimeout(timer)
   }
-  return { api, request, until, close, directory, writeDirectory, log: () => log }
+  return { api, request, until, close, directory, writeDirectory, base, log: () => log }
 }
 
 // The files a `files` entry should put in the tarball. dist/ must hold exactly the two bundles, so stale or foreign

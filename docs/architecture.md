@@ -3,7 +3,7 @@
 The plugin is a thin layer over Linear's official MCP server. OpenCode owns the MCP transport, OAuth, credentials,
 permission prompts and tool output limits. The plugin registers the server, names its `/connect` entry, adds default
 permission rules, reports status, ships two skills, adds one read of its own, `linear_issues`, and lets scripts call
-the known reads through a tools RPC. It has no runtime dependencies.
+the known tools through a tools RPC. It has no runtime dependencies.
 
 ## Layout
 
@@ -83,18 +83,19 @@ reason is cut to one line of 160 characters with no URL query.
 
 ## Tools RPC
 
-`linear.workspace.tools` lets a script call the known reads with no model; [Scripting](scripting.md) is the user's
-view. Its methods are `describe` and one per name in `READ_TOOLS`, named after the upstream tool. It is an allowlist:
-`WRITE_TOOLS`, and a tool that Linear adds later, which ask on the model path, are never methods. The methods are the
-same with either access: the server is always named `linear`. `READ_TOOLS` is what Linear's read-only server lists;
-`describe` reports each method as available or not from what OpenCode lists now.
+`linear.workspace.tools` lets a script call Linear's tools with no model; [Scripting](scripting.md) is the user's
+view. Its methods are `describe`, one per name in `READ_TOOLS` and `WRITE_TOOLS` (each named after the upstream tool,
+with its class), and `issues`, the plugin's own `linear_issues` as a direct-only read. The table is an allowlist: a
+tool that Linear adds later is never a method. The methods are the same with either access: the server is always
+named `linear`. With `access: "read"` only the reads are listed, so `describe` marks every write unavailable.
 
 A call is `{ sessionID, input }`. The module:
 
 1. looks up the session with `ctx.session.get`, and its agent's rules with `ctx.agent.get` in the session's location
    (`SESSION_UNKNOWN`, `SESSION_AGENT_REQUIRED`);
-2. refuses the tool when the last rule that matches `linear_<tool>` on `*`, in the agent's rules followed by the
-   session's, is a deny: OpenCode hides such a tool from the model (`PERMISSION_DENIED`);
+2. resolves the method's action (`linear_<tool>`, or `linear_issues`) against the agent's rules and then the
+   session's, and refuses anything but `allow` (`PERMISSION_DENIED`): an `ask` cannot be answered, and a `deny` is
+   hidden; either refuses before any tool call;
 3. refuses with `SERVER_CONFLICT` while `linear` is a user server at another URL than the one for `access`; an adopted
    server is the plugin's;
 4. finds the tool's executor in `ctx.tool.list()`, or names the server's connection state (`AUTH_REQUIRED` and so on)

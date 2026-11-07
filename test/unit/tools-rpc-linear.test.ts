@@ -2,7 +2,7 @@
 // tools-rpc.test.ts.
 import { describe, expect, test } from "bun:test"
 import { PLUGIN_ID as LINEAR_PLUGIN_ID, SERVER_NAME } from "../../src/constants.js"
-import { KNOWN_READS, NEXT_STEPS, PLUGIN_ID, TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
+import { METHODS, NEXT_STEPS, PLUGIN_ID, TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 import { defaultRules } from "../../src/permissions.js"
 
@@ -14,25 +14,27 @@ describe("Linear's tools RPC", () => {
     expect(TOOLS_RPC_ID).toBe("linear.workspace.tools")
   })
 
-  test("its methods are exactly the 41 known reads, the server tools the default rules allow", () => {
-    expect([...KNOWN_READS]).toEqual([...READ_TOOLS])
-    expect(KNOWN_READS).toHaveLength(41)
-    // The plugin's own linear_issues is allowed too, as a tool only: it is never a method.
+  test("its MCP methods are exactly the 41 known reads and the 36 known writes, each with its class", () => {
+    expect(METHODS.map((method) => method.name)).toEqual([...READ_TOOLS, ...WRITE_TOOLS])
+    expect(METHODS.filter((method) => method.class === "read").map((method) => method.name)).toEqual([...READ_TOOLS])
+    expect(METHODS.filter((method) => method.class === "write").map((method) => method.name)).toEqual([...WRITE_TOOLS])
+    expect(READ_TOOLS).toHaveLength(41)
+    expect(WRITE_TOOLS).toHaveLength(36)
+    // The plugin's own linear_issues is allowed too, and is the owned method `issues`, not an MCP one.
     const allowed = defaultRules().filter((rule) => rule.effect === "allow").map((rule) => rule.action)
-    expect(KNOWN_READS.map((name) => `${SERVER_NAME}_${name}`)).toEqual(allowed.filter((action) => action !== ISSUES_ACTION))
+    expect(READ_TOOLS.map((name) => `${SERVER_NAME}_${name}`)).toEqual(allowed.filter((action) => action !== ISSUES_ACTION))
     expect(allowed).toContain(ISSUES_ACTION)
-    expect(KNOWN_READS).not.toContain("issues")
+    expect(METHODS.map((method) => method.name)).not.toContain("issues")
   })
 
-  test("no known write and no unknown tool is a method", () => {
-    expect(WRITE_TOOLS).toHaveLength(36)
-    expect(KNOWN_READS.filter((name) => WRITE_TOOLS.includes(name))).toEqual([])
-    for (const name of ["shiny_new_tool", "describe", "*"]) expect(KNOWN_READS).not.toContain(name)
+  test("no unknown tool is a method", () => {
+    for (const name of ["shiny_new_tool", "describe", "*"]) expect(METHODS.map((method) => method.name)).not.toContain(name)
   })
 
   test("names Linear's own commands in its next steps, and has no per-account servers", () => {
     expect(NEXT_STEPS.AUTH_REQUIRED).toContain("/connect")
     expect(NEXT_STEPS.SERVER_CONFLICT).toContain("mcp.servers.linear")
+    expect(NEXT_STEPS.SESSION_UNKNOWN).toContain("x-opencode-directory")
     for (const step of Object.values(NEXT_STEPS)) expect(step).toMatch(/[^.]\.$/)
     expect(NEXT_STEPS.ACCOUNT_UNKNOWN).toBeUndefined()
   })

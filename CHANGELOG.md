@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The tools RPC is v2: every known tool is a method with its class (the 41 reads and the 36 writes), and `linear_issues` is the owned method `issues` (a direct-only read). A call runs only with a prior explicit `allow` in the agent's or the session's rules: an `ask` is refused before the tool runs, so no prompt waits, and a saved "Always allow" does not authorize an ad-hoc script. With `access: "read"` a write is a method but unavailable, since Linear's read-only server does not list it. A tool Linear adds later is still not a method.
+
 ## [0.0.8] - 2026-11-06
 
 ### Changed
