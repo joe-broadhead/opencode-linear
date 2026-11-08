@@ -20,9 +20,8 @@ writes each declared `ask` or `deny` as that tool's default instead (the person'
 replaces it), and denies a read-only helper every tool not marked `readOnly`. A declared `allow`
 changes nothing in Jelly.
 
-- Ask: `linear_create_attachment`, `linear_create_attachment_from_upload`, `linear_create_initiative_label`, `linear_create_issue_label`, `linear_delete_attachment`, `linear_delete_comment`, `linear_delete_diff_comment`, `linear_delete_status_update`, `linear_mark_notification`, `linear_merge_diff`, `linear_prepare_attachment_upload`, `linear_prepare_file_upload`, `linear_resolve_diff_thread`, `linear_restore_initiative_label`, `linear_restore_issue_label`, `linear_restore_project_label`, `linear_retire_initiative_label`, `linear_retire_issue_label`, `linear_retire_project_label`, `linear_save_comment`, `linear_save_diff_comment`, `linear_save_document`, `linear_save_initiative`, `linear_save_initiative_label`, `linear_save_issue`, `linear_save_issue_label`, `linear_save_milestone`, `linear_save_project`, `linear_save_project_label`, `linear_save_release`, `linear_save_release_note`, `linear_save_status_update`, `linear_share_issue`, `linear_submit_diff_review`, `linear_unshare_issue`, `linear_update_diff`.
-- Off: none.
-- Everything else runs, as the plugin's own rules let it.
+- Ask: none. Every tool is declared `allow`, so a Jelly agent runs what the plugin's own default allows.
+- Off: none. To make one ask or stop, declare `ask` or `deny` for it, or set the plugin's `access` option in the agent's options.
 
 A tool the upstream server adds later is not declared, so in Jelly it is not asked about by
 default. Keep `jelly.tools` in step with the known-tool list; `test/unit/jelly.test.ts` checks
