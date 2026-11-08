@@ -27,9 +27,9 @@ describe("the jelly declaration", () => {
     expect(declarationProblems(ROOT, { effectOf: (permission) => evaluate([BASE_ALLOW, ...defaultRules()], permission) })).toEqual([])
   })
 
-  test("declares Linear's reads as reads that run and its writes as writes that ask", () => {
+  test("declares every Linear tool as allowed, the reads as reads", () => {
     for (const tool of READ_TOOLS) expect(byPermission.get(`linear_${tool}`)).toMatchObject({ effect: "allow", readOnly: true })
-    for (const tool of WRITE_TOOLS) expect(byPermission.get(`linear_${tool}`)).toMatchObject({ effect: "ask", readOnly: false })
+    for (const tool of WRITE_TOOLS) expect(byPermission.get(`linear_${tool}`)).toMatchObject({ effect: "allow", readOnly: false })
     expect(byPermission.get(ISSUES_ACTION)).toMatchObject({ name: "linear.issues", effect: "allow", readOnly: true })
     expect(jelly.tools).toHaveLength(READ_TOOLS.length + WRITE_TOOLS.length + 1)
     // Exactly the known tools: none Linear no longer serves, such as whoami.

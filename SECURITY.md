@@ -35,15 +35,19 @@ project.
 
 What the model can do in Linear is limited by three layers, in this order:
 
-1. **Linear's server.** With `access: "read"` (the default), the plugin registers Linear's read-only server,
+1. **Linear's server.** With `access: "read-only"`, the plugin registers Linear's read-only server,
    `https://mcp.linear.app/mcp/readonly`, with the `read` scope. It lists only tools that read, and Linear refuses
-   changes through it. With `access: "write"`, the plugin registers `https://mcp.linear.app/mcp` with `read write`.
-   The two servers have different addresses, so each needs its own sign-in. If you define `mcp.servers.linear`
-   yourself, the plugin adopts it only at the URL for your `access`.
-2. **Default permission rules.** Every Linear tool asks before it runs, except Linear's read tools listed in
-   `src/linear-tools.ts`, and the plugin's own `linear_issues`. Reads, `linear_extract_images` included, run without a
-   prompt. To review each image fetch, add `{ "action": "linear_extract_images", "resource": "*", "effect": "ask" }`
-   to your `permissions`.
+   changes through it. Otherwise the plugin registers `https://mcp.linear.app/mcp` with `read write`, which is the
+   default. The two servers have different addresses, so each needs its own sign-in. If you define
+   `mcp.servers.linear` yourself, the plugin adopts it only at the URL for your `access`.
+2. **Default permission rules: everything is allowed.** Every tool the plugin registers runs without a prompt, and so
+   does a tool Linear adds later, so an agent can read and change everything the signed-in account can: issues,
+   comments, projects, documents, initiatives and labels. Nothing asks first. To restrict it, set the plugin option
+   `"access": "ask-changes"` (reads run, every change asks) or `"access": "read-only"` (reads run, every change is
+   denied), give the agent its own later rules, or add a rule per tool. The README's Permissions section and
+   `docs/configuration.md#permissions` have the three ways and the generated block. A read of other people's images,
+   `linear_extract_images`, runs too; to review each fetch, add
+   `{ "action": "linear_extract_images", "resource": "*", "effect": "ask" }` to your `permissions`.
 3. **Your OpenCode permissions.** Your `permissions` rules and saved "Always allow" answers override the default
    rules. A `deny` you configure always wins.
 
@@ -71,8 +75,8 @@ for a script, with no model. Every known tool is a method, with its class, but a
 - A script names a session that names an agent, and runs as them. Before any call, the plugin resolves that method's
   permission action against the agent's rules and then the session's rules, the host's own order. Only `allow` runs: a
   rule that resolves to `ask` is refused because no one can answer it, and a `deny` is refused. Neither makes a call.
-  The default rules allow the reads and `linear_issues` and ask for every write, so a script writes only with a prior
-  explicit `allow` in the agent's or the session's rules, and with `access: "write"`.
+  A script gets the same default as the model, so at `access: "all"` it can read and change what the account can;
+  under `"ask-changes"` an ask is refused and under `"read-only"` a change is denied.
 - A saved "Always allow" is **not** consulted: it lives outside the agent's and session's rules, so an old click does
   not authorize a new script. A grant is reviewable in config, or in a Jobs one-off's approval.
 - After the resolve, an MCP call runs through OpenCode's own executor, which checks the action again, as it does for

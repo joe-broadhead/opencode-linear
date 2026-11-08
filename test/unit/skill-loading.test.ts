@@ -18,8 +18,8 @@ function skills(files: Record<string, string>) {
 
 describe("skill loading", () => {
   test("linear always, linear-write only with write access", () => {
-    expect(skillNames("read")).toEqual(["linear"])
-    expect(skillNames("write")).toEqual(["linear", "linear-write"])
+    expect(skillNames("read-only")).toEqual(["linear"])
+    expect(skillNames("all")).toEqual(["linear", "linear-write"])
     expect(SKILLS_DIR.replaceAll("\\", "/").endsWith("/skills/")).toBe(true)
   })
 
@@ -48,15 +48,15 @@ describe("skill loading", () => {
     const ok = (name: string) => `---\nname: ${name}\ndescription: ${name} skill\n---\nBody\n`
     const directory = skills({ linear: ok("linear"), "linear-write": ok("linear-write") })
     const ids = (loaded: Awaited<ReturnType<typeof loadSkills>>) => loaded.skills.map((skill): string => skill.id)
-    expect(ids(await loadSkills("read", directory))).toEqual(["linear"])
-    const write = await loadSkills("write", directory)
+    expect(ids(await loadSkills("read-only", directory))).toEqual(["linear"])
+    const write = await loadSkills("all", directory)
     expect(ids(write)).toEqual(["linear", "linear-write"])
     expect(write.problems).toEqual([])
   })
 
   test("a missing or broken skill becomes a problem for status, not a setup failure", async () => {
     const directory = skills({ linear: "---\nname: linear\n---\n" })
-    expect(await loadSkills("write", directory)).toEqual({
+    expect(await loadSkills("all", directory)).toEqual({
       skills: [],
       problems: [
         'SKILLS_INVALID: The "linear" skill was not loaded: skills/linear/SKILL.md has no description. Next step: Reinstall the plugin.',
@@ -68,7 +68,7 @@ describe("skill loading", () => {
   test("an unreadable skill file is reported as unreadable, not missing", async () => {
     const directory = skills({})
     mkdirSync(join(directory, "linear", "SKILL.md"), { recursive: true })
-    expect((await loadSkills("read", directory)).problems).toEqual([
+    expect((await loadSkills("read-only", directory)).problems).toEqual([
       'SKILLS_INVALID: The "linear" skill was not loaded: skills/linear/SKILL.md cannot be read (EISDIR). Next step: Reinstall the plugin.',
     ])
   })

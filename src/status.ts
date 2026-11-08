@@ -3,7 +3,7 @@ import { PLUGIN_ID, SERVER_NAME, TESTED_HOSTS } from "./constants.js"
 import { isSupportedHost, type HostCheck } from "./host-version.js"
 import { ISSUES_TOOL } from "./issues.js"
 import { classify } from "./linear-tools.js"
-import type { Access } from "./options.js"
+import { ACCESS_VALUES, type Access } from "./options.js"
 import { defaultRules, unguardedAgents, type Rule } from "./permissions.js"
 import { VERSION } from "./version.js"
 
@@ -24,6 +24,7 @@ export interface StatusFacts {
   readonly source?: ServerSource
   readonly account?: string
   readonly access: Access
+  readonly deprecation?: string
   readonly host: HostCheck
   /** The names of the tools the `linear` server serves, without the `linear_` prefix. */
   readonly tools?: readonly string[]
@@ -43,6 +44,8 @@ export interface Status {
   readonly error?: string
   readonly account?: string
   readonly access: Access
+  /** Present when the deprecated `read` or `write` value set the access: what to write instead. */
+  readonly deprecation?: string
   readonly source?: ServerSource
   /** How many Linear tools OpenCode lists. */
   readonly tools: number
@@ -61,9 +64,10 @@ export interface Status {
 const SIGN_IN = `Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth ${SERVER_NAME} opens it automatically).`
 
 /** The default rules to paste into an agent's own permissions, one rule a line, as a JSON array body. */
-const AGENT_RULES = defaultRules()
-  .map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`)
-  .join("\n")
+const agentRulesText = (access: Access) =>
+  defaultRules(access)
+    .map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`)
+    .join("\n")
 
 /** The next step while agents lack the rules: the family's one fixed sentence. */
 const AGENTS_NEXT_STEP =
@@ -103,11 +107,12 @@ export function buildStatus(facts: StatusFacts): Status {
     ...(error ? { error } : {}),
     ...(facts.account ? { account: facts.account } : {}),
     access: facts.access,
+    ...(facts.deprecation ? { deprecation: facts.deprecation } : {}),
     ...(facts.source ? { source: facts.source } : {}),
     tools: facts.tools?.length ?? 0,
     unknownCount: unknown.length,
     unknownTools: unknown.filter((name) => SAFE_NAME.test(name)).slice(0, LISTED_UNKNOWN),
-    unguardedAgents: unguardedAgents(facts.agents ?? []),
+    unguardedAgents: unguardedAgents(facts.agents ?? [], facts.access),
     host: facts.host,
     problems: facts.problems ?? [],
   }
@@ -150,8 +155,9 @@ const STATE_TEXT: Record<State, string> = {
 }
 
 const ACCESS_TEXT: Record<Access, string> = {
-  read: "read-only (Linear's read-only server; changes are not available)",
-  write: "read and write (each change asks before it runs)",
+  all: "every tool runs without asking, reads, changes and new tools included",
+  "ask-changes": "reads run without asking; every change and every new tool asks first",
+  "read-only": "read-only (Linear's read-only server; changes are not available)",
 }
 
 /** The server's address and owner, after the state label. */
@@ -161,11 +167,12 @@ function serverText(source: ServerSource) {
   return `your mcp.servers.${SERVER_NAME} points at ${source.url}`
 }
 
-function toolsText({ tools, unknownCount, unknownTools }: Status) {
+function toolsText({ tools, unknownCount, unknownTools, access }: Status) {
   if (unknownCount === 0) return `${tools} available, 0 unknown`
   const more = unknownCount - unknownTools.length
   const names = unknownTools.length ? `: ${unknownTools.join(", ")}${more > 0 ? ` and ${more} more` : ""}` : ""
-  return `${tools} available, ${unknownCount} unknown${names} (unknown tools ask before running)`
+  const posture = access === "all" ? "unknown tools run too" : access === "read-only" ? "unknown tools are denied" : "unknown tools ask before running"
+  return `${tools} available, ${unknownCount} unknown${names} (${posture})`
 }
 
 /** The OpenCode row: the version, whether it is tested, the supported range, then any setup problems. */
@@ -186,9 +193,9 @@ export function formatStatus(status: Status) {
     "Linear status",
     `- Connection: ${STATE_TEXT[status.state]}${details ? ` (${details})` : ""}`,
     `- Account: ${status.account ?? "account name not reported by Linear's MCP"}`,
-    `- Access: ${ACCESS_TEXT[status.access]}`,
+    `- Access: ${ACCESS_TEXT[status.access]}${status.deprecation ? ` (${status.deprecation})` : ""}`,
     `- Tools: ${toolsText(status)}`,
-    `- Agents without default rules: ${agents.length ? `${agents.join(", ")}\n${AGENT_RULES}` : "none"}`,
+    `- Agents without default rules: ${agents.length ? `${agents.join(", ")}\n${agentRulesText(status.access)}` : "none"}`,
     `- OpenCode: ${hostText(status)}`,
     `- Next step: ${status.nextStep}`,
   ].join("\n")
@@ -202,7 +209,7 @@ export interface StatusContext {
 }
 
 /** Reads the live facts through public host APIs. Optional lookups that fail leave their field empty. */
-export async function readStatus(ctx: StatusContext, facts: Pick<StatusFacts, "source" | "access" | "host" | "problems">) {
+export async function readStatus(ctx: StatusContext, facts: Pick<StatusFacts, "source" | "access" | "deprecation" | "host" | "problems">) {
   const [servers, agents, tools] = await Promise.all([ctx.mcp.list(), ctx.agent.list(), ctx.tool.list()])
   const server = servers.data.find((entry) => entry.name === SERVER_NAME)
   const connection = server?.integrationID ? await ctx.integration.connection.active(server.integrationID).catch(() => undefined) : undefined
@@ -244,7 +251,8 @@ export const StatusRpc = {
           state: { enum: ["connected", "sign_in_required", "connecting", "disabled", "failed", "not_configured", "conflict"] },
           error: { type: "string" },
           account: { type: "string" },
-          access: { enum: ["read", "write"] },
+          access: { enum: [...ACCESS_VALUES] },
+          deprecation: { type: "string" },
           source: {
             type: "object",
             required: ["type", "url"],

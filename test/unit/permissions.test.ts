@@ -1,22 +1,37 @@
 import { describe, expect, test } from "bun:test"
 import { ISSUES_TOOL } from "../../src/issues.js"
-import { READ_TOOLS } from "../../src/linear-tools.js"
+import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 import { defaultRules, evaluate, hasDefaultRules, insertRules, registerDefaultRules, unguardedAgents, type Rule } from "../../src/permissions.js"
 import { agentEditor, allow, builtInAgents, transforms, type AgentEditor, type FakeAgent } from "./fake.js"
 
 const ask: Rule = { action: "linear_*", resource: "*", effect: "ask" }
+const denyAll: Rule = { action: "linear_*", resource: "*", effect: "deny" }
 const effects = (rules: readonly Rule[]) => ["linear_list_issues", "linear_get_workspace", "linear_save_issue", "linear_shiny_new_tool"].map((action) => evaluate(rules, action))
 
 describe("defaultRules", () => {
-  test("ask for every Linear tool, then allow each known read and the plugin's own, and deny nothing", () => {
+  // R18: every tool a plugin registers is allowed, and so is the pattern, so a tool Linear adds later runs at once.
+  test("allow every Linear tool by default, reads, writes and the plugin's own alike", () => {
     const rules = defaultRules()
-    expect(rules[0]).toEqual(ask)
-    expect(rules.slice(1)).toEqual([...READ_TOOLS, ISSUES_TOOL].map((tool) => ({ action: `linear_${tool}`, resource: "*", effect: "allow" })))
-    expect(rules.filter((rule) => rule.effect === "deny")).toEqual([])
+    expect(rules[0]).toEqual({ action: "linear_*", resource: "*", effect: "allow" })
+    expect(rules.slice(1)).toEqual([
+      ...READ_TOOLS.map((tool): Rule => ({ action: `linear_${tool}`, resource: "*", effect: "allow" })),
+      { action: `linear_${ISSUES_TOOL}`, resource: "*", effect: "allow" },
+      ...WRITE_TOOLS.map((tool): Rule => ({ action: `linear_${tool}`, resource: "*", effect: "allow" })),
+    ])
+    expect(rules.filter((rule) => rule.effect !== "allow")).toEqual([])
+    expect(effects([allow("*"), ...rules])).toEqual(["allow", "allow", "allow", "allow"])
   })
 
-  test("reads allow and everything else asks", () => {
-    expect(effects([allow("*"), ...defaultRules()])).toEqual(["allow", "allow", "ask", "ask"])
+  test("ask-changes allows reads and asks for everything else, new tools included", () => {
+    const rules = defaultRules("ask-changes")
+    expect(rules[0]).toEqual(ask)
+    expect(effects([allow("*"), ...rules])).toEqual(["allow", "allow", "ask", "ask"])
+  })
+
+  test("read-only allows reads and denies everything else, new tools included", () => {
+    const rules = defaultRules("read-only")
+    expect(rules[0]).toEqual(denyAll)
+    expect(effects([allow("*"), ...rules])).toEqual(["allow", "allow", "deny", "deny"])
   })
 })
 
@@ -37,9 +52,9 @@ describe("insertRules", () => {
     const once = permissions.slice()
     expect(insertRules(permissions, defaultRules())).toBe(false)
     expect(permissions).toEqual(once)
-    const own = [allow("*"), { ...ask }, allow("linear_save_issue")]
+    const own: Rule[] = [allow("*"), ...defaultRules(), allow("linear_save_issue"), { action: "linear_get_workspace", resource: "*", effect: "ask" }]
     expect(insertRules(own, defaultRules())).toBe(false)
-    expect(own).toHaveLength(3)
+    expect(own.filter((rule) => rule.action === "linear_*")).toHaveLength(1)
   })
 
   test("leaves agents without a base allow untouched and never throws on odd lists", () => {
@@ -55,14 +70,14 @@ describe("insertRules", () => {
     insertRules(explore.permissions, defaultRules())
     expect(effects(explore.permissions)).toEqual(["deny", "deny", "deny", "deny"])
     insertRules(plan.permissions, defaultRules())
-    expect(effects(plan.permissions)).toEqual(["allow", "allow", "ask", "ask"])
+    expect(effects(plan.permissions)).toEqual(["allow", "allow", "allow", "allow"])
   })
 
   test("the user's rules come later and win, both ways", () => {
     const permissions = [allow("*")]
     insertRules(permissions, defaultRules())
     permissions.push(allow("linear_save_issue"), { action: "linear_list_*", resource: "*", effect: "deny" })
-    expect(effects(permissions)).toEqual(["deny", "allow", "allow", "ask"])
+    expect(effects(permissions)).toEqual(["deny", "allow", "allow", "allow"])
   })
 })
 
@@ -101,7 +116,7 @@ describe("unguardedAgents", () => {
       { id: "other-plugin-first", permissions: [allow("*"), allow("github_*"), ...defaultRules()] },
       { id: "before-base", permissions: [{ ...ask }, allow("*")] },
       { id: "locked", permissions: [allow("*"), { action: "*", resource: "*", effect: "deny" as const }] },
-      { id: "asks", permissions: [allow("*"), { action: "linear_*", resource: "*", effect: "deny" as const }] },
+      { id: "denies", permissions: [allow("*"), { action: "linear_*", resource: "*", effect: "deny" as const }] },
     ]
     expect(unguardedAgents(agents)).toEqual(["reviewer", "before-base"])
     expect(hasDefaultRules(guarded)).toBe(true)

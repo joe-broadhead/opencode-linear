@@ -44,7 +44,7 @@ skill ids collide with another plugin's or the agent's own.
 
 ## Signing in
 
-`jelly.signIns` declares one sign-in, `linear`, for Linear's MCP server `linear`, which signs in with OpenCode's MCP OAuth. Read and write access are different servers with different tokens, so changing `access` needs a new sign-in, and the row says Not signed in until then.
+`jelly.signIns` declares one sign-in, `linear`, for Linear's MCP server `linear`, which signs in with OpenCode's MCP OAuth. The read-only server and the full one are different addresses with different tokens, so changing `access` between `"read-only"` and the other values needs a new sign-in, and the row says Not signed in until then.
 
 Jelly folds the declared sign-ins into this plugin's one card, which shows each as Connected, Not signed in or Sign in again (expired or revoked), and starts, renews and signs out of each. An agent's `jelly_connection_request`, or a tool result that names this plugin's "Run /connect and choose …" next step, opens the same card. The plugin still signs in through OpenCode, as it does without Jelly; the declaration only tells Jelly which of the engine's integrations and servers are this plugin's.
 

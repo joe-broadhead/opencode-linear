@@ -10,7 +10,7 @@ import { Plugin } from "@opencode/plugin"
 import { defaultRules, type Rule } from "../../src/permissions.js"
 import { SUPPORTED_HOST, TESTED_HOSTS } from "../../src/constants.js"
 import { ASSIGNED } from "./fake-mcp.js"
-import { agentRules, attempt, cleanup, effect, HOST_VERSION, session, startHost, until, type Host } from "./harness.js"
+import { agentRules, attempt, cleanup, codeMode, effect, HOST_VERSION, ruledSession, script, session, startHost, until, type Host } from "./harness.js"
 
 const AGENT_RULES = defaultRules().map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`).join("\n")
 const AGENTS_NEXT_STEP = "Put the default rules shown by /linear-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Linear tools."
@@ -45,7 +45,7 @@ async function status(host: Host, sessionID: string) {
   })
 }
 
-describe(`read access on OpenCode ${HOST_VERSION}`, () => {
+describe(`the default access on OpenCode ${HOST_VERSION}`, () => {
   let host: Host
   beforeAll(async () => {
     host = await startHost({ config: () => ({ agents: { reviewer: { description: "Reviews changes", mode: "subagent" } } }) })
@@ -67,7 +67,7 @@ describe(`read access on OpenCode ${HOST_VERSION}`, () => {
     expect(servers.find((server) => server.name === "linear")?.status).toEqual({ status: "connected" })
     expect(await linearTools(host)).toEqual(["linear_issues", "linear_list_issues", "linear_save_issue", "linear_shiny_new_tool"])
     const { data: skills } = await host.client.skill.list({ location: host.location })
-    expect(skills.map((skill) => skill.id).filter((id) => id.startsWith("linear"))).toEqual(["linear"])
+    expect(skills.map((skill) => skill.id).filter((id) => id.startsWith("linear"))).toEqual(["linear", "linear-write"])
     const { data: commands } = await host.client.command.list({ location: host.location })
     expect(commands.map((command) => command.name)).toContain("linear-status")
   })
@@ -89,19 +89,47 @@ describe(`read access on OpenCode ${HOST_VERSION}`, () => {
     const explore = await session(host, "explore")
     expect(await attempt(host, explore, "explore", "list_issues")).toEqual({ asked: undefined, ok: false, error: "Tool.Error: Permission denied: linear_list_issues" })
     const plan = await session(host, "plan")
-    expect(await attempt(host, plan, "plan", "shiny_new_tool")).toMatchObject({ asked: "linear_shiny_new_tool", ok: false })
+    // R18: the pattern allows a tool Linear adds later, so it runs there too.
+    expect(await attempt(host, plan, "plan", "shiny_new_tool")).toEqual({ asked: undefined, ok: true })
   })
 
-  test("P2 and H2: known reads run without a prompt, and everything else asks", async () => {
+  // R18: every tool runs without a prompt at the default access, reads, writes and a tool Linear adds later alike.
+  test("H2: every tool runs without a prompt, reads, writes and one the plugin does not know", async () => {
     const build = await session(host)
     const before = host.fake.calls.length
     expect(await attempt(host, build, "build", "list_issues")).toEqual({ asked: undefined, ok: true })
-    expect(await attempt(host, build, "build", "shiny_new_tool")).toEqual({ asked: "linear_shiny_new_tool", ok: false, error: "Permission.DeclinedError: " })
-    expect(await attempt(host, build, "build", "save_issue")).toEqual({ asked: "linear_save_issue", ok: false, error: "Permission.DeclinedError: " })
-    expect(host.fake.calls.slice(before)).toEqual(["list_issues"])
+    expect(await attempt(host, build, "build", "shiny_new_tool")).toEqual({ asked: undefined, ok: true })
+    expect(await attempt(host, build, "build", "save_issue")).toEqual({ asked: undefined, ok: true })
+    expect(host.fake.calls.slice(before)).toEqual(["list_issues", "shiny_new_tool", "save_issue"])
     const build_ = (await agentRules(host)).get("build")!
     expect(["linear_list_issues", "linear_save_issue", "linear_shiny_new_tool"].filter((action) => hidden(build_, action))).toEqual([])
-    expect(await effect(host, "build", "linear_shiny_new_tool")).toBe("ask")
+    expect(await effect(host, "build", "linear_shiny_new_tool")).toBe("allow")
+  })
+
+  // R2: the same proofs on the Code Mode path, inside the host's `execute`, where nobody can answer a prompt.
+  test("R2 Code Mode: a read and a write run; an ask and a deny are refused with nothing sent; an unknown name is not callable", async () => {
+    await linearTools(host)
+    const run = async (sessionID: string, tool: string) => codeMode(host, sessionID, `const r = await tools.linear[${JSON.stringify(tool)}]({}); throw new Error("SEEN " + JSON.stringify(r))`)
+    const before = host.fake.calls.length
+    expect(await run(await session(host), "list_issues")).toHaveProperty("seen")
+    expect(await run(await session(host), "save_issue")).toHaveProperty("seen")
+    expect(host.fake.calls.slice(before)).toEqual(["list_issues", "save_issue"])
+
+    // An ask is refused before the tool runs: nothing reaches Linear and no prompt is left waiting.
+    const asking = host.fake.calls.length
+    const askSession = await ruledSession(host, [{ action: "linear_list_issues", resource: "*", effect: "ask" }])
+    const asked = await run(askSession, "list_issues")
+    expect(asked).toHaveProperty("refused")
+    expect((asked as { refused: string }).refused).toMatch(/needs approval|nobody is present|not permitted|declined/i)
+    expect(host.fake.calls.slice(asking)).toEqual([])
+    expect(await host.client.permission.list({ sessionID: askSession })).toEqual([])
+
+    // A deny refuses, and a name that is not a method is not callable.
+    const denied = await run(await ruledSession(host, [deny("list_issues")]), "list_issues")
+    expect(denied).toHaveProperty("refused")
+    expect(denied).toMatchObject({ refused: expect.stringMatching(/Permission denied: linear_list_issues|not permitted/i) })
+    expect(await run(await session(host), "no_such_tool")).toHaveProperty("refused")
+    expect(host.fake.calls.slice(asking)).toEqual([])
   })
 
   test("linear_issues runs through the host's own list_issues: its rules, Linear's live shape and the fields it shows", async () => {
@@ -124,15 +152,6 @@ describe(`read access on OpenCode ${HOST_VERSION}`, () => {
     expect(host.fake.inputs.length).toBe(before)
   })
 
-  test("P4: a saved 'Always allow' removes the prompt", async () => {
-    const build = await session(host)
-    expect(await attempt(host, build, "build", "shiny_new_tool", "always")).toEqual({ asked: "linear_shiny_new_tool", ok: true })
-    expect(await attempt(host, build, "build", "shiny_new_tool")).toEqual({ asked: undefined, ok: true })
-    const { projectID } = await host.client.sessions.get({ sessionID: build })
-    const saved = await host.client.permission.saved.list({ projectID })
-    expect(saved.map(({ action, resource }) => ({ action, resource }))).toEqual([{ action: "linear_shiny_new_tool", resource: "*" }])
-  })
-
   test("P5: an agent defined only in user config gets no rules, and Linear tools run there unprompted", async () => {
     const reviewer = (await agentRules(host)).get("reviewer")!
     expect(reviewer.some((rule) => rule.action.startsWith("linear_"))).toBe(false)
@@ -143,8 +162,8 @@ describe(`read access on OpenCode ${HOST_VERSION}`, () => {
   test("H5: /linear-status reports the connection, new tools, the unguarded agent and its fix", async () => {
     await linearTools(host)
     const text = await status(host, await session(host))
-    expect(text).toContain(`- Connection: connected (${host.fake.endpoints.read}, registered by this plugin)`)
-    expect(text).toContain("- Tools: 4 available, 1 unknown: shiny_new_tool (unknown tools ask before running)\n")
+    expect(text).toContain(`- Connection: connected (${host.fake.endpoints.all}, registered by this plugin)`)
+    expect(text).toContain("- Tools: 4 available, 1 unknown: shiny_new_tool (unknown tools run too)\n")
     expect(text).toContain(`- Agents without default rules: reviewer\n${AGENT_RULES}\n`)
     expect(text).toContain(`- Next step: ${AGENTS_NEXT_STEP}`)
     expect(text).toContain(`- OpenCode: ${HOST_VERSION} (${TESTED_HOSTS.includes(HOST_VERSION) ? "tested" : "untested"}; supported range ${SUPPORTED_HOST})`)
@@ -168,7 +187,6 @@ describe("write access with the user's own linear server", () => {
   let host: Host
   beforeAll(async () => {
     host = await startHost({
-      options: { access: "write" },
       config: (url) => ({ mcp: { servers: { linear: { type: "remote", url, oauth: false, headers: { "x-linear-test": "user" } } } } }),
     })
   })
@@ -179,22 +197,21 @@ describe("write access with the user's own linear server", () => {
     expect(host.fake.markers.length).toBeGreaterThan(0)
     expect(new Set(host.fake.markers)).toEqual(new Set(["user"]))
     const text = await status(host, await session(host))
-    expect(text).toContain(`- Connection: connected (${host.fake.endpoints.write}, your own mcp.servers.linear, used unchanged)`)
-    expect(text).toContain("- Access: read and write (each change asks before it runs)")
+    expect(text).toContain(`- Connection: connected (${host.fake.endpoints.all}, your own mcp.servers.linear, used unchanged)`)
+    expect(text).toContain("- Access: every tool runs without asking, reads, changes and new tools included")
   })
 
-  test("P2 and H2: in write mode known writes ask, and the write skill is registered", async () => {
+  test("the default access runs a write without a prompt, and the write skill is registered", async () => {
     const build = await session(host)
     expect(hidden((await agentRules(host)).get("build")!, "linear_save_issue")).toBe(false)
-    expect(await attempt(host, build, "build", "save_issue")).toEqual({ asked: "linear_save_issue", ok: false, error: "Permission.DeclinedError: " })
-    expect(await attempt(host, build, "build", "save_issue", "once")).toEqual({ asked: "linear_save_issue", ok: true })
+    expect(await attempt(host, build, "build", "save_issue")).toEqual({ asked: undefined, ok: true })
     expect(await attempt(host, build, "build", "list_issues")).toEqual({ asked: undefined, ok: true })
     const { data: skills } = await host.client.skill.list({ location: host.location })
     expect(skills.map((skill) => skill.id).filter((id) => id.startsWith("linear")).sort()).toEqual(["linear", "linear-write"])
   })
 })
 
-describe("user permissions in read access", () => {
+describe("user permissions", () => {
   const userRules = [allow("save_issue"), deny("list_issues")]
   let host: Host
   beforeAll(async () => {
@@ -213,12 +230,12 @@ describe("user permissions in read access", () => {
     expect(await attempt(host, build, "build", "save_issue")).toEqual({ asked: undefined, ok: true })
     expect(await attempt(host, build, "build", "list_issues")).toEqual({ asked: undefined, ok: false, error: "Tool.Error: Permission denied: linear_list_issues" })
     expect(hidden((await agentRules(host)).get("build")!, "linear_list_issues")).toBe(true)
-    expect(await attempt(host, build, "build", "shiny_new_tool")).toMatchObject({ asked: "linear_shiny_new_tool", ok: false })
+    expect(await attempt(host, build, "build", "shiny_new_tool")).toEqual({ asked: undefined, ok: true })
   })
 
   test("P5: the per-agent fix guards a config-only agent and keeps the user's rules winning", async () => {
     const reviewer = await session(host, "reviewer")
-    expect(await attempt(host, reviewer, "reviewer", "shiny_new_tool")).toMatchObject({ asked: "linear_shiny_new_tool", ok: false })
+    expect(await attempt(host, reviewer, "reviewer", "shiny_new_tool")).toEqual({ asked: undefined, ok: true })
     expect(await attempt(host, reviewer, "reviewer", "save_issue")).toEqual({ asked: undefined, ok: true })
     expect(await attempt(host, reviewer, "reviewer", "list_issues")).toMatchObject({ asked: undefined, ok: false })
     expect(await status(host, reviewer)).toContain("- Agents without default rules: none\n")
@@ -236,7 +253,58 @@ describe("a user linear server that points elsewhere", () => {
     const text = await status(host, await session(host))
     const other = host.fake.url.replace(/\/mcp$/, "/other")
     expect(text).toContain(`- Connection: conflict (your mcp.servers.linear points at ${other})`)
-    expect(text).toContain(`- Next step: Your OpenCode config defines mcp.servers.linear with ${other}, but access "read" uses ${host.fake.endpoints.read}.`)
+    expect(text).toContain(`- Next step: Your OpenCode config defines mcp.servers.linear with ${other}, but access "all" uses ${host.fake.endpoints.all}.`)
+  })
+})
+
+// R18: one host per access value on the tools RPC path: the block that value generates, a read, and a write.
+describe(`access on OpenCode ${HOST_VERSION}`, () => {
+  for (const access of ["all", "ask-changes", "read-only"] as const) {
+    describe(access, () => {
+      let host: Host
+      beforeAll(async () => {
+        host = await startHost({ options: { access } })
+        // The tools RPC resolves a method only once OpenCode lists its tool.
+        await until("Linear's tools are registered", async () => (await host.probe().tool.list()).some((tool) => tool.id === "linear_list_issues"))
+      })
+      afterAll(() => host?.close())
+
+      test("the block is generated from defaultRules(access), and a read runs on the tools RPC path", async () => {
+        const rules = (await agentRules(host)).get("build")!
+        expect(rules.slice(1, 1 + defaultRules(access).length)).toEqual(defaultRules(access))
+        const before = host.fake.calls.length
+        const read = await script(host, await session(host), "list_issues")
+        expect(read.value).toMatchObject({ output: { tool: "list_issues" } })
+        expect(host.fake.calls.slice(before)).toEqual(["list_issues"])
+      })
+
+      test(`a write on the tools RPC path follows ${access}`, async () => {
+        const sessionID = await session(host)
+        const before = host.fake.calls.length
+        const result = await script(host, sessionID, "save_issue")
+        if (access === "all") {
+          expect(result.value).toMatchObject({ output: { tool: "save_issue" } })
+          expect(host.fake.calls.slice(before)).toEqual(["save_issue"])
+        } else {
+          expect(result).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
+          // Nothing reaches Linear, and no approval prompt is left waiting.
+          expect(host.fake.calls.slice(before)).toEqual([])
+          expect(await host.client.permission.list({ sessionID })).toEqual([])
+        }
+      })
+    })
+  }
+
+  // The deprecated values are the same switch, with a note in status.
+  test("the deprecated read and write values map onto access, and status says so", async () => {
+    const host = await startHost({ options: { access: "read" } })
+    try {
+      const { data } = await host.client.rpc.call({ rpcID: "linear.workspace", method: "status", input: {}, location: host.location }).then((result) => ({ data: result.output as Record<string, unknown> }))
+      expect(data).toMatchObject({ access: "read-only" })
+      expect(String(data.deprecation)).toContain('The access value "read" is deprecated: it means "read-only".')
+    } finally {
+      await host.close()
+    }
   })
 })
 

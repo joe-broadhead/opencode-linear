@@ -22,7 +22,8 @@ type RemoteConfig = Extract<Mcp.ServerConfig, { type: "remote" }>
 export const serverConfig = (seam: LinearSeam, access: Access): RemoteConfig => ({
   type: "remote",
   url: seam.endpoints[access],
-  oauth: seam.oauth ?? { scope: access === "write" ? "read write" : "read" },
+  // The sign-in asks for write scope by default: only `read-only` narrows it.
+  oauth: seam.oauth ?? { scope: access === "read-only" ? "read" : "read write" },
 })
 
 /** Origin and path only, so a token in a query string never reaches status. */
@@ -80,8 +81,15 @@ export function createLinearPlugin(seam: LinearSeam) {
       })
       // Code Mode's catalog describes the server's namespace with this text.
       await ctx.tool.transform((editor) => editor.namespace({ name: SERVER_NAME, description: NAMESPACE_DESCRIPTION[options.access] }))
-      await registerDefaultRules(ctx.agent, defaultRules(), report("rules"))
-      const read = () => readStatus(ctx, { ...(source ? { source } : {}), access: options.access, host, problems: [...problems.values()] })
+      await registerDefaultRules(ctx.agent, defaultRules(options.access), report("rules"))
+      const read = () =>
+        readStatus(ctx, {
+          ...(source ? { source } : {}),
+          access: options.access,
+          ...(options.deprecation ? { deprecation: options.deprecation } : {}),
+          host,
+          problems: [...problems.values()],
+        })
       // The plugin's own server, or the user's adopted one; a server at another URL is not Linear's for this access.
       const owned = () => source?.type === "plugin" || source?.type === "adopted"
       const issues = { tool: ctx.tool, owned, status: read }

@@ -1,7 +1,8 @@
 import type { Plugin } from "@opencode/plugin"
 import { errorText, SERVER_NAME } from "./constants.js"
 import { ISSUES_TOOL } from "./issues.js"
-import { READ_TOOLS } from "./linear-tools.js"
+import type { Access } from "./options.js"
+import { READ_TOOLS, WRITE_TOOLS } from "./linear-tools.js"
 
 export interface Rule {
   readonly action: string
@@ -11,26 +12,36 @@ export interface Rule {
 
 /** The host's permission action for an MCP tool of the `linear` server. */
 const actionOf = (tool: string) => `${SERVER_NAME}_${tool}`
-/** The plugin's first rule, and its marker: any Linear tool asks unless a later rule decides otherwise. */
-const ASK_ALL: Rule = { action: actionOf("*"), resource: "*", effect: "ask" }
 const rule = (tool: string, effect: Rule["effect"]): Rule => ({ action: actionOf(tool), resource: "*", effect })
 
 /**
- * Broad first, narrow last, because the last matching rule wins: every Linear tool asks, then known reads run, and
- * the plugin's own read, `linear_issues`.
+ * Broad first, narrow last, because the last matching rule wins. At `access: "all"` every tool the plugin registers is
+ * allowed, and so is one Linear adds later through the `linear_*` pattern; `ask-changes` asks for anything that is not
+ * a read, and `read-only` denies it. The reads and the plugin's own `linear_issues` are always allowed, which is why
+ * the first rule alone decides an unknown tool.
  */
-export const defaultRules = (): Rule[] => [{ ...ASK_ALL }, ...[...READ_TOOLS, ISSUES_TOOL].map((tool) => rule(tool, "allow"))]
+export function defaultRules(access: Access = "all"): Rule[] {
+  const other: Rule["effect"] = access === "all" ? "allow" : access === "ask-changes" ? "ask" : "deny"
+  return [
+    rule("*", other),
+    ...[...READ_TOOLS, ISSUES_TOOL].map((tool) => rule(tool, "allow")),
+    ...WRITE_TOOLS.map((tool) => rule(tool, other)),
+  ]
+}
 
 const same = (a: Rule, b: Rule) => a.action === b.action && a.resource === b.resource && a.effect === b.effect
 const BASE_ALLOW: Rule = { action: "*", resource: "*", effect: "allow" }
 
 /**
- * True when the agent carries the plugin's `linear_*` rule anywhere after its base allow, inserted by the plugin or
- * added by the user. Other plugins insert at the same index, so the rule need not follow the base allow directly.
+ * True when the whole default block for `access` appears, in order, anywhere after the agent's first base allow:
+ * inserted by the plugin or copied by the user. Other plugins insert their blocks at the same index, so it need not
+ * follow the base allow directly.
  */
-export function hasDefaultRules(permissions: readonly Rule[]) {
+export function hasDefaultRules(permissions: readonly Rule[], access: Access = "all") {
   const base = permissions.findIndex((item) => same(item, BASE_ALLOW))
-  return permissions.some((item, index) => index > base && same(item, ASK_ALL))
+  const block = defaultRules(access)
+  if (base === -1) return false
+  return permissions.some((_, start) => start > base && block.every((item, offset) => same(permissions[start + offset] ?? item, item)))
 }
 
 /**
@@ -72,5 +83,5 @@ export function evaluate(permissions: readonly Rule[], action: string): Rule["ef
 }
 
 /** Agents where a new Linear tool would run without asking: no default rules, and nothing else stops it. */
-export const unguardedAgents = (agents: readonly { readonly id: string; readonly permissions: readonly Rule[] }[]) =>
-  agents.filter((agent) => !hasDefaultRules(agent.permissions) && evaluate(agent.permissions, actionOf("new_tool")) === "allow").map((agent) => agent.id)
+export const unguardedAgents = (agents: readonly { readonly id: string; readonly permissions: readonly Rule[] }[], access: Access = "all") =>
+  agents.filter((agent) => !hasDefaultRules(agent.permissions, access) && evaluate(agent.permissions, actionOf("new_tool")) === "allow").map((agent) => agent.id)

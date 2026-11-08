@@ -72,6 +72,8 @@ export async function startHost(input: HostInput = {}) {
   const probes = new Map<string, Plugin.Context>()
   const probe = Plugin.define({ id: "linear.host-test.probe", setup: (ctx) => void probes.set(ctx.location.directory, ctx) })
   const config = {
+    // Schedule check programs are how a host test runs Code Mode with nobody present to answer a prompt.
+    experimental: { schedules: true },
     // Keep the built-in local providers from probing their default ports.
     providers: { lmstudio: { settings: { baseURL: "" } }, ollama: { settings: { baseURL: "" } }, vllm: { settings: { baseURL: "" } } },
     ...input.config?.(fake.url),
@@ -163,6 +165,44 @@ export async function attempt(host: Host, sessionID: string, agent: string, tool
 
 export const agentRules = async (host: Host) =>
   new Map((await host.client.agent.list({ location: host.location })).data.map((agent) => [agent.id as string, agent.permissions as Rule[]]))
+
+/**
+ * Runs `code` as Code Mode does, through a schedule's check program: OpenCode checks each tool's input and output and
+ * evaluates permissions with nobody present to answer a prompt. The program reports by throwing "SEEN <json>", so no
+ * schedule is ever created and no model is involved.
+ */
+export async function codeMode(host: Host, sessionID: string, code: string): Promise<{ seen: unknown } | { refused: string }> {
+  let message: string
+  try {
+    const schedule = await host.client.experimental.schedule.create({ sessionID, name: "linear-host-test", when: { in: "6 hours" }, prompt: "noop", if: { code } })
+    await host.client.experimental.schedule.delete({ scheduleID: schedule.id })
+    throw new Error("the check program finished without reporting")
+  } catch (error) {
+    message = error instanceof Error ? error.message : String(error)
+  }
+  const seen = /SEEN (.*)$/s.exec(message)
+  if (!seen) return { refused: message }
+  try {
+    return { seen: JSON.parse(seen[1]!) }
+  } catch {
+    return { seen: seen[1]! }
+  }
+}
+
+/** A session with rules of its own, for the access and script tests. */
+export const ruledSession = async (host: Host, permissions: readonly Rule[], agent = "build") =>
+  (await host.client.sessions.create({ agent, location: host.location, permissions: [...permissions] })).id
+
+/** A tools RPC call's result, or its error's `{ type, code, message }`. */
+export async function script(host: Host, sessionID: string, method: string, input: unknown = {}): Promise<Record<string, any>> {
+  try {
+    const result = await host.client.rpc.call({ rpcID: "linear.workspace.tools", method, input: { sessionID, input } as never, location: host.location })
+    return { value: result.output }
+  } catch (error) {
+    const e = error as Record<string, any>
+    return { status: e.status, type: e.type ?? e._tag, code: e.data?.code, message: String(e.message ?? e) }
+  }
+}
 
 /** The host's own last-match evaluation for an MCP call (resource `*`), via its permission API. */
 export async function effect(host: Host, agent: string, action: string) {

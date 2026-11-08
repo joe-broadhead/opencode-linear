@@ -12,7 +12,7 @@ To set options, use the object form:
 
 ```json
 {
-  "plugins": [{ "package": "@joe-broadhead/opencode-linear", "options": { "access": "write" } }]
+  "plugins": [{ "package": "@joe-broadhead/opencode-linear", "options": { "access": "ask-changes" } }]
 }
 ```
 
@@ -20,29 +20,34 @@ To set options, use the object form:
 
 ### `access`
 
-- Type: `"read"` or `"write"`.
-- Default: `"read"`.
+- Type: `"all"`, `"ask-changes"` or `"read-only"`.
+- Default: `"all"`.
 
-| | `"read"` | `"write"` |
-| --- | --- | --- |
-| Server the plugin registers as `linear` | `https://mcp.linear.app/mcp/readonly` | `https://mcp.linear.app/mcp` |
-| OAuth scope | `read` | `read write` |
-| Tools | Linear's read tools only, and `linear_issues` | Linear's read and write tools, and `linear_issues` |
-| Skills | `linear` | `linear` and `linear-write` |
+| | `"all"` (the default) | `"ask-changes"` | `"read-only"` |
+| --- | --- | --- | --- |
+| Server the plugin registers as `linear` | `https://mcp.linear.app/mcp` | `https://mcp.linear.app/mcp` | `https://mcp.linear.app/mcp/readonly` |
+| OAuth scope | `read write` | `read write` | `read` |
+| Default rules | every tool allows, and so does the `linear_*` pattern | reads allow; every other tool asks | reads allow; every other tool is denied |
+| Tools | Linear's read and write tools, and `linear_issues` | Linear's read and write tools, and `linear_issues` | Linear's read tools only, and `linear_issues` |
+| Skills | `linear` and `linear-write` | `linear` and `linear-write` | `linear` |
 
-Linear's read-only server lists only tools that read, and refuses changes itself. The default permission rules are the
-same for both values; see [Permissions](#permissions).
+Linear's read-only server lists only tools that read, and refuses changes itself. The generated rules for each value
+are printed in full under [Permissions](#permissions).
 
-OpenCode keeps sign-ins per server name and address, so read access and write access each have their own sign-in.
-Linear's consent page decides the workspace of each one, so the two can be in different workspaces.
+`"read"` and `"write"` are the values the option accepted before this one: `"read"` means `"read-only"` and `"write"`
+means `"all"`, and `/linear-status` says so in the Access row. Set the new value, and sign in again if the server
+address changed.
 
-- Switching to an access you have never signed in with: run `/connect` and choose Linear, then press `o` or Enter to
+OpenCode keeps sign-ins per server name and address, so the read-only server and the full one each have their own
+sign-in. Linear's consent page decides the workspace of each one, so the two can be in different workspaces.
+
+- Switching to a server you have never signed in with: run `/connect` and choose Linear, then press `o` or Enter to
   open the link. In a terminal, `opencode mcp auth linear` opens it automatically.
-- Switching to an access you signed in with before: OpenCode reuses that sign-in without asking, in whatever
+- Switching to a server you signed in with before: OpenCode reuses that sign-in without asking, in whatever
   workspace it was made. Ask the model which Linear workspace it is connected to; Linear's `get_workspace` answers.
-- Changing the workspace of one access: with that access configured, run `opencode mcp logout linear` in the project
+- Changing the workspace of one server: with that access configured, run `opencode mcp logout linear` in the project
   where the plugin is configured. It removes every stored sign-in for the current `linear` address, and leaves the
-  other access's sign-in alone. Or remove the account in `/connect` → Linear. Then sign in again and pick the
+  other server's sign-in alone. Or remove the account in `/connect` → Linear. Then sign in again and pick the
   workspace on Linear's consent page.
 
 ### `allowUntestedHost`
@@ -72,11 +77,11 @@ range in its `OpenCode` row, for example `2.2.5 (tested; supported range >=2.2.3
 If your config defines no server named `linear`, the plugin registers one:
 
 ```json
-{ "type": "remote", "url": "https://mcp.linear.app/mcp/readonly", "oauth": { "scope": "read" } }
+{ "type": "remote", "url": "https://mcp.linear.app/mcp", "oauth": { "scope": "read write" } }
 ```
 
-With `access: "write"`, the URL is `https://mcp.linear.app/mcp` and the scope `read write`. OpenCode's own defaults
-apply to everything else, and it registers its OAuth client with Linear automatically.
+With `access: "read-only"`, the URL is `https://mcp.linear.app/mcp/readonly` and the scope `read`. OpenCode's own
+defaults apply to everything else, and it registers its OAuth client with Linear automatically.
 
 To change anything else, for example to use a pre-registered OAuth client, define `mcp.servers.linear` yourself, at
 the URL for your `access`. The plugin then **adopts** your entry unchanged, and `/linear-status` shows "Connection:
@@ -101,44 +106,285 @@ Linear's other server, or a local command, is a **conflict**: the plugin leaves 
 shows "Connection: conflict", and gives the next step:
 
 ```text
-- Next step: Your OpenCode config defines mcp.servers.linear with https://mcp.linear.app/mcp, but access "read" uses https://mcp.linear.app/mcp/readonly. Point it at https://mcp.linear.app/mcp/readonly or remove it, then restart OpenCode.
+- Next step: Your OpenCode config defines mcp.servers.linear with https://mcp.linear.app/mcp/readonly, but access "all" uses https://mcp.linear.app/mcp. Point it at https://mcp.linear.app/mcp or remove it, then restart OpenCode.
 ```
 
 ## Permissions
 
-OpenCode asserts every MCP call itself, with the action `linear_<tool>` and the resource `*`. The plugin adds these
-rules to every agent that starts with the base rule `{ "action": "*", "resource": "*", "effect": "allow" }`, directly
-after that rule:
+OpenCode asserts every MCP call itself, with the action `linear_<tool>` and the resource `*`. **Every tool is allowed by
+default.** The plugin adds the rules for the `access` option to every agent that starts with the base rule
+`{ "action": "*", "resource": "*", "effect": "allow" }`, directly after that rule. The block is generated from
+`defaultRules(access)` in `src/permissions.ts`, and each value's block is printed below in full.
+
+`access: "all"` (the default) allows every tool the plugin registers, and any tool Linear adds later:
 
 ```json
 [
-  { "action": "linear_*", "resource": "*", "effect": "ask" },
-  { "action": "linear_extract_images", "resource": "*", "effect": "allow" },
-  { "action": "linear_get_agent_skill", "resource": "*", "effect": "allow" },
-  "… one allow rule for each read tool in src/linear-tools.ts …",
-  { "action": "linear_search_documentation", "resource": "*", "effect": "allow" },
-  { "action": "linear_issues", "resource": "*", "effect": "allow" }
+  {"action":"linear_*","resource":"*","effect":"allow"},
+  {"action":"linear_extract_images","resource":"*","effect":"allow"},
+  {"action":"linear_get_agent_skill","resource":"*","effect":"allow"},
+  {"action":"linear_get_attachment","resource":"*","effect":"allow"},
+  {"action":"linear_get_diff","resource":"*","effect":"allow"},
+  {"action":"linear_get_diff_threads","resource":"*","effect":"allow"},
+  {"action":"linear_get_document","resource":"*","effect":"allow"},
+  {"action":"linear_get_initiative","resource":"*","effect":"allow"},
+  {"action":"linear_get_issue","resource":"*","effect":"allow"},
+  {"action":"linear_get_issue_status","resource":"*","effect":"allow"},
+  {"action":"linear_get_milestone","resource":"*","effect":"allow"},
+  {"action":"linear_get_notifications","resource":"*","effect":"allow"},
+  {"action":"linear_get_project","resource":"*","effect":"allow"},
+  {"action":"linear_get_release","resource":"*","effect":"allow"},
+  {"action":"linear_get_release_note","resource":"*","effect":"allow"},
+  {"action":"linear_get_status_updates","resource":"*","effect":"allow"},
+  {"action":"linear_get_team","resource":"*","effect":"allow"},
+  {"action":"linear_get_template","resource":"*","effect":"allow"},
+  {"action":"linear_get_triage_responsibility","resource":"*","effect":"allow"},
+  {"action":"linear_get_user","resource":"*","effect":"allow"},
+  {"action":"linear_get_workspace","resource":"*","effect":"allow"},
+  {"action":"linear_list_agent_skills","resource":"*","effect":"allow"},
+  {"action":"linear_list_comments","resource":"*","effect":"allow"},
+  {"action":"linear_list_custom_views","resource":"*","effect":"allow"},
+  {"action":"linear_list_cycles","resource":"*","effect":"allow"},
+  {"action":"linear_list_diffs","resource":"*","effect":"allow"},
+  {"action":"linear_list_documents","resource":"*","effect":"allow"},
+  {"action":"linear_list_initiative_labels","resource":"*","effect":"allow"},
+  {"action":"linear_list_initiatives","resource":"*","effect":"allow"},
+  {"action":"linear_list_issue_labels","resource":"*","effect":"allow"},
+  {"action":"linear_list_issue_statuses","resource":"*","effect":"allow"},
+  {"action":"linear_list_issues","resource":"*","effect":"allow"},
+  {"action":"linear_list_milestones","resource":"*","effect":"allow"},
+  {"action":"linear_list_project_labels","resource":"*","effect":"allow"},
+  {"action":"linear_list_projects","resource":"*","effect":"allow"},
+  {"action":"linear_list_release_notes","resource":"*","effect":"allow"},
+  {"action":"linear_list_release_pipelines","resource":"*","effect":"allow"},
+  {"action":"linear_list_releases","resource":"*","effect":"allow"},
+  {"action":"linear_list_teams","resource":"*","effect":"allow"},
+  {"action":"linear_list_templates","resource":"*","effect":"allow"},
+  {"action":"linear_list_users","resource":"*","effect":"allow"},
+  {"action":"linear_search_documentation","resource":"*","effect":"allow"},
+  {"action":"linear_issues","resource":"*","effect":"allow"},
+  {"action":"linear_create_attachment","resource":"*","effect":"allow"},
+  {"action":"linear_create_attachment_from_upload","resource":"*","effect":"allow"},
+  {"action":"linear_create_initiative_label","resource":"*","effect":"allow"},
+  {"action":"linear_create_issue_label","resource":"*","effect":"allow"},
+  {"action":"linear_delete_attachment","resource":"*","effect":"allow"},
+  {"action":"linear_delete_comment","resource":"*","effect":"allow"},
+  {"action":"linear_delete_diff_comment","resource":"*","effect":"allow"},
+  {"action":"linear_delete_status_update","resource":"*","effect":"allow"},
+  {"action":"linear_mark_notification","resource":"*","effect":"allow"},
+  {"action":"linear_merge_diff","resource":"*","effect":"allow"},
+  {"action":"linear_prepare_attachment_upload","resource":"*","effect":"allow"},
+  {"action":"linear_prepare_file_upload","resource":"*","effect":"allow"},
+  {"action":"linear_resolve_diff_thread","resource":"*","effect":"allow"},
+  {"action":"linear_restore_initiative_label","resource":"*","effect":"allow"},
+  {"action":"linear_restore_issue_label","resource":"*","effect":"allow"},
+  {"action":"linear_restore_project_label","resource":"*","effect":"allow"},
+  {"action":"linear_retire_initiative_label","resource":"*","effect":"allow"},
+  {"action":"linear_retire_issue_label","resource":"*","effect":"allow"},
+  {"action":"linear_retire_project_label","resource":"*","effect":"allow"},
+  {"action":"linear_save_comment","resource":"*","effect":"allow"},
+  {"action":"linear_save_diff_comment","resource":"*","effect":"allow"},
+  {"action":"linear_save_document","resource":"*","effect":"allow"},
+  {"action":"linear_save_initiative","resource":"*","effect":"allow"},
+  {"action":"linear_save_initiative_label","resource":"*","effect":"allow"},
+  {"action":"linear_save_issue","resource":"*","effect":"allow"},
+  {"action":"linear_save_issue_label","resource":"*","effect":"allow"},
+  {"action":"linear_save_milestone","resource":"*","effect":"allow"},
+  {"action":"linear_save_project","resource":"*","effect":"allow"},
+  {"action":"linear_save_project_label","resource":"*","effect":"allow"},
+  {"action":"linear_save_release","resource":"*","effect":"allow"},
+  {"action":"linear_save_release_note","resource":"*","effect":"allow"},
+  {"action":"linear_save_status_update","resource":"*","effect":"allow"},
+  {"action":"linear_share_issue","resource":"*","effect":"allow"},
+  {"action":"linear_submit_diff_review","resource":"*","effect":"allow"},
+  {"action":"linear_unshare_issue","resource":"*","effect":"allow"},
+  {"action":"linear_update_diff","resource":"*","effect":"allow"}
 ]
 ```
 
-`READ_TOOLS` in `src/linear-tools.ts` lists Linear's 41 read tools, the tools its read-only server lists, and
-`WRITE_TOOLS` its 36 write tools. Writes and tools that Linear adds later match only `linear_*`, so they ask.
-`/linear-status` names the tools in neither list.
+`access: "ask-changes"` allows the reads and asks for every write, and for a tool Linear adds later:
 
-The last rule is for the plugin's own tool, `linear_issues`: the issues assigned to you, as a table of identifier,
-title, state, priority and link, in every state, most recently updated first (25 rows by default, at most 100). It
-asks Linear for those five fields only. Jelly draws the table; the model reads the same rows as text, with a last line
-that says whether Linear has more, because the rows are a sample and not a count. It only reads, through Linear's `list_issues` with
-assignee `me`, so `list_issues`'s own rules apply to that call as well, and the plugin holds no credential. It is a
-direct tool, set with `codemode: false`: the model is offered it directly even when Code Mode holds Linear's other
-tools, because [Jelly](jelly.md) draws its result as a table only for a direct call. `/linear-status` counts it among
-the Linear tools, never as an unknown one. It is not a method of the tools RPC; a script calls `list_issues` itself.
+```json
+[
+  {"action":"linear_*","resource":"*","effect":"ask"},
+  {"action":"linear_extract_images","resource":"*","effect":"allow"},
+  {"action":"linear_get_agent_skill","resource":"*","effect":"allow"},
+  {"action":"linear_get_attachment","resource":"*","effect":"allow"},
+  {"action":"linear_get_diff","resource":"*","effect":"allow"},
+  {"action":"linear_get_diff_threads","resource":"*","effect":"allow"},
+  {"action":"linear_get_document","resource":"*","effect":"allow"},
+  {"action":"linear_get_initiative","resource":"*","effect":"allow"},
+  {"action":"linear_get_issue","resource":"*","effect":"allow"},
+  {"action":"linear_get_issue_status","resource":"*","effect":"allow"},
+  {"action":"linear_get_milestone","resource":"*","effect":"allow"},
+  {"action":"linear_get_notifications","resource":"*","effect":"allow"},
+  {"action":"linear_get_project","resource":"*","effect":"allow"},
+  {"action":"linear_get_release","resource":"*","effect":"allow"},
+  {"action":"linear_get_release_note","resource":"*","effect":"allow"},
+  {"action":"linear_get_status_updates","resource":"*","effect":"allow"},
+  {"action":"linear_get_team","resource":"*","effect":"allow"},
+  {"action":"linear_get_template","resource":"*","effect":"allow"},
+  {"action":"linear_get_triage_responsibility","resource":"*","effect":"allow"},
+  {"action":"linear_get_user","resource":"*","effect":"allow"},
+  {"action":"linear_get_workspace","resource":"*","effect":"allow"},
+  {"action":"linear_list_agent_skills","resource":"*","effect":"allow"},
+  {"action":"linear_list_comments","resource":"*","effect":"allow"},
+  {"action":"linear_list_custom_views","resource":"*","effect":"allow"},
+  {"action":"linear_list_cycles","resource":"*","effect":"allow"},
+  {"action":"linear_list_diffs","resource":"*","effect":"allow"},
+  {"action":"linear_list_documents","resource":"*","effect":"allow"},
+  {"action":"linear_list_initiative_labels","resource":"*","effect":"allow"},
+  {"action":"linear_list_initiatives","resource":"*","effect":"allow"},
+  {"action":"linear_list_issue_labels","resource":"*","effect":"allow"},
+  {"action":"linear_list_issue_statuses","resource":"*","effect":"allow"},
+  {"action":"linear_list_issues","resource":"*","effect":"allow"},
+  {"action":"linear_list_milestones","resource":"*","effect":"allow"},
+  {"action":"linear_list_project_labels","resource":"*","effect":"allow"},
+  {"action":"linear_list_projects","resource":"*","effect":"allow"},
+  {"action":"linear_list_release_notes","resource":"*","effect":"allow"},
+  {"action":"linear_list_release_pipelines","resource":"*","effect":"allow"},
+  {"action":"linear_list_releases","resource":"*","effect":"allow"},
+  {"action":"linear_list_teams","resource":"*","effect":"allow"},
+  {"action":"linear_list_templates","resource":"*","effect":"allow"},
+  {"action":"linear_list_users","resource":"*","effect":"allow"},
+  {"action":"linear_search_documentation","resource":"*","effect":"allow"},
+  {"action":"linear_issues","resource":"*","effect":"allow"},
+  {"action":"linear_create_attachment","resource":"*","effect":"ask"},
+  {"action":"linear_create_attachment_from_upload","resource":"*","effect":"ask"},
+  {"action":"linear_create_initiative_label","resource":"*","effect":"ask"},
+  {"action":"linear_create_issue_label","resource":"*","effect":"ask"},
+  {"action":"linear_delete_attachment","resource":"*","effect":"ask"},
+  {"action":"linear_delete_comment","resource":"*","effect":"ask"},
+  {"action":"linear_delete_diff_comment","resource":"*","effect":"ask"},
+  {"action":"linear_delete_status_update","resource":"*","effect":"ask"},
+  {"action":"linear_mark_notification","resource":"*","effect":"ask"},
+  {"action":"linear_merge_diff","resource":"*","effect":"ask"},
+  {"action":"linear_prepare_attachment_upload","resource":"*","effect":"ask"},
+  {"action":"linear_prepare_file_upload","resource":"*","effect":"ask"},
+  {"action":"linear_resolve_diff_thread","resource":"*","effect":"ask"},
+  {"action":"linear_restore_initiative_label","resource":"*","effect":"ask"},
+  {"action":"linear_restore_issue_label","resource":"*","effect":"ask"},
+  {"action":"linear_restore_project_label","resource":"*","effect":"ask"},
+  {"action":"linear_retire_initiative_label","resource":"*","effect":"ask"},
+  {"action":"linear_retire_issue_label","resource":"*","effect":"ask"},
+  {"action":"linear_retire_project_label","resource":"*","effect":"ask"},
+  {"action":"linear_save_comment","resource":"*","effect":"ask"},
+  {"action":"linear_save_diff_comment","resource":"*","effect":"ask"},
+  {"action":"linear_save_document","resource":"*","effect":"ask"},
+  {"action":"linear_save_initiative","resource":"*","effect":"ask"},
+  {"action":"linear_save_initiative_label","resource":"*","effect":"ask"},
+  {"action":"linear_save_issue","resource":"*","effect":"ask"},
+  {"action":"linear_save_issue_label","resource":"*","effect":"ask"},
+  {"action":"linear_save_milestone","resource":"*","effect":"ask"},
+  {"action":"linear_save_project","resource":"*","effect":"ask"},
+  {"action":"linear_save_project_label","resource":"*","effect":"ask"},
+  {"action":"linear_save_release","resource":"*","effect":"ask"},
+  {"action":"linear_save_release_note","resource":"*","effect":"ask"},
+  {"action":"linear_save_status_update","resource":"*","effect":"ask"},
+  {"action":"linear_share_issue","resource":"*","effect":"ask"},
+  {"action":"linear_submit_diff_review","resource":"*","effect":"ask"},
+  {"action":"linear_unshare_issue","resource":"*","effect":"ask"},
+  {"action":"linear_update_diff","resource":"*","effect":"ask"}
+]
+```
+
+`access: "read-only"` allows the reads and denies every write, and a tool Linear adds later. It also registers
+Linear's read-only server, so its write tools are not listed at all:
+
+```json
+[
+  {"action":"linear_*","resource":"*","effect":"deny"},
+  {"action":"linear_extract_images","resource":"*","effect":"allow"},
+  {"action":"linear_get_agent_skill","resource":"*","effect":"allow"},
+  {"action":"linear_get_attachment","resource":"*","effect":"allow"},
+  {"action":"linear_get_diff","resource":"*","effect":"allow"},
+  {"action":"linear_get_diff_threads","resource":"*","effect":"allow"},
+  {"action":"linear_get_document","resource":"*","effect":"allow"},
+  {"action":"linear_get_initiative","resource":"*","effect":"allow"},
+  {"action":"linear_get_issue","resource":"*","effect":"allow"},
+  {"action":"linear_get_issue_status","resource":"*","effect":"allow"},
+  {"action":"linear_get_milestone","resource":"*","effect":"allow"},
+  {"action":"linear_get_notifications","resource":"*","effect":"allow"},
+  {"action":"linear_get_project","resource":"*","effect":"allow"},
+  {"action":"linear_get_release","resource":"*","effect":"allow"},
+  {"action":"linear_get_release_note","resource":"*","effect":"allow"},
+  {"action":"linear_get_status_updates","resource":"*","effect":"allow"},
+  {"action":"linear_get_team","resource":"*","effect":"allow"},
+  {"action":"linear_get_template","resource":"*","effect":"allow"},
+  {"action":"linear_get_triage_responsibility","resource":"*","effect":"allow"},
+  {"action":"linear_get_user","resource":"*","effect":"allow"},
+  {"action":"linear_get_workspace","resource":"*","effect":"allow"},
+  {"action":"linear_list_agent_skills","resource":"*","effect":"allow"},
+  {"action":"linear_list_comments","resource":"*","effect":"allow"},
+  {"action":"linear_list_custom_views","resource":"*","effect":"allow"},
+  {"action":"linear_list_cycles","resource":"*","effect":"allow"},
+  {"action":"linear_list_diffs","resource":"*","effect":"allow"},
+  {"action":"linear_list_documents","resource":"*","effect":"allow"},
+  {"action":"linear_list_initiative_labels","resource":"*","effect":"allow"},
+  {"action":"linear_list_initiatives","resource":"*","effect":"allow"},
+  {"action":"linear_list_issue_labels","resource":"*","effect":"allow"},
+  {"action":"linear_list_issue_statuses","resource":"*","effect":"allow"},
+  {"action":"linear_list_issues","resource":"*","effect":"allow"},
+  {"action":"linear_list_milestones","resource":"*","effect":"allow"},
+  {"action":"linear_list_project_labels","resource":"*","effect":"allow"},
+  {"action":"linear_list_projects","resource":"*","effect":"allow"},
+  {"action":"linear_list_release_notes","resource":"*","effect":"allow"},
+  {"action":"linear_list_release_pipelines","resource":"*","effect":"allow"},
+  {"action":"linear_list_releases","resource":"*","effect":"allow"},
+  {"action":"linear_list_teams","resource":"*","effect":"allow"},
+  {"action":"linear_list_templates","resource":"*","effect":"allow"},
+  {"action":"linear_list_users","resource":"*","effect":"allow"},
+  {"action":"linear_search_documentation","resource":"*","effect":"allow"},
+  {"action":"linear_issues","resource":"*","effect":"allow"},
+  {"action":"linear_create_attachment","resource":"*","effect":"deny"},
+  {"action":"linear_create_attachment_from_upload","resource":"*","effect":"deny"},
+  {"action":"linear_create_initiative_label","resource":"*","effect":"deny"},
+  {"action":"linear_create_issue_label","resource":"*","effect":"deny"},
+  {"action":"linear_delete_attachment","resource":"*","effect":"deny"},
+  {"action":"linear_delete_comment","resource":"*","effect":"deny"},
+  {"action":"linear_delete_diff_comment","resource":"*","effect":"deny"},
+  {"action":"linear_delete_status_update","resource":"*","effect":"deny"},
+  {"action":"linear_mark_notification","resource":"*","effect":"deny"},
+  {"action":"linear_merge_diff","resource":"*","effect":"deny"},
+  {"action":"linear_prepare_attachment_upload","resource":"*","effect":"deny"},
+  {"action":"linear_prepare_file_upload","resource":"*","effect":"deny"},
+  {"action":"linear_resolve_diff_thread","resource":"*","effect":"deny"},
+  {"action":"linear_restore_initiative_label","resource":"*","effect":"deny"},
+  {"action":"linear_restore_issue_label","resource":"*","effect":"deny"},
+  {"action":"linear_restore_project_label","resource":"*","effect":"deny"},
+  {"action":"linear_retire_initiative_label","resource":"*","effect":"deny"},
+  {"action":"linear_retire_issue_label","resource":"*","effect":"deny"},
+  {"action":"linear_retire_project_label","resource":"*","effect":"deny"},
+  {"action":"linear_save_comment","resource":"*","effect":"deny"},
+  {"action":"linear_save_diff_comment","resource":"*","effect":"deny"},
+  {"action":"linear_save_document","resource":"*","effect":"deny"},
+  {"action":"linear_save_initiative","resource":"*","effect":"deny"},
+  {"action":"linear_save_initiative_label","resource":"*","effect":"deny"},
+  {"action":"linear_save_issue","resource":"*","effect":"deny"},
+  {"action":"linear_save_issue_label","resource":"*","effect":"deny"},
+  {"action":"linear_save_milestone","resource":"*","effect":"deny"},
+  {"action":"linear_save_project","resource":"*","effect":"deny"},
+  {"action":"linear_save_project_label","resource":"*","effect":"deny"},
+  {"action":"linear_save_release","resource":"*","effect":"deny"},
+  {"action":"linear_save_release_note","resource":"*","effect":"deny"},
+  {"action":"linear_save_status_update","resource":"*","effect":"deny"},
+  {"action":"linear_share_issue","resource":"*","effect":"deny"},
+  {"action":"linear_submit_diff_review","resource":"*","effect":"deny"},
+  {"action":"linear_unshare_issue","resource":"*","effect":"deny"},
+  {"action":"linear_update_diff","resource":"*","effect":"deny"}
+]
+```
+
+`linear_issues` is the plugin's own read tool, allowed by
+`{ "action": "linear_issues", "resource": "*", "effect": "allow" }`: it runs the host's `list_issues`, so that tool's
+rules apply to the call it makes. It is a direct tool, so Jelly can draw its result as a table. The `linear_*` pattern also matches tools of any other MCP server whose name starts
+with `linear_`; those follow the same access value.
 
 OpenCode uses the last rule that matches, so everything after the plugin's rules wins:
 
-1. the agent's own rules, such as Plan's and Explore's restrictions;
+1. the agent's own rules, such as Explore's restrictions and Plan's;
 2. your top-level `permissions`, which OpenCode adds to every agent;
-3. your saved "Always allow" answers, which beat an `ask` but never a configured `deny`.
+3. your saved **Always allow** answers, which beat an `ask` but never a configured `deny`.
 
 A `deny` on resource `*` also hides the tool from the model. In an unattended run such as `opencode run`, a tool that
 asks is refused. An agent without the base rule gets no Linear rules and keeps its own behaviour.
@@ -163,8 +409,8 @@ Run one write tool without a prompt (or answer "Always allow" once):
 ### Agents that miss the rules
 
 OpenCode creates agents that exist only in your config after plugins add their rules, so those agents get no Linear
-rules; agents that a later plugin adds are in the same position. An agent counts as guarded when the `linear_*` ask
-rule appears anywhere after its base allow. `/linear-status` and `/linear` list every other agent where a new Linear
+rules; agents that a later plugin adds are in the same position. An agent counts as guarded when the whole default
+block for the configured `access` appears, in order, anywhere after its base allow; its own rules decide otherwise. `/linear-status` and `/linear` list every other agent where a new Linear
 tool would run without asking, by name, followed by the default rules to paste. The next step reads:
 
 ```text
@@ -186,8 +432,7 @@ own:
       "permissions": [
         { "action": "linear_*", "resource": "*", "effect": "ask" },
         { "action": "linear_extract_images", "resource": "*", "effect": "allow" },
-        "… the rest of the block from /linear-status …",
-        { "action": "linear_delete_*", "resource": "*", "effect": "deny" }
+        { "action": "linear_delete_comment", "resource": "*", "effect": "deny" }
       ]
     }
   }
@@ -216,7 +461,7 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 For example:
 
 ```text
-OPTIONS_INVALID: The option "access" must be "read" (the default) or "write", found "admin". Next step: Fix the plugin options in opencode.json, for example "plugins": [{ "package": "@joe-broadhead/opencode-linear", "options": { "access": "write" } }].
+OPTIONS_INVALID: The option "access" must be "all" (the default), "ask-changes" or "read-only", found "admin". Next step: Fix the plugin options in opencode.json, for example "plugins": [{ "package": "@joe-broadhead/opencode-linear", "options": { "access": "read-only" } }].
 ```
 
 Errors from Linear's server and from OpenCode pass through unchanged, except in the tools RPC for scripts, whose codes
@@ -234,7 +479,7 @@ plugin of this family shares, with the same names and meanings:
 | `state` | `connected`, `sign_in_required`, `connecting`, `disabled`, `failed`, `not_configured` or `conflict`. The `Connection` row shows the same states as `connected`, `sign-in required`, `connecting`, `disabled`, `failed`, `not configured` and `conflict`. |
 | `error` | For a failed connection only: OpenCode's reason, on one line of at most 160 characters, with any URL cut before its query. The text for a needed sign-in can hold an authorization URL, so it is never shown. |
 | `account` | The account label OpenCode reports, if any |
-| `access` | `read` or `write` |
+| `access` | `all`, `ask-changes` or `read-only`; with the deprecated `read` or `write` mapped, and `deprecation` naming it |
 | `source` | `type` (`plugin`, `adopted` or `conflict`), `url`, and for a conflict the `expected` URL |
 | `tools` | How many Linear tools OpenCode lists |
 | `unknownCount`, `unknownTools` | How many of them the plugin does not know, and at most 20 of their names, only those made of lowercase letters, digits and `_` |

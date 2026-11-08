@@ -46,7 +46,7 @@ export interface FakeMcpOptions {
 export interface FakeMcp {
   readonly url: string
   /** Two paths on the same server, standing in for Linear's read-only and full servers. */
-  readonly endpoints: { readonly read: string; readonly write: string }
+  readonly endpoints: { readonly all: string; readonly "ask-changes": string; readonly "read-only": string }
   /**
    * While true, every MCP request gets 401 with a bearer challenge, as Linear's server answers before a sign-in or
    * after its tokens are revoked. The sign-in server keeps answering.
@@ -182,7 +182,7 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
   const { port } = server.address() as AddressInfo
   Object.assign(fake, {
     url: `http://127.0.0.1:${port}/mcp`,
-    endpoints: { read: `http://127.0.0.1:${port}/mcp/readonly`, write: `http://127.0.0.1:${port}/mcp` },
+    endpoints: { all: `http://127.0.0.1:${port}/mcp`, "ask-changes": `http://127.0.0.1:${port}/mcp`, "read-only": `http://127.0.0.1:${port}/mcp/readonly` },
     origin: `http://127.0.0.1:${port}`,
     tokens,
     calls,

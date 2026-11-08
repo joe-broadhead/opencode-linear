@@ -8,8 +8,8 @@ import type { Access } from "./options.js"
 /** `skills/` at the package root, next to `dist/` (and next to `src/` in the repository). */
 export const SKILLS_DIR = fileURLToPath(new URL("../skills/", import.meta.url))
 
-/** `linear` always; `linear-write` only when writes are enabled. */
-export const skillNames = (access: Access) => (access === "write" ? ["linear", "linear-write"] : ["linear"])
+/** `linear` always; `linear-write` unless the plugin uses Linear's read-only server. */
+export const skillNames = (access: Access) => (access === "read-only" ? ["linear"] : ["linear", "linear-write"])
 
 const notLoaded = (name: string, problem: string) => `The "${name}" skill was not loaded: skills/${name}/SKILL.md ${problem}.`
 const REINSTALL = "Reinstall the plugin."

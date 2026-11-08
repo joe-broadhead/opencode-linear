@@ -86,8 +86,8 @@ reason is cut to one line of 160 characters with no URL query.
 `linear.workspace.tools` lets a script call Linear's tools with no model; [Scripting](scripting.md) is the user's
 view. Its methods are `describe`, one per name in `READ_TOOLS` and `WRITE_TOOLS` (each named after the upstream tool,
 with its class), and `issues`, the plugin's own `linear_issues` as a direct-only read. The table is an allowlist: a
-tool that Linear adds later is never a method. The methods are the same with either access: the server is always
-named `linear`. With `access: "read"` only the reads are listed, so `describe` marks every write unavailable.
+tool that Linear adds later is never a method. The methods are the same at every access value: the server is always
+named `linear`. With `access: "read-only"` only the reads are listed, so `describe` marks every write unavailable.
 
 A call is `{ sessionID, input }`. The module:
 

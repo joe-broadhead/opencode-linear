@@ -4,9 +4,31 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- `assets/icon-128.png` and `assets/icon-256.png`, with `opencode.icons` and `opencode.vendor` in `package.json`, and
+  `scripts/check-icons.mjs`, the family icon contract's check.
+
 ### Changed
 
-- The tools RPC is v2: every known tool is a method with its class (the 41 reads and the 36 writes), and `linear_issues` is the owned method `issues` (a direct-only read). A call runs only with a prior explicit `allow` in the agent's or the session's rules: an `ask` is refused before the tool runs, so no prompt waits, and a saved "Always allow" does not authorize an ad-hoc script. With `access: "read"` a write is a method but unavailable, since Linear's read-only server does not list it. A tool Linear adds later is still not a method.
+- **`access` takes the family's values: `"all"` (the default), `"ask-changes"` and `"read-only"`.** `"all"` is the
+  new default and uses Linear's full server, so the sign-in asks for write scope and every tool runs without asking;
+  `"ask-changes"` asks before every change; `"read-only"` uses Linear's read-only server and denies changes. The old
+  `"write"` means `"all"` and the old `"read"` means `"read-only"`, and `/linear-status` says they are deprecated.
+  Every tool the plugin registers is allowed by default, and so is the `linear_*` pattern, so a tool Linear adds later
+  runs at once; restrict it with `access`, with an agent's own rules, or with a rule per tool. The README's
+  Permissions section and SECURITY say what an all-allow default means here.
+- `docs/scripting.md` is the family's scripting contract: the strict envelope, the location section and its unload
+  note, the result wording, and the refusal table, with an example-parsing test that fails when a doc example names a
+  method that does not exist, omits the location header, or uses an input the tool does not take.
+- One typed code table, `PLUGIN_CODES` and `RPC_CODES` in `src/constants.ts`, with a test that fails when a code in
+  `src` is in neither, when a table code is raised nowhere, and when the README's Troubleshooting table, the
+  configuration guide's Errors table or the scripting doc's refusal table drifts from it in either direction.
+- The README prints the default block in full, and every access value's block is printed in the configuration guide,
+  both checked against `defaultRules(access)`. The docs' tested-release sentences are checked against `TESTED_HOSTS`:
+  2.2.3, 2.2.4, 2.2.5 and 2.2.6. The CI has an `actionlint` job, and `npm run check` runs `actionlint` and the icon
+  check.
+- The tools RPC is v2: every known tool is a method with its class (the 41 reads and the 36 writes), and `linear_issues` is the owned method `issues` (a direct-only read). A call runs only with a prior explicit `allow` in the agent's or the session's rules: an `ask` is refused before the tool runs, so no prompt waits, and a saved "Always allow" does not authorize an ad-hoc script. With `access: "read-only"` a write is a method but unavailable, since Linear's read-only server does not list it. A tool Linear adds later is still not a method.
 
 ## [0.0.8] - 2026-11-06
 

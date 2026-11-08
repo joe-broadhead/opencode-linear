@@ -12,7 +12,7 @@ const AGENT_RULES = defaultRules().map((rule, index, rules) => `  ${JSON.stringi
 
 const host = checkHost("2.2.3", false)
 const READ_URL = "https://mcp.linear.app/mcp/readonly"
-const base: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: READ_URL }, access: "read", host }
+const base: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: READ_URL }, access: "all", host }
 const guarded = { id: "build", permissions: [allow("*"), ...defaultRules()] }
 
 describe("buildStatus", () => {
@@ -22,7 +22,7 @@ describe("buildStatus", () => {
       version: VERSION,
       state: "connected",
       account: "Acme",
-      access: "read",
+      access: "all",
       source: { type: "plugin", url: READ_URL },
       tools: 1,
       unknownCount: 0,
@@ -37,7 +37,7 @@ describe("buildStatus", () => {
         "Linear status",
         "- Connection: connected (https://mcp.linear.app/mcp/readonly, registered by this plugin)",
         "- Account: Acme",
-        "- Access: read-only (Linear's read-only server; changes are not available)",
+        "- Access: every tool runs without asking, reads, changes and new tools included",
         "- Tools: 1 available, 0 unknown",
         "- Agents without default rules: none",
         "- OpenCode: 2.2.3 (tested; supported range >=2.2.3 <2.3.0)",
@@ -84,7 +84,7 @@ describe("buildStatus", () => {
     const conflict = buildStatus({ ...base, source: { type: "conflict", url: "https://linear.example.com/mcp", expected: READ_URL } })
     expect(conflict.state).toBe("conflict")
     expect(conflict.nextStep).toBe(
-      `Your OpenCode config defines mcp.servers.linear with https://linear.example.com/mcp, but access "read" uses ${READ_URL}. Point it at ${READ_URL} or remove it, then restart OpenCode.`,
+      `Your OpenCode config defines mcp.servers.linear with https://linear.example.com/mcp, but access "all" uses ${READ_URL}. Point it at ${READ_URL} or remove it, then restart OpenCode.`,
     )
     expect(formatStatus(conflict)).toContain("- Connection: conflict (your mcp.servers.linear points at https://linear.example.com/mcp)")
   })
@@ -94,7 +94,7 @@ describe("buildStatus", () => {
     expect(status.tools).toBe(4)
     expect(status.unknownCount).toBe(2)
     expect(status.unknownTools).toEqual(["shiny_new_tool", "create_issue"])
-    expect(formatStatus(status)).toContain("- Tools: 4 available, 2 unknown: shiny_new_tool, create_issue (unknown tools ask before running)")
+    expect(formatStatus(status)).toContain("- Tools: 4 available, 2 unknown: shiny_new_tool, create_issue (unknown tools run too)")
   })
 
   test("counts linear_issues as the plugin's own tool, not an unknown one", () => {
@@ -110,18 +110,18 @@ describe("buildStatus", () => {
     const status = buildStatus({ ...base, tools: ["list_issues", ...odd, ...many] })
     expect(status.unknownCount).toBe(29)
     expect(status.unknownTools).toEqual(many.slice(0, 20))
-    expect(formatStatus(status)).toContain(`- Tools: 30 available, 29 unknown: ${many.slice(0, 20).join(", ")} and 9 more (unknown tools ask before running)`)
-    expect(formatStatus(buildStatus({ ...base, tools: odd }))).toContain("- Tools: 4 available, 4 unknown (unknown tools ask before running)")
+    expect(formatStatus(status)).toContain(`- Tools: 30 available, 29 unknown: ${many.slice(0, 20).join(", ")} and 9 more (unknown tools run too)`)
+    expect(formatStatus(buildStatus({ ...base, tools: odd }))).toContain("- Tools: 4 available, 4 unknown (unknown tools run too)")
   })
 
   test("names agents without the default rules, with the block to paste, and points the next step at it", () => {
-    const status = buildStatus({ ...base, access: "write", agents: [guarded, { id: "reviewer", permissions: [allow("*")] }] })
+    const status = buildStatus({ ...base, agents: [guarded, { id: "reviewer", permissions: [allow("*")] }] })
     expect(status.unguardedAgents).toEqual(["reviewer"])
     expect(status.nextStep).toBe(
       "Put the default rules shown by /linear-status first in each listed agent's own permissions, in opencode.json or the agent's Markdown file, followed by your top-level rules for Linear tools.",
     )
     // One rule a line, as a JSON array body that pastes into a permissions list.
-    expect(JSON.parse(`[${AGENT_RULES}]`)).toEqual(defaultRules())
+    expect(JSON.parse(`[${AGENT_RULES}]`)).toEqual(defaultRules("all"))
     const text = formatStatus(status)
     // The row lists the names only, then the rules.
     expect(text).toContain(`- Agents without default rules: reviewer\n${AGENT_RULES}\n- OpenCode:`)
@@ -172,7 +172,7 @@ describe("buildStatus", () => {
   })
 
   test("write access says each change asks", () => {
-    expect(formatStatus(buildStatus({ ...base, access: "write" }))).toContain("- Access: read and write (each change asks before it runs)")
+    expect(formatStatus(buildStatus({ ...base, access: "all" }))).toContain("- Access: every tool runs without asking, reads, changes and new tools included")
   })
 })
 
@@ -196,12 +196,12 @@ function statusContext(overrides: { account?: Promise<unknown>; integrationID?: 
 describe("readStatus", () => {
   test("reads connection, account, tools and agents through public APIs", async () => {
     const account = Promise.resolve({ type: "credential", id: "c", label: "Acme workspace", method: "oauth" })
-    const status = await readStatus(statusContext({ integrationID: "mcp_1", account }), { source: { type: "plugin", url: READ_URL }, access: "read", host, problems: [] })
+    const status = await readStatus(statusContext({ integrationID: "mcp_1", account }), { source: { type: "plugin", url: READ_URL }, access: "all", host, problems: [] })
     expect(status).toMatchObject({ state: "connected", account: "Acme workspace", unknownTools: ["shiny_new_tool"], unguardedAgents: ["reviewer"] })
   })
 
   test("a failed account lookup leaves the account unreported", async () => {
-    const status = await readStatus(statusContext({ integrationID: "mcp_1", account: Promise.reject(new Error("offline")) }), { access: "read", host })
+    const status = await readStatus(statusContext({ integrationID: "mcp_1", account: Promise.reject(new Error("offline")) }), { access: "all", host })
     expect(status.account).toBeUndefined()
     expect(status.state).toBe("connected")
   })

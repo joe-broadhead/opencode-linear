@@ -20,10 +20,12 @@ describe("Linear's tools RPC", () => {
     expect(METHODS.filter((method) => method.class === "write").map((method) => method.name)).toEqual([...WRITE_TOOLS])
     expect(READ_TOOLS).toHaveLength(41)
     expect(WRITE_TOOLS).toHaveLength(36)
-    // The plugin's own linear_issues is allowed too, and is the owned method `issues`, not an MCP one.
+    // Every known tool is allowed by default, the pattern that covers a tool Linear adds later included; the plugin's
+    // own linear_issues is the owned method `issues`, not an MCP one.
     const allowed = defaultRules().filter((rule) => rule.effect === "allow").map((rule) => rule.action)
-    expect(READ_TOOLS.map((name) => `${SERVER_NAME}_${name}`)).toEqual(allowed.filter((action) => action !== ISSUES_ACTION))
-    expect(allowed).toContain(ISSUES_ACTION)
+    // The reads, the plugin's own `issues`, then the writes: the block's order.
+    expect(allowed).toEqual([`${SERVER_NAME}_*`, ...READ_TOOLS.map((name) => `${SERVER_NAME}_${name}`), ISSUES_ACTION, ...WRITE_TOOLS.map((name) => `${SERVER_NAME}_${name}`)])
+    expect(METHODS.map((method) => method.name)).not.toContain("issues")
     expect(METHODS.map((method) => method.name)).not.toContain("issues")
   })
 
