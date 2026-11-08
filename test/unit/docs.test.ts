@@ -25,9 +25,9 @@ describe("docs", () => {
     expect(writes.filter((count) => count !== WRITE_TOOLS.length)).toEqual([])
   })
 
-  test.each(FILES)("%s names only Linear tools the plugin knows, and its own linear_issues", (file) => {
+  test.each(FILES)("%s names only Linear tools the plugin knows, and its own linear_issues and linear_events_list", (file) => {
     const named = [...text(file).matchAll(/\blinear_([a-z][a-z_]*)(?![\w*])/g)].map((match) => match[1]!)
-    expect(named.filter((tool) => ![...READ_TOOLS, ...WRITE_TOOLS, "issues"].includes(tool))).toEqual([])
+    expect(named.filter((tool) => ![...READ_TOOLS, ...WRITE_TOOLS, "issues", "events_list"].includes(tool))).toEqual([])
   })
 
   // Once the plugin is removed and OpenCode reloads, `mcp logout linear` finds no server, and each access keeps its own

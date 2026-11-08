@@ -4,6 +4,7 @@ import { defaultRules, evaluate, type Rule } from "../../src/permissions.js"
 import { type Declaration, type DeclaredTool, declarationProblems, docProblems, readPackage } from "../support/jelly-kit.js"
 
 const ISSUES_ACTION = "linear_issues"
+const EVENTS_ACTION = "linear_events_list"
 const BASE_ALLOW: Rule = { action: "*", resource: "*", effect: "allow" }
 
 /**
@@ -31,9 +32,11 @@ describe("the jelly declaration", () => {
     for (const tool of READ_TOOLS) expect(byPermission.get(`linear_${tool}`)).toMatchObject({ effect: "allow", readOnly: true })
     for (const tool of WRITE_TOOLS) expect(byPermission.get(`linear_${tool}`)).toMatchObject({ effect: "ask", readOnly: false })
     expect(byPermission.get(ISSUES_ACTION)).toMatchObject({ name: "linear.issues", effect: "allow", readOnly: true })
-    expect(jelly.tools).toHaveLength(READ_TOOLS.length + WRITE_TOOLS.length + 1)
+    // Memory's collector runs linear_events_list unattended, so it never asks.
+    expect(byPermission.get(EVENTS_ACTION)).toMatchObject({ name: "linear.events_list", effect: "allow", readOnly: true })
+    expect(jelly.tools).toHaveLength(READ_TOOLS.length + WRITE_TOOLS.length + 2)
     // Exactly the known tools: none Linear no longer serves, such as whoami.
-    expect([...byPermission.keys()].sort()).toEqual([...READ_TOOLS, ...WRITE_TOOLS].map((tool) => `linear_${tool}`).concat(ISSUES_ACTION).sort())
+    expect([...byPermission.keys()].sort()).toEqual([...READ_TOOLS, ...WRITE_TOOLS].map((tool) => `linear_${tool}`).concat(ISSUES_ACTION, EVENTS_ACTION).sort())
   })
 
   test("draws linear_issues with Jelly's table card", () => {

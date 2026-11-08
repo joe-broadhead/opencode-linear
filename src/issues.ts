@@ -78,16 +78,19 @@ function issuesText(rows: readonly IssueRow[], more: boolean) {
   return [`Issue | Title | State | Priority | Link`, ...lines, "", tail].join("\n")
 }
 
-/** Why `linear_list_issues` cannot be called, with the status next step for the server's state. */
-async function unavailable(status: () => Promise<Status>) {
+/**
+ * Why Linear's `read` cannot be called for the plugin's own tool `caller` (`linear_issues`, `linear_events_list`), with
+ * the status next step for the server's state.
+ */
+export async function unavailable(status: () => Promise<Status>, read = "list_issues", caller = `${SERVER_NAME}_${ISSUES_TOOL}`) {
   const current = await status().catch(() => undefined)
   if (current?.state === "conflict") {
-    return linearError("SERVER_CONFLICT", `Your mcp.servers.${SERVER_NAME} is not Linear's server for access "${current.access}", so linear_issues does not call it.`, current.nextStep)
+    return linearError("SERVER_CONFLICT", `Your mcp.servers.${SERVER_NAME} is not Linear's server for access "${current.access}", so ${caller} does not call it.`, current.nextStep)
   }
-  if (current?.state === "sign_in_required") return linearError("AUTH_REQUIRED", "Linear needs a sign-in, so its list_issues is unavailable.", current.nextStep)
+  if (current?.state === "sign_in_required") return linearError("AUTH_REQUIRED", `Linear needs a sign-in, so its ${read} is unavailable.`, current.nextStep)
   const state = current ? ` (the ${SERVER_NAME} server is ${current.state.replaceAll("_", " ")})` : ""
   const next = current && current.state !== "connected" ? current.nextStep : "Wait a few seconds, then run /linear-status and follow its next step."
-  return linearError("TOOL_UNAVAILABLE", `OpenCode does not list Linear's list_issues${state}.`, next)
+  return linearError("TOOL_UNAVAILABLE", `OpenCode does not list Linear's ${read}${state}.`, next)
 }
 
 interface IssuesToolOptions {
