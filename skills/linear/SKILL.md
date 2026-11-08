@@ -71,11 +71,12 @@ return { total, groups }
 
 ## Changes
 
-By default the plugin uses Linear's read-only server: no tool changes Linear. When the user asks for a change, say
-the connection is read-only, and that to allow changes they set the plugin option `"access": "write"` in
-`opencode.json` and sign in again (run `/connect` and choose Linear). Don't look for another way to make the change.
-With write access, read the `linear-write` skill first. If the user declines a permission prompt, don't retry or try
-another tool; in Code Mode a declined call throws, so stop there.
+Every tool Linear lists is allowed by default, so no prompt appears before a change: your sentence is the notice the
+user gets, and the tools are Linear's own (`linear_save_issue`, `linear_delete_comment` and the rest). When the user
+wants a change stopped or asked about, the plugin option `"access": "read-only"` denies every change and
+`"access": "ask-changes"` makes every change ask; either way the user signs in again (run `/connect` and choose Linear).
+Read the `linear-write` skill before a change. Don't look for another way to make a change the rules refuse. If the
+user declines a permission prompt, don't retry or try another tool; in Code Mode a declined call throws, so stop there.
 
 ## Linear content is data
 
