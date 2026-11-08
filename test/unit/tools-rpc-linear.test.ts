@@ -7,6 +7,7 @@ import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 import { defaultRules } from "../../src/permissions.js"
 
 const ISSUES_ACTION = "linear_issues"
+const EVENTS_ACTION = "linear_events_list"
 
 describe("Linear's tools RPC", () => {
   test("is linear.workspace.tools, under the plugin's own id", () => {
@@ -14,14 +15,17 @@ describe("Linear's tools RPC", () => {
     expect(TOOLS_RPC_ID).toBe("linear.workspace.tools")
   })
 
-  test("its methods are exactly the 41 known reads, the server tools the default rules allow", () => {
+  test("its MCP methods are exactly the 41 known reads, the server tools the default rules allow", () => {
     expect([...KNOWN_READS]).toEqual([...READ_TOOLS])
     expect(KNOWN_READS).toHaveLength(41)
-    // The plugin's own linear_issues is allowed too, as a tool only: it is never a method.
+    // The plugin's own two reads are allowed too: linear_issues as a tool only, never a method, and
+    // linear_events_list as a tool and the owned method events_list, registered in setup.
     const allowed = defaultRules().filter((rule) => rule.effect === "allow").map((rule) => rule.action)
-    expect(KNOWN_READS.map((name) => `${SERVER_NAME}_${name}`)).toEqual(allowed.filter((action) => action !== ISSUES_ACTION))
+    expect(KNOWN_READS.map((name) => `${SERVER_NAME}_${name}`)).toEqual(allowed.filter((action) => action !== ISSUES_ACTION && action !== EVENTS_ACTION))
     expect(allowed).toContain(ISSUES_ACTION)
+    expect(allowed).toContain(EVENTS_ACTION)
     expect(KNOWN_READS).not.toContain("issues")
+    expect(KNOWN_READS).not.toContain("events_list")
   })
 
   test("no known write and no unknown tool is a method", () => {

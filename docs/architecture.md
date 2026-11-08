@@ -17,6 +17,8 @@ the known reads through a tools RPC. It has no runtime dependencies.
 | `src/linear-tools.ts` | `READ_TOOLS`, `WRITE_TOOLS` and `classify()`. No runtime imports, so the drift script can load it |
 | `src/permissions.ts` | The default rules, their placement, and detection of agents without them |
 | `src/issues.ts` | `linear_issues`: the issues assigned to you as a table, read through the host's own `linear_list_issues` |
+| `src/events.ts` | `linear_events_list` and the tools RPC method `events_list`: assigned issue changes and notifications as Memory's events, read through the host's own executors |
+| `src/host/events-list.ts` | The `events_list` source contract: the event type and limits, input, cursors, `makeEvent`, `fitPage`, the checks and the conformance test. A copy every source plugin carries unchanged |
 | `src/status.ts` | The status model and text, `/linear-status`, and the status RPC method |
 | `src/skills.ts` | Loading and registering the skills |
 | `src/host/tools-rpc.ts` | The tools RPC for scripts, `linear.workspace.tools`; a copy of a module shared by several plugins, with Linear's part in one marked block |
@@ -43,9 +45,11 @@ typechecks. The package exports `.` (`dist/index.js`) and `./tui` (`dist/tui.js`
    other URL is a conflict: nothing is added, and status reports it.
 5. `ctx.tool.transform` gives the `linear` namespace its Code Mode description, which says what the access allows.
 6. `ctx.agent.transform` inserts the default rules after each agent's base `* * allow`.
-7. `ctx.tool.transform` adds `linear_issues`, a direct tool (`codemode: false`) in the `linear` namespace.
+7. `ctx.tool.transform` adds `linear_issues`, a direct tool (`codemode: false`) in the `linear` namespace, and
+   `linear_events_list`, a Code Mode tool in the same namespace.
 8. `ctx.skill.transform`, `ctx.command.transform` (`/linear-status`) and `ctx.rpc.register` (`linear.workspace/status`).
-9. `registerToolsRpc` registers the tools RPC, `linear.workspace.tools`, and its `evaluate` hook.
+9. `registerToolsRpc` registers the tools RPC, `linear.workspace.tools`, with `events_list` as its one owned method,
+   and its `evaluate` hook.
 10. `watchIntegration` starts. Setup returns one cleanup that stops it and disposes the tools RPC.
 
 Transforms are synchronous and never throw: a failure is kept as a problem for status, and cleared when the next replay
@@ -87,7 +91,10 @@ reason is cut to one line of 160 characters with no URL query.
 view. Its methods are `describe` and one per name in `READ_TOOLS`, named after the upstream tool. It is an allowlist:
 `WRITE_TOOLS`, and a tool that Linear adds later, which ask on the model path, are never methods. The methods are the
 same with either access: the server is always named `linear`. `READ_TOOLS` is what Linear's read-only server lists;
-`describe` reports each method as available or not from what OpenCode lists now.
+`describe` reports each method as available or not from what OpenCode lists now. One method is the plugin's own:
+`events_list` runs `linear_events_list`'s spec, which asserts `linear_events_list` with the call's source id and then
+reads through the same executors, so an ask on any of its checks is refused as for an MCP method. Its own errors carry
+their code, what happened and the next step, which `pluginError` passes on.
 
 A call is `{ sessionID, input }`. The module:
 

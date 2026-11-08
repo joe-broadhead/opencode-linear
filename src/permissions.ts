@@ -1,5 +1,6 @@
 import type { Plugin } from "@opencode/plugin"
 import { errorText, SERVER_NAME } from "./constants.js"
+import { EVENTS_LIST } from "./host/events-list.js"
 import { ISSUES_TOOL } from "./issues.js"
 import { READ_TOOLS } from "./linear-tools.js"
 
@@ -17,9 +18,9 @@ const rule = (tool: string, effect: Rule["effect"]): Rule => ({ action: actionOf
 
 /**
  * Broad first, narrow last, because the last matching rule wins: every Linear tool asks, then known reads run, and
- * the plugin's own read, `linear_issues`.
+ * the plugin's own reads, `linear_issues` and `linear_events_list`.
  */
-export const defaultRules = (): Rule[] => [{ ...ASK_ALL }, ...[...READ_TOOLS, ISSUES_TOOL].map((tool) => rule(tool, "allow"))]
+export const defaultRules = (): Rule[] => [{ ...ASK_ALL }, ...[...READ_TOOLS, ISSUES_TOOL, EVENTS_LIST].map((tool) => rule(tool, "allow"))]
 
 const same = (a: Rule, b: Rule) => a.action === b.action && a.resource === b.resource && a.effect === b.effect
 const BASE_ALLOW: Rule = { action: "*", resource: "*", effect: "allow" }
