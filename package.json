@@ -66,6 +66,12 @@
         "readOnly": true
       },
       {
+        "name": "linear.events_list",
+        "permission": "linear_events_list",
+        "effect": "allow",
+        "readOnly": true
+      },
+      {
         "name": "linear.extract_images",
         "permission": "linear_extract_images",
         "effect": "allow",

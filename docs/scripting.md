@@ -6,6 +6,7 @@ OpenCode server. It uses the tools RPC, `linear.workspace.tools`, through `openc
 | Method | The tool |
 | --- | --- |
 | one per known read, named after Linear's tool: `list_issues`, `get_issue`, `list_projects`, `get_user` and the others | `linear_<method>`, such as `linear_list_issues` |
+| `events_list` | `linear_events_list`: what changed in Linear for you since a cursor, as Memory's events ([configuration](configuration.md#events-list)) |
 | `describe` | none: lists the methods, their permission actions, whether OpenCode lists each tool now, and each tool's input as JSON Schema |
 
 The methods are exactly Linear's 41 read tools that the plugin knows, the ones its default rules allow
@@ -22,6 +23,12 @@ Each method runs the tool with the same input: Linear's own tool, through OpenCo
 plugin never sees the OAuth token. Linear's write tools, such as `save_issue` or `save_comment`, are never methods,
 even with `access: "write"` and an allow rule. Neither is a tool that Linear adds later, nor the plugin's own
 `linear_issues`, a table for the model; a script calls `list_issues` itself.
+
+`events_list` is the plugin's own read for Memory's collector. It runs `linear_events_list`'s own spec as the session
+and its agent: it asserts `linear_events_list`, then reads `get_workspace`, `get_user`, `list_issues` and
+`get_notifications` through OpenCode's executors, so each read's rules apply. Its own refusals are the codes in the
+configuration guide's [errors](configuration.md#errors), such as `CURSOR_INVALID`; a refused read is
+`PERMISSION_DENIED` naming that read.
 
 The methods work the same with either access. With `access: "read"` (the default) they call Linear's read-only
 server, and with `access: "write"` the full one. `describe` shows which methods the server for your access lists now.
@@ -120,7 +127,7 @@ added later, and `rpc.invalid_input` for a body that is not the envelope above, 
 ## What scripts cannot do
 
 - Change anything in Linear: no write tool is a method, with either access.
-- Call a tool that is not one of the 41 known reads, even with an allow rule.
+- Call a tool that is not one of the 41 known reads or `events_list`, even with an allow rule.
 - Answer an approval prompt, or use a tool that asks.
 - Use a token: the plugin has none to give.
 
