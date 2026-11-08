@@ -22,9 +22,71 @@ export const SUPPORTED_HOST = ">=2.2.3 <2.3.0"
 /** The OpenCode releases every check runs on: the one list. Status calls only these "tested". */
 export const TESTED_HOSTS: readonly string[] = ["2.2.3", "2.2.4", "2.2.5", "2.2.6"]
 
-/** The one error shape: `CODE: What happened. Next step: What to do.` Both parts are sentences. */
-export const errorText = (code: string, message: string, nextStep: string) => `${code}: ${message} Next step: ${nextStep}`
+/**
+ * Every code this plugin's own code raises. The README's Troubleshooting table and the configuration guide's Errors
+ * table name each one, and a test fails when they differ either way.
+ */
+export type PluginCode =
+  | "AUTH_REQUIRED"
+  | "HOST_UNTESTED"
+  | "OPTIONS_INVALID"
+  | "RULES_NOT_ADDED"
+  | "SERVER_CONFLICT"
+  | "SERVER_NOT_REGISTERED"
+  | "SKILLS_INVALID"
+  | "STATUS_UNAVAILABLE"
+  | "TOOL_UNAVAILABLE"
+  | "UPSTREAM_UNREADABLE"
 
-export function linearError(code: string, message: string, nextStep: string) {
+export const PLUGIN_CODES: readonly PluginCode[] = [
+  "AUTH_REQUIRED",
+  "HOST_UNTESTED",
+  "OPTIONS_INVALID",
+  "RULES_NOT_ADDED",
+  "SERVER_CONFLICT",
+  "SERVER_NOT_REGISTERED",
+  "SKILLS_INVALID",
+  "STATUS_UNAVAILABLE",
+  "TOOL_UNAVAILABLE",
+  "UPSTREAM_UNREADABLE",
+]
+
+/**
+ * The codes the tools RPC shares with every plugin of this family, listed in docs/scripting.md beside this plugin's
+ * own. They come from the shared tools RPC module and from OpenCode, not from this plugin's code.
+ */
+export type RpcCode =
+  | "AUTH_REQUIRED"
+  | "CANCELLED"
+  | "CONNECTING"
+  | "CONNECTION_FAILED"
+  | "DISABLED"
+  | "NOT_REGISTERED"
+  | "PERMISSION_DENIED"
+  | "SERVER_CONFLICT"
+  | "SESSION_AGENT_REQUIRED"
+  | "SESSION_UNKNOWN"
+  | "TOOL_UNAVAILABLE"
+  | "UPSTREAM_ERROR"
+
+export const RPC_CODES: readonly RpcCode[] = [
+  "AUTH_REQUIRED",
+  "CANCELLED",
+  "CONNECTING",
+  "CONNECTION_FAILED",
+  "DISABLED",
+  "NOT_REGISTERED",
+  "PERMISSION_DENIED",
+  "SERVER_CONFLICT",
+  "SESSION_AGENT_REQUIRED",
+  "SESSION_UNKNOWN",
+  "TOOL_UNAVAILABLE",
+  "UPSTREAM_ERROR",
+]
+
+/** The one error shape: `CODE: What happened. Next step: What to do.` Both parts are sentences. */
+export const errorText = (code: PluginCode, message: string, nextStep: string) => `${code}: ${message} Next step: ${nextStep}`
+
+export function linearError(code: PluginCode, message: string, nextStep: string) {
   return Object.assign(new Error(errorText(code, message, nextStep)), { code, nextStep })
 }
