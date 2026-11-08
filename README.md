@@ -80,9 +80,10 @@ only tools that read, and Linear refuses changes through it. To let the model ma
 ### Scripts
 
 A script or a cron job can call Linear's tools with no model, through `opencode api`. It runs as a session and its
-agent, and every call needs a rule that resolves to `allow`: the 41 reads and `linear_issues` run on the default rules,
-while a write needs a prior explicit `allow` in the session's or the agent's rules. An `ask` is refused, and a saved
-"Always allow" is not enough. Write tools are not listed at all with `access: "read"`.
+agent, and every call resolves the rule for its action, the agent's and then the session's: only an `allow` runs, an
+`ask` is refused, and a saved "Always allow" is not enough. The plugin's default rules follow the `access` option, so
+restrict a script with `access` or with a later rule. When the plugin uses Linear's read-only server, write tools are
+not listed at all.
 
 ```sh
 opencode api post /api/rpc/linear.workspace.tools/get_issue -H "x-opencode-directory:$PWD" \
