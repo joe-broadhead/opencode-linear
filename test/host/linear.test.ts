@@ -33,7 +33,7 @@ const hidden = (rules: readonly Rule[], action: string) => {
 const linearTools = (host: Host) =>
   until("Linear's tools are registered", async () => {
     const ids = (await host.probe().tool.list()).map((tool) => tool.id).filter((id) => id.startsWith("linear_"))
-    return ids.length === 4 && ids.sort()
+    return ids.length === 5 && ids.sort()
   })
 
 async function status(host: Host, sessionID: string) {
@@ -65,7 +65,8 @@ describe(`read access on OpenCode ${HOST_VERSION}`, () => {
     expect(plugins.find((plugin) => plugin.id === "linear.workspace")?.state.status).toBe("active")
     const { data: servers } = await host.client.mcp.list({ location: host.location })
     expect(servers.find((server) => server.name === "linear")?.status).toEqual({ status: "connected" })
-    expect(await linearTools(host)).toEqual(["linear_issues", "linear_list_issues", "linear_save_issue", "linear_shiny_new_tool"])
+    // The fake's three tools, and the plugin's own linear_issues and linear_events_list.
+    expect(await linearTools(host)).toEqual(["linear_events_list", "linear_issues", "linear_list_issues", "linear_save_issue", "linear_shiny_new_tool"])
     const { data: skills } = await host.client.skill.list({ location: host.location })
     expect(skills.map((skill) => skill.id).filter((id) => id.startsWith("linear"))).toEqual(["linear"])
     const { data: commands } = await host.client.command.list({ location: host.location })
@@ -124,6 +125,21 @@ describe(`read access on OpenCode ${HOST_VERSION}`, () => {
     expect(host.fake.inputs.length).toBe(before)
   })
 
+  test("linear_events_list asserts its own action on the real host, then reads through the host's executors", async () => {
+    await linearTools(host)
+    const events = (await host.probe().tool.list()).find((tool) => tool.id === "linear_events_list")!
+    const run = (sessionID: string, id: string) =>
+      events.execute({ since: "2026-11-01" }, { sessionID, agent: "build", messageID: "msg_host_test", id, signal: new AbortController().signal, progress: async () => {} } as never)
+    const from = host.fake.inputs.length
+    // The default rules allow it; the fake serves no get_workspace, so its first read names that.
+    await expect(run(await session(host), "call_events_1")).rejects.toThrow(/^TOOL_UNAVAILABLE: OpenCode does not list Linear's get_workspace/)
+    // A session that denies linear_events_list: the assert refuses it before any read.
+    const permissions = [{ action: "linear_events_list", resource: "*", effect: "deny" as const }]
+    const locked = (await host.client.sessions.create({ agent: "build", location: host.location, permissions })).id
+    await expect(run(locked, "call_events_2")).rejects.toThrow("linear_events_list")
+    expect(host.fake.inputs.length).toBe(from)
+  })
+
   test("P4: a saved 'Always allow' removes the prompt", async () => {
     const build = await session(host)
     expect(await attempt(host, build, "build", "shiny_new_tool", "always")).toEqual({ asked: "linear_shiny_new_tool", ok: true })
@@ -144,7 +160,7 @@ describe(`read access on OpenCode ${HOST_VERSION}`, () => {
     await linearTools(host)
     const text = await status(host, await session(host))
     expect(text).toContain(`- Connection: connected (${host.fake.endpoints.read}, registered by this plugin)`)
-    expect(text).toContain("- Tools: 4 available, 1 unknown: shiny_new_tool (unknown tools ask before running)\n")
+    expect(text).toContain("- Tools: 5 available, 1 unknown: shiny_new_tool (unknown tools ask before running)\n")
     expect(text).toContain(`- Agents without default rules: reviewer\n${AGENT_RULES}\n`)
     expect(text).toContain(`- Next step: ${AGENTS_NEXT_STEP}`)
     expect(text).toContain(`- OpenCode: ${HOST_VERSION} (${TESTED_HOSTS.includes(HOST_VERSION) ? "tested" : "untested"}; supported range ${SUPPORTED_HOST})`)

@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `linear_events_list`, Memory's source of Linear events: the changes to issues assigned to you and your Linear
+  notifications since a cursor, oldest first, as the shared `events_list` contract's events (`src/host/events-list.ts`,
+  pinned by `scripts/check-copies.mjs`). It reads `get_workspace`, `get_user`, `list_issues` and `get_notifications`
+  through OpenCode, is a Code Mode tool and the tools RPC method `events_list`, and has a default allow rule and a
+  `jelly` declaration as a read that never asks. New error codes: `INPUT_INVALID`, `SOURCE_UNKNOWN`,
+  `ACCOUNT_UNKNOWN`, `CURSOR_INVALID`, `TOO_MANY_CHANGES` and `UPSTREAM_ERROR`.
+
 ## [0.0.8] - 2026-11-06
 
 ### Changed

@@ -1,6 +1,7 @@
 import { Plugin, type Mcp } from "@opencode/plugin"
 import { errorText, NAMESPACE_DESCRIPTION, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { checkHost } from "./host-version.js"
+import { eventsMethod, registerEventsTool } from "./events.js"
 import { registerToolsRpc } from "./host/tools-rpc.js"
 import { watchIntegration } from "./integration.js"
 import { registerIssuesTool } from "./issues.js"
@@ -85,11 +86,16 @@ export function createLinearPlugin(seam: LinearSeam) {
       // The plugin's own server, or the user's adopted one; a server at another URL is not Linear's for this access.
       const owned = () => source?.type === "plugin" || source?.type === "adopted"
       await registerIssuesTool({ tool: ctx.tool, owned, status: read })
+      // Memory's source of Linear events, as a Code Mode tool and a tools RPC method.
+      await registerEventsTool({ tool: ctx.tool, permission: ctx.permission, owned, status: read })
       await registerSkills(ctx.skill, skills)
       await registerStatusCommand(ctx, read)
       await registerStatusRpc(ctx.rpc, read)
       // Scripts call the known reads with no model, as a session and its agent.
-      const stopTools = await registerToolsRpc(ctx, { mcp: { server: SERVER_NAME, managed: owned } })
+      const stopTools = await registerToolsRpc(ctx, {
+        mcp: { server: SERVER_NAME, managed: owned },
+        owned: [eventsMethod({ tool: ctx.tool, permission: ctx.permission, owned, status: read })],
+      })
       const stopWatch = watchIntegration(ctx, owned)
       return async () => {
         await stopWatch()

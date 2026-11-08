@@ -11,7 +11,7 @@ describe("defaultRules", () => {
   test("ask for every Linear tool, then allow each known read and the plugin's own, and deny nothing", () => {
     const rules = defaultRules()
     expect(rules[0]).toEqual(ask)
-    expect(rules.slice(1)).toEqual([...READ_TOOLS, ISSUES_TOOL].map((tool) => ({ action: `linear_${tool}`, resource: "*", effect: "allow" })))
+    expect(rules.slice(1)).toEqual([...READ_TOOLS, ISSUES_TOOL, "events_list"].map((tool) => ({ action: `linear_${tool}`, resource: "*", effect: "allow" })))
     expect(rules.filter((rule) => rule.effect === "deny")).toEqual([])
   })
 
