@@ -3,6 +3,8 @@ name: linear
 description: Read before your first Linear tool call, linear_issues included. Use whenever the user asks about Linear or their Linear work - my issues, what I'm working on, what's in this cycle, a project's progress, an issue's comments, counts by state, a teammate's assignments - or names an identifier such as ENG-123 or a linear.app link. Covers choosing between linear_issues and list_issues, filters, paging, counts and citing links. Not for GitHub or Jira issues.
 ---
 
+If Linear's tools are absent, run `/connect` and choose Linear, or on Jelly call jelly_connection_request.
+
 # Linear
 
 Linear's tools are `linear_<tool>`, or `tools.linear.<tool>(input)` in Code Mode, where `search` with namespace

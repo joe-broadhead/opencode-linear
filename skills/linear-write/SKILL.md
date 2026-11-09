@@ -3,6 +3,8 @@ name: linear-write
 description: Read before any change in Linear - creating or updating an issue, project or document, commenting, changing a status, assignee or label, sharing an issue, merging or reviewing a diff, or deleting. Covers reading the item first, confirming, one change at a time, the changes that reach beyond the item, and reporting links.
 ---
 
+If Linear's tools are absent, run `/connect` and choose Linear, or on Jelly call jelly_connection_request.
+
 # Changing Linear
 
 The plugin has Linear's write access, and every tool is allowed by default, so no prompt appears before a change
