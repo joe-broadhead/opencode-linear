@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
+import { parseOptions } from "../../src/options.js"
 import { defaultRules, evaluate, type Rule } from "../../src/permissions.js"
 import { type Declaration, type DeclaredTool, declarationProblems, docProblems, readPackage } from "../support/jelly-kit.js"
 
@@ -18,11 +19,15 @@ const pkg = readPackage(ROOT)
 const jelly = pkg.jelly as Declaration & {
   tools: DeclaredTool[]
   views: { tools?: string[]; card?: { template: string } }[]
-  contributes: { homeFeeds: { label: string; description: string; feed: { title: string; tools: string[]; script: string } }[] }
+  contributes: { settings: { key: string; type: string }[]; homeFeeds: { label: string; description: string; feed: { title: string; tools: string[]; script: string } }[] }
 }
 const byPermission = new Map(jelly.tools.map((tool) => [tool.permission, tool]))
 
 describe("the jelly declaration", () => {
+  test("declares the flat access option", () => {
+    expect(jelly.contributes.settings.map(({ key, type }) => ({ key, type }))).toEqual([{ key: "access", type: "string" }])
+    expect(parseOptions({ access: "read-only" }).access).toBe("read-only")
+  })
   test("follows the plugin authors' standard, with the effects the plugin's own default rules give", () => {
     expect(declarationProblems(ROOT, { effectOf: (permission) => evaluate([BASE_ALLOW, ...defaultRules()], permission) })).toEqual([])
   })
