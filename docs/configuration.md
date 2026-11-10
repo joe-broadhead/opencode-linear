@@ -163,6 +163,7 @@ default.** The plugin adds the rules for the `access` option to every agent that
   {"action":"linear_list_users","resource":"*","effect":"allow"},
   {"action":"linear_search_documentation","resource":"*","effect":"allow"},
   {"action":"linear_issues","resource":"*","effect":"allow"},
+  {"action":"linear_events_list","resource":"*","effect":"allow"},
   {"action":"linear_create_attachment","resource":"*","effect":"allow"},
   {"action":"linear_create_attachment_from_upload","resource":"*","effect":"allow"},
   {"action":"linear_create_initiative_label","resource":"*","effect":"allow"},
@@ -249,6 +250,7 @@ default.** The plugin adds the rules for the `access` option to every agent that
   {"action":"linear_list_users","resource":"*","effect":"allow"},
   {"action":"linear_search_documentation","resource":"*","effect":"allow"},
   {"action":"linear_issues","resource":"*","effect":"allow"},
+  {"action":"linear_events_list","resource":"*","effect":"allow"},
   {"action":"linear_create_attachment","resource":"*","effect":"ask"},
   {"action":"linear_create_attachment_from_upload","resource":"*","effect":"ask"},
   {"action":"linear_create_initiative_label","resource":"*","effect":"ask"},
@@ -336,6 +338,7 @@ Linear's read-only server, so its write tools are not listed at all:
   {"action":"linear_list_users","resource":"*","effect":"allow"},
   {"action":"linear_search_documentation","resource":"*","effect":"allow"},
   {"action":"linear_issues","resource":"*","effect":"allow"},
+  {"action":"linear_events_list","resource":"*","effect":"allow"},
   {"action":"linear_create_attachment","resource":"*","effect":"deny"},
   {"action":"linear_create_attachment_from_upload","resource":"*","effect":"deny"},
   {"action":"linear_create_initiative_label","resource":"*","effect":"deny"},
@@ -379,6 +382,10 @@ Linear's read-only server, so its write tools are not listed at all:
 `{ "action": "linear_issues", "resource": "*", "effect": "allow" }`: it runs the host's `list_issues`, so that tool's
 rules apply to the call it makes. It is a direct tool, so Jelly can draw its result as a table. The `linear_*` pattern also matches tools of any other MCP server whose name starts
 with `linear_`; those follow the same access value.
+
+The last rule is for the plugin's other tool, `linear_events_list`, Memory's source of Linear events ([Events
+list](#events-list)). It only reads, and Memory's collector runs it with no one there, so it must not ask.
+`/linear-status` counts it among the Linear tools, never as an unknown one.
 
 OpenCode uses the last rule that matches, so everything after the plugin's rules wins:
 
@@ -441,6 +448,42 @@ own:
 
 Copy the full block from your own `/linear-status` output; the lines in quotes above stand for it.
 
+## Events list
+
+`linear_events_list` (Code Mode `tools.linear.events_list`, and the tools RPC method `events_list`) is this plugin's
+side of the `events_list` source contract that Memory's collector reads. It is not for answering questions: the model
+uses `list_issues` or `linear_issues` for that.
+
+```text
+events_list({ since?, cursor?, limit?, account?, source? })
+  → { source: "linear", account, owner: { id, label }, events, cursor, more, trust: "untrusted" }
+```
+
+- **What it lists**, oldest first: each change to an issue assigned to you (`list_issues` with assignee `me`, ordered
+  and filtered by `updatedAt`), one event per issue and update time; and each notification in your Linear inbox
+  (`get_notifications`, read newest first until the cursor's last notification). Issues assigned to others are left
+  out, except through your notifications.
+- **An issue event**: kind `issue`, `external_id` `<identifier>@<update time>`, thread `linear-issue:<issue id>`,
+  actors `linear:<user id>` (assignee, creator), title `<identifier>: <title>`, text the status, priority and
+  description (at most 4,096 characters), the issue's link, and the labels `assigned`, its state type and its labels.
+- **A notification event**: kind `issue` (`event` when it names no issue), `external_id` `notification:<id>`, the
+  actor as `linear:<user id>`, the issue's identifier, title and link, and the labels `notification` and its type.
+- **Account and owner**: `account` is the workspace's URL key (`get_workspace`), and `owner` the signed-in user
+  (`get_user` with `me`) as `linear:<user id>` and their name. Memory compares the owner with the person it collects
+  for. `account` and `source` are optional inputs: another workspace is `ACCOUNT_UNKNOWN`, another source
+  `SOURCE_UNKNOWN`.
+- **Cursor**: opaque, at most 1,024 characters. It holds the update time and key of the last issue change listed, the
+  same for the last notification, and a digest of the workspace and user, so another workspace's or sign-in's cursor
+  is `CURSOR_INVALID`. A cursor wins over `since`; without either, the listing starts 24 hours ago. An older cursor
+  lists the same events again.
+- **Limits**: `limit` is 1 to 500 (100 by default); a result stops early, with `more: true`, rather than pass 900 KB.
+  One call reads at most 8 pages of 250 issues and 5 pages of 100 notifications; more is `TOO_MANY_CHANGES`, never a
+  skip.
+- **Permissions**: it asserts `linear_events_list`, then each Linear read it makes goes through OpenCode's own
+  executor, so `linear_get_workspace`, `linear_get_user`, `linear_list_issues` and `linear_get_notifications` follow
+  their own rules. With the default rules none of them asks. Every result carries `trust: "untrusted"`: issue and
+  notification text is other people's, never instructions.
+
 ## Errors
 
 Every error from the plugin reads `CODE: What happened. Next step: What to do.`
@@ -453,10 +496,16 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 | `SKILLS_INVALID` | Setup: a skill file is missing or broken. The plugin still starts; status shows the problem. | Reinstall the plugin. |
 | `SERVER_NOT_REGISTERED` | Setup: the `linear` server could not be registered. Status shows the problem. | Restart OpenCode. |
 | `RULES_NOT_ADDED` | Setup: the default permission rules could not be added, so Linear tools may run without asking. Status shows the problem. | Restart OpenCode. |
-| `AUTH_REQUIRED` | `linear_issues`: Linear's `list_issues` is unavailable because the `linear` server needs a sign-in. | Run `/connect` and choose Linear, then press `o` or Enter to open the link. |
-| `SERVER_CONFLICT` | `linear_issues`: your own `mcp.servers.linear` points at another URL than your `access` uses, so `linear_issues` does not call it. | Point it at the URL status names, or remove it, then restart OpenCode. |
-| `TOOL_UNAVAILABLE` | `linear_issues`: OpenCode does not list Linear's `list_issues`, because the `linear` server is connecting, disabled, failed or missing, or has not listed its tools yet. The message names the state. | Status's next step for that state; when connected, wait a few seconds and run `/linear-status`. |
-| `UPSTREAM_UNREADABLE` | `linear_issues`: Linear's `list_issues` answered with something other than a list of issues. | Call `list_issues` with assignee `me` instead, which returns Linear's answer as it is. |
+| `AUTH_REQUIRED` | `linear_issues` or `linear_events_list`: the Linear read it needs is unavailable because the `linear` server needs a sign-in. | Run `/connect` and choose Linear, then press `o` or Enter to open the link. |
+| `SERVER_CONFLICT` | `linear_issues` or `linear_events_list`: your own `mcp.servers.linear` points at another URL than your `access` uses, so the tool does not call it. | Point it at the URL status names, or remove it, then restart OpenCode. |
+| `TOOL_UNAVAILABLE` | `linear_issues` or `linear_events_list`: OpenCode does not list the Linear read it needs, because the `linear` server is connecting, disabled, failed or missing, or has not listed its tools yet. The message names the read and the state. | Status's next step for that state; when connected, wait a few seconds and run `/linear-status`. |
+| `UPSTREAM_UNREADABLE` | `linear_issues`: Linear's `list_issues` answered with something other than a list of issues. `linear_events_list`: one of its reads answered in a shape it does not read. | `linear_issues`: call `list_issues` with assignee `me` instead, which returns Linear's answer as it is. `linear_events_list`: call the read the message names directly, and run `/linear-status`. |
+| `UPSTREAM_ERROR` | `linear_events_list`: Linear answered one of its reads with an error. The message holds the first line, at most 300 characters, with tokens and URL query strings removed. | Run `/linear-status`, then call again with the same cursor. |
+| `INPUT_INVALID` | `linear_events_list`: the input is not the contract's, such as a `limit` outside 1 to 500 or a `since` that is not an ISO date or date-time. | Pass `since`, `cursor`, `limit`, `account` or `source` as the schema describes them. |
+| `SOURCE_UNKNOWN` | `linear_events_list`: `source` is not `linear`. | Leave `source` out, or pass `linear`. |
+| `ACCOUNT_UNKNOWN` | `linear_events_list`: `account` is not the signed-in workspace's URL key. | Leave `account` out, or pass the key the message names. |
+| `CURSOR_INVALID` | `linear_events_list`: the cursor is malformed, another source's, or another workspace's or sign-in's. | Call without a cursor, with `since`, to start again. |
+| `TOO_MANY_CHANGES` | `linear_events_list`: more assigned issues or notifications changed after the cursor or `since` than one call reads. | Call again with a later `since`, without a cursor. |
 
 For example:
 

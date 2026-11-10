@@ -33,27 +33,39 @@ export const TESTED_HOSTS: readonly string[] = ["2.2.3", "2.2.4", "2.2.5", "2.2.
  * table name each one, and a test fails when they differ either way.
  */
 type PluginCode =
+  | "ACCOUNT_UNKNOWN"
   | "AUTH_REQUIRED"
+  | "CURSOR_INVALID"
   | "HOST_UNTESTED"
+  | "INPUT_INVALID"
   | "OPTIONS_INVALID"
   | "RULES_NOT_ADDED"
   | "SERVER_CONFLICT"
   | "SERVER_NOT_REGISTERED"
   | "SKILLS_INVALID"
+  | "SOURCE_UNKNOWN"
   | "STATUS_UNAVAILABLE"
+  | "TOO_MANY_CHANGES"
   | "TOOL_UNAVAILABLE"
+  | "UPSTREAM_ERROR"
   | "UPSTREAM_UNREADABLE"
 
 export const PLUGIN_CODES: readonly PluginCode[] = [
+  "ACCOUNT_UNKNOWN",
   "AUTH_REQUIRED",
+  "CURSOR_INVALID",
   "HOST_UNTESTED",
+  "INPUT_INVALID",
   "OPTIONS_INVALID",
   "RULES_NOT_ADDED",
   "SERVER_CONFLICT",
   "SERVER_NOT_REGISTERED",
   "SKILLS_INVALID",
+  "SOURCE_UNKNOWN",
   "STATUS_UNAVAILABLE",
+  "TOO_MANY_CHANGES",
   "TOOL_UNAVAILABLE",
+  "UPSTREAM_ERROR",
   "UPSTREAM_UNREADABLE",
 ]
 
@@ -93,6 +105,7 @@ export const RPC_CODES: readonly RpcCode[] = [
 /** The one error shape: `CODE: What happened. Next step: What to do.` Both parts are sentences. */
 export const errorText = (code: PluginCode, message: string, nextStep: string) => `${code}: ${message} Next step: ${nextStep}`
 
+/** An error with its code, what happened (`detail`) and the next step, as the tools RPC reports a plugin error. */
 export function linearError(code: PluginCode, message: string, nextStep: string) {
-  return Object.assign(new Error(errorText(code, message, nextStep)), { code, nextStep })
+  return Object.assign(new Error(errorText(code, message, nextStep)), { code, detail: message, nextStep })
 }

@@ -16,6 +16,7 @@ describe("defaultRules", () => {
     expect(rules.slice(1)).toEqual([
       ...READ_TOOLS.map((tool): Rule => ({ action: `linear_${tool}`, resource: "*", effect: "allow" })),
       { action: `linear_${ISSUES_TOOL}`, resource: "*", effect: "allow" },
+      { action: "linear_events_list", resource: "*", effect: "allow" },
       ...WRITE_TOOLS.map((tool): Rule => ({ action: `linear_${tool}`, resource: "*", effect: "allow" })),
     ])
     expect(rules.filter((rule) => rule.effect !== "allow")).toEqual([])

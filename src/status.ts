@@ -1,6 +1,7 @@
 import type { Plugin, Rpc } from "@opencode/plugin"
 import { PLUGIN_ID, SERVER_NAME, TESTED_HOSTS } from "./constants.js"
 import { isSupportedHost, type HostCheck } from "./host-version.js"
+import { EVENTS_LIST } from "./host/events-list.js"
 import { ISSUES_TOOL } from "./issues.js"
 import { classify } from "./linear-tools.js"
 import { ACCESS_VALUES, type Access } from "./options.js"
@@ -97,8 +98,8 @@ const STATE_OF = { connected: "connected", pending: "connecting", needs_auth: "s
 
 export function buildStatus(facts: StatusFacts): Status {
   const state: State = facts.source?.type === "conflict" ? "conflict" : facts.server ? STATE_OF[facts.server.status] : "not_configured"
-  // linear_issues is the plugin's own tool in the server's namespace, not one the server added.
-  const unknown = (facts.tools ?? []).filter((tool) => tool !== ISSUES_TOOL && classify(tool) === "unknown")
+  // linear_issues and linear_events_list are the plugin's own tools in the server's namespace, not ones the server added.
+  const unknown = (facts.tools ?? []).filter((tool) => tool !== ISSUES_TOOL && tool !== EVENTS_LIST && classify(tool) === "unknown")
   // OpenCode's text for a needed sign-in can hold an authorization URL, so only a failure's reason is kept.
   const error = facts.server?.status === "failed" && facts.server.error ? shortReason(facts.server.error) : undefined
   const status = {

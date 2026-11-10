@@ -277,11 +277,11 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
       // Config-only agents get no default rules: their own rules decide, after the host's defaults.
       agents: { locked: { permissions: [rule("linear_*", "deny")] }, careful: { permissions: [rule("linear_list_issues", "ask")] } },
     })
-    // The server's tools and the fake's new one, plus the plugin's own linear_issues in the same namespace.
-    for (const [access, tools] of [["read-only", READ_TOOLS.length + 2], ["all", READ_TOOLS.length + WRITE_TOOLS.length + 2]] as const) {
+    // The server's tools and the fake's new one, plus the plugin's own linear_issues and linear_events_list in the same namespace.
+    for (const [access, tools] of [["read-only", READ_TOOLS.length + 3], ["all", READ_TOOLS.length + WRITE_TOOLS.length + 3]] as const) {
       await host.until(`linear is connected in ${access} access with its ${tools} tools`, async () => {
         const { output } = await host.api<{ output: { state: string; tools: number; unknownCount: number } }>("POST", "/api/rpc/linear.workspace/status", { input: {} }, where(access))
-        // Only the fake's new tool is unknown: linear_issues is the plugin's own.
+        // Only the fake's new tool is unknown: linear_issues and linear_events_list are the plugin's own.
         return output.state === "connected" && output.tools === tools && output.unknownCount === 1
       })
       const create = async (body: Record<string, unknown>) => {
@@ -307,9 +307,9 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
   test.each(["read-only", "all"] as const)("in %s access, describes every known tool with its class, and the owned issues method", async (access) => {
     const { value } = await script(access, "describe", {})
     expect(value.id).toBe(TOOLS_RPC_ID)
-    expect(value.methods.map((method: { name: string }) => method.name)).toEqual([...READ_TOOLS, ...WRITE_TOOLS, "issues"])
+    expect(value.methods.map((method: { name: string }) => method.name)).toEqual([...READ_TOOLS, ...WRITE_TOOLS, "issues", "events_list"])
     const listed = new Set(access === "read-only" ? READ_TOOLS : [...READ_TOOLS, ...WRITE_TOOLS])
-    for (const method of value.methods.slice(0, -1)) {
+    for (const method of value.methods.slice(0, -2)) {
       const name = method.name as string
       expect({ name, kind: method.kind, action: method.action, available: method.available }).toEqual({
         name,
@@ -320,9 +320,10 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
       expect(method.class).toBe((READ_TOOLS as readonly string[]).includes(name) ? "read" : "write")
       if (listed.has(name)) expect(method.input).toEqual({ type: "object", properties: { query: { type: "string" } } })
     }
-    // The plugin's own direct read is a method in both access modes.
-    expect(value.methods.at(-1)).toMatchObject({ name: "issues", kind: "plugin", class: "read", action: "linear_issues", available: true })
-    expect(Object.keys(value.methods.at(-1).input.properties)).toEqual(["limit"])
+    // The plugin's own reads are methods in both access modes: linear_issues, then linear_events_list.
+    expect(value.methods.at(-2)).toMatchObject({ name: "issues", kind: "plugin", class: "read", action: "linear_issues", available: true })
+    expect(Object.keys(value.methods.at(-2).input.properties)).toEqual(["limit"])
+    expect(value.methods.at(-1)).toMatchObject({ name: "events_list", kind: "plugin", class: "read", action: "linear_events_list", available: true })
   })
 
   test.each(["read-only", "all"] as const)("in %s access, a deny refuses and a write follows the block", async (access) => {
@@ -398,6 +399,15 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     expect((await call("read-only", "narrow", "get_issue", { query: "q" })).value).toMatchObject({ output: { tool: "get_issue" } })
     expect((await call("read-only", "reopen", "list_issues", { query: "q" })).value).toMatchObject({ output: { tool: "list_issues" } })
     expect(await call("read-only", "reopen", "get_issue", { query: "q" })).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
+  })
+
+  test("events_list runs the packed plugin's own spec, reads through OpenCode, and reports an answer it cannot read with its own code", async () => {
+    const from = fake.calls.length
+    // The fake answers get_workspace with its call, not a workspace.
+    const result = await call("read-only", "build", "events_list", {})
+    expect(result).toMatchObject({ type: "failed", code: "UPSTREAM_UNREADABLE" })
+    expect(String(result.message)).toContain("UPSTREAM_UNREADABLE: Linear's get_workspace answered in a shape events_list does not read.")
+    expect(toolCalls(from)).toEqual(["get_workspace"])
   })
 
   test("gives Linear's own error as UPSTREAM_ERROR: its first line, with the signed URL redacted", async () => {

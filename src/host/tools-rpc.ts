@@ -75,9 +75,14 @@ export const NEXT_STEPS: NextSteps = {
   CANCELLED: "Call the method again if you still need the result.",
 }
 
-/** The plugin's own errors, thrown by plugin-owned specs, as a code, what happened and the next step. Linear has none. */
-export function pluginError(_error: unknown): Failure | undefined {
-  return undefined
+/**
+ * The plugin's own errors, thrown by the `events_list` method's spec (`linearError`), as a code, what happened and the
+ * next step.
+ */
+export function pluginError(error: unknown): Failure | undefined {
+  if (!(error instanceof Error)) return undefined
+  const { code, detail, nextStep } = error as Error & { code?: unknown; detail?: unknown; nextStep?: unknown }
+  return typeof code === "string" && typeof detail === "string" && typeof nextStep === "string" ? { code, what: detail, next: nextStep } : undefined
 }
 
 // <<< PLUGIN-SPECIFIC <<<

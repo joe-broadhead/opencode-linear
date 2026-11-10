@@ -155,8 +155,12 @@ describe("setup", () => {
     expect(NAMESPACE_DESCRIPTION[access]).toContain("Read the linear skill before the first call")
     expect(NAMESPACE_DESCRIPTION[access]).toContain("by its identifier and the url Linear returns")
     if (access === "read-only") expect(NAMESPACE_DESCRIPTION["read-only"]).toContain('the user sets the plugin option "access": "all" and signs in again')
-    // linear_issues, a direct tool in the linear namespace, so Jelly can draw its result.
-    expect(tools.map((info) => [info.name, info.options])).toEqual([["issues", { namespace: "linear", codemode: false }]])
+    // linear_issues, a direct tool in the linear namespace, so Jelly can draw its result; linear_events_list, a Code
+    // Mode tool for Memory's collector.
+    expect(tools.map((info) => [info.name, info.options])).toEqual([
+      ["issues", { namespace: "linear", codemode: false }],
+      ["events_list", { namespace: "linear" }],
+    ])
     expect(rpc).toEqual(["linear.workspace", "linear.workspace.tools"])
     // The tools RPC's one hook: it refuses an ask on its own script calls.
     expect(hooks).toEqual(["evaluate"])

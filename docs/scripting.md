@@ -26,6 +26,12 @@ full server lists them, and a write runs under the rules.
 `issues` runs the plugin's own `linear_issues`, as the model does: it reads through the host's `linear_list_issues`
 executor, so that read's rules apply too. Its input is `{ "limit"?: 1 to 100 }`, 25 by default. It returns
 `{ "columns", "rows" }`: identifier, title, state, priority and link for each issue assigned to you.
+`events_list` is the plugin's own read for Memory's collector. It runs `linear_events_list`'s own spec as the session
+and its agent: it asserts `linear_events_list`, then reads `get_workspace`, `get_user`, `list_issues` and
+`get_notifications` through OpenCode's executors, so each read's rules apply. Its own refusals are the codes in the
+configuration guide's [errors](configuration.md#errors), such as `CURSOR_INVALID`; a refused read is
+`PERMISSION_DENIED` naming that read.
+
 
 ## A script runs as a session
 

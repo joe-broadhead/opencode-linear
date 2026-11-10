@@ -22,8 +22,8 @@ Run `opencode reload`, or restart OpenCode. Then run `/linear-status`: it shows 
 (see [Sign in](#sign-in)).
 
 The plugin registers Linear's MCP server under the name `linear`, adds default permission rules, the `/linear-status`
-command, the `/linear` status view, two skills and one tool of its own, `linear_issues`. Every other tool is Linear's,
-and OpenCode handles the connection, the sign-in and the stored credentials.
+command, the `/linear` status view, two skills and two tools of its own, `linear_issues` and `linear_events_list`.
+Every other tool is Linear's, and OpenCode handles the connection, the sign-in and the stored credentials.
 
 `linear_issues` answers the issues assigned to you as a table: identifier, title, state, priority and link, in every
 state, most recently updated first, 25 rows by default and at most 100. It is a quick look, not a count: the model
@@ -32,6 +32,13 @@ Linear's own `list_issues`, under that tool's sign-in and permission rules, and 
 a direct tool, offered to the model even when Code Mode holds Linear's other tools, because
 [Jelly](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/jelly.md) draws a tool's result as a table only
 for a direct call, not for one made inside Code Mode.
+
+`linear_events_list` is for Memory's collector, not for answering questions: it lists what changed in Linear for you
+since a cursor, as normalised events, oldest first: each change to an issue assigned to you, and each notification in
+your Linear inbox, with the issue's identifier and link. It only reads, through Linear's `get_workspace`, `get_user`,
+`list_issues` and `get_notifications`, and never asks with the default rules. It is this plugin's side of the shared
+`events_list` source contract
+([configuration](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/configuration.md#events-list)).
 
 **Update** with `opencode plugin update @joe-broadhead/opencode-linear`, then run `opencode reload`. An entry pinned
 to a version, such as `@joe-broadhead/opencode-linear@0.0.1`, does not update: remove the `@version` from its
@@ -91,7 +98,8 @@ opencode api post /api/rpc/linear.workspace.tools/get_issue -H "x-opencode-direc
   -d '{"input":{"sessionID":"ses_…","input":{"id":"ENG-123"}}}'
 ```
 
-See [Scripting](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md).
+The method `events_list` runs `linear_events_list` the same way. See
+[Scripting](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md).
 
 ## Permissions
 
@@ -182,6 +190,7 @@ The plugin inserts this block directly after each agent's base rule that allows 
   {"action":"linear_list_users","resource":"*","effect":"allow"},
   {"action":"linear_search_documentation","resource":"*","effect":"allow"},
   {"action":"linear_issues","resource":"*","effect":"allow"},
+  {"action":"linear_events_list","resource":"*","effect":"allow"},
   {"action":"linear_create_attachment","resource":"*","effect":"allow"},
   {"action":"linear_create_attachment_from_upload","resource":"*","effect":"allow"},
   {"action":"linear_create_initiative_label","resource":"*","effect":"allow"},
@@ -306,6 +315,12 @@ Run `/linear-status` first. Its last line is the next step.
 | `SERVER_CONFLICT` from `linear_issues` | Your own `mcp.servers.linear` points at another URL than your `access` uses. Point it at the URL `/linear-status` names, or remove it, then restart OpenCode. |
 | `TOOL_UNAVAILABLE` from `linear_issues` | OpenCode does not list Linear's `list_issues` yet. Follow the next step in the message, or run `/linear-status`. |
 | `UPSTREAM_UNREADABLE` from `linear_issues` | Linear's `list_issues` answered with something other than a list of issues. Ask for `list_issues` with assignee `me` instead. |
+| `INPUT_INVALID` from `linear_events_list` | The `events_list` input is invalid, and the message names the problems. Pass `since`, `cursor`, `limit`, `account` or `source` as the tool's schema describes them. |
+| `SOURCE_UNKNOWN` from `linear_events_list` | This plugin lists only the source `linear`. Leave `source` out, or pass `linear`. |
+| `CURSOR_INVALID` from `linear_events_list` | The cursor was not issued by `events_list` for this Linear workspace and sign-in. Call `events_list` without a cursor, with `since`, to start again. |
+| `ACCOUNT_UNKNOWN` from `linear_events_list` | The signed-in Linear workspace is not the account `events_list` was asked for. Leave `account` out, or pass the signed-in workspace. |
+| `TOO_MANY_CHANGES` from `linear_events_list` | More changes than one `events_list` call reads came after the cursor or `since`. Call `events_list` again with a later `since`, without a cursor. |
+| `UPSTREAM_ERROR` from `linear_events_list` | Linear's read failed. Run `/linear-status`, then call `events_list` again with the same cursor. |
 
 A script's errors from the tools RPC have their own codes, listed in
 [Scripting](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md#errors).

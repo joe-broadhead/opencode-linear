@@ -2,6 +2,7 @@ import { Plugin, type Mcp } from "@opencode/plugin"
 import { errorText, NAMESPACE_DESCRIPTION, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { checkHost } from "./host-version.js"
 import { METHODS, registerToolsRpc } from "./host/tools-rpc.js"
+import { eventsMethod, registerEventsTool } from "./events.js"
 import { watchIntegration } from "./integration.js"
 import { issuesMethod, registerIssuesTool } from "./issues.js"
 import { parseOptions, type Access } from "./options.js"
@@ -94,12 +95,15 @@ export function createLinearPlugin(seam: LinearSeam) {
       const owned = () => source?.type === "plugin" || source?.type === "adopted"
       const issues = { tool: ctx.tool, owned, status: read }
       await registerIssuesTool(issues)
+      // Memory's source of Linear events, as a Code Mode tool and a tools RPC method.
+      const events = { tool: ctx.tool, permission: ctx.permission, owned, status: read }
+      await registerEventsTool(events)
       await registerSkills(ctx.skill, skills)
       await registerStatusCommand(ctx, read)
       await registerStatusRpc(ctx.rpc, read)
-      // Scripts call every known tool and linear_issues with no model, as a session and its agent: a write needs a
-      // prior allow rule for its action.
-      const stopTools = await registerToolsRpc(ctx, { methods: [...METHODS, issuesMethod(issues)], mcp: { server: SERVER_NAME, managed: owned } })
+      // Scripts call every known tool and the plugin's own linear_issues and linear_events_list with no model, as a
+      // session and its agent: a write needs a prior allow rule for its action.
+      const stopTools = await registerToolsRpc(ctx, { methods: [...METHODS, issuesMethod(issues), eventsMethod(events)], mcp: { server: SERVER_NAME, managed: owned } })
       const stopWatch = watchIntegration(ctx, owned)
       return async () => {
         await stopWatch()

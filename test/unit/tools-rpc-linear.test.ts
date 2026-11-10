@@ -7,6 +7,7 @@ import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 import { defaultRules } from "../../src/permissions.js"
 
 const ISSUES_ACTION = "linear_issues"
+const EVENTS_ACTION = "linear_events_list"
 
 describe("Linear's tools RPC", () => {
   test("is linear.workspace.tools, under the plugin's own id", () => {
@@ -23,10 +24,10 @@ describe("Linear's tools RPC", () => {
     // Every known tool is allowed by default, the pattern that covers a tool Linear adds later included; the plugin's
     // own linear_issues is the owned method `issues`, not an MCP one.
     const allowed = defaultRules().filter((rule) => rule.effect === "allow").map((rule) => rule.action)
-    // The reads, the plugin's own `issues`, then the writes: the block's order.
-    expect(allowed).toEqual([`${SERVER_NAME}_*`, ...READ_TOOLS.map((name) => `${SERVER_NAME}_${name}`), ISSUES_ACTION, ...WRITE_TOOLS.map((name) => `${SERVER_NAME}_${name}`)])
+    // The reads, the plugin's own `issues` and `events_list`, then the writes: the block's order.
+    expect(allowed).toEqual([`${SERVER_NAME}_*`, ...READ_TOOLS.map((name) => `${SERVER_NAME}_${name}`), ISSUES_ACTION, EVENTS_ACTION, ...WRITE_TOOLS.map((name) => `${SERVER_NAME}_${name}`)])
     expect(METHODS.map((method) => method.name)).not.toContain("issues")
-    expect(METHODS.map((method) => method.name)).not.toContain("issues")
+    expect(METHODS.map((method) => method.name)).not.toContain("events_list")
   })
 
   test("no unknown tool is a method", () => {

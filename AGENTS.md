@@ -1,8 +1,8 @@
 # Repository rules
 
 This repository builds `@joe-broadhead/opencode-linear`, an OpenCode plugin that registers Linear's official MCP
-server and adds default permission rules, a status command, a status dialog, two skills, one read tool of its own
-(`linear_issues`) and a tools RPC for scripts.
+server and adds default permission rules, a status command, a status dialog, two skills, two read tools of its own
+(`linear_issues` and `linear_events_list`) and a tools RPC for scripts.
 Read [docs/architecture.md](docs/architecture.md) before you change code, and [CONTRIBUTING.md](CONTRIBUTING.md) for
 the checks and the release steps.
 
@@ -40,6 +40,11 @@ the checks and the release steps.
   (`codemode: false`) on purpose: Jelly draws its `table` card only from a direct call's result. That makes it present
   in every session, also when Code Mode holds Linear's other tools, so add no other direct tool without the same
   reason. Its answer keeps Jelly's `table` shape: at most 8 columns, 100 rows and 200 characters a cell.
+- **`linear_events_list` is Memory's source of Linear events** (`src/events.ts`), a Code Mode tool and the tools RPC's
+  one owned method, `events_list`. It keeps the shared `events_list` contract in `src/host/events-list.ts`, a copy
+  every source plugin carries unchanged (`scripts/check-copies.mjs` pins its hash): change it in every source plugin at
+  once. It asserts its own action, reads only through the host's executors, never writes, never asks with the default
+  rules, and its tests run the contract's conformance check on synthetic fixtures.
 - **The `jelly` section** of `package.json` declares every known tool, the skills, the `linear_issues` table card,
   the Home feed, the sign-in, a one-line `summary` and the `icon`, with only fields that Jelly's declaration schema
   accepts: it refuses unknown keys, so a Jelly without `summary` and `icon` refuses the declaration.

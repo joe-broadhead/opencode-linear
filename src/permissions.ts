@@ -1,5 +1,6 @@
 import type { Plugin } from "@opencode/plugin"
 import { errorText, SERVER_NAME } from "./constants.js"
+import { EVENTS_LIST } from "./host/events-list.js"
 import { ISSUES_TOOL } from "./issues.js"
 import type { Access } from "./options.js"
 import { READ_TOOLS, WRITE_TOOLS } from "./linear-tools.js"
@@ -24,7 +25,7 @@ export function defaultRules(access: Access = "all"): Rule[] {
   const other: Rule["effect"] = access === "all" ? "allow" : access === "ask-changes" ? "ask" : "deny"
   return [
     rule("*", other),
-    ...[...READ_TOOLS, ISSUES_TOOL].map((tool) => rule(tool, "allow")),
+    ...[...READ_TOOLS, ISSUES_TOOL, EVENTS_LIST].map((tool) => rule(tool, "allow")),
     ...WRITE_TOOLS.map((tool) => rule(tool, other)),
   ]
 }

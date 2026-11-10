@@ -32,6 +32,16 @@ All notable changes to this project are documented here. The format follows [Kee
   2.2.3, 2.2.4, 2.2.5 and 2.2.6. The CI has an `actionlint` job, and `npm run check` runs `actionlint` and the icon
   check.
 - The tools RPC is v2: every known tool is a method with its class (the 41 reads and the 36 writes), and `linear_issues` is the owned method `issues` (a direct-only read). A call runs only with a prior explicit `allow` in the agent's or the session's rules: an `ask` is refused before the tool runs, so no prompt waits, and a saved "Always allow" does not authorize an ad-hoc script. With `access: "read-only"` a write is a method but unavailable, since Linear's read-only server does not list it. A tool Linear adds later is still not a method.
+## [0.0.9] - 2026-11-08
+
+### Added
+
+- `linear_events_list`, Memory's source of Linear events: the changes to issues assigned to you and your Linear
+  notifications since a cursor, oldest first, as the shared `events_list` contract's events (`src/host/events-list.ts`,
+  pinned by `scripts/check-copies.mjs`). It reads `get_workspace`, `get_user`, `list_issues` and `get_notifications`
+  through OpenCode, is a Code Mode tool and the tools RPC method `events_list`, and has a default allow rule and a
+  `jelly` declaration as a read that never asks. New error codes: `INPUT_INVALID`, `SOURCE_UNKNOWN`,
+  `ACCOUNT_UNKNOWN`, `CURSOR_INVALID`, `TOO_MANY_CHANGES` and `UPSTREAM_ERROR`.
 
 ## [0.0.8] - 2026-11-06
 
