@@ -22,6 +22,7 @@ const STALE: [string, RegExp][] = [
   ["says it is read-only now", /\bread-only now\b/i],
   ["is refused while read-only", /\brefused while (?:the plugin is )?read-only\b/i],
   ["says no tool changes anything", /\bno tool (?:here )?changes\b/i],
+  ["states the default as a fact about every value", /\ballowed by default\b/i],
 ]
 
 /** A sentence that names a restricting value describes that value, not the default, so it is not a claim about `all`. */
@@ -44,8 +45,8 @@ describe("the model-facing text at access all", () => {
   })
 
   test("says what a change does under each access value, in the namespace the model reads", () => {
-    expect(NAMESPACE_DESCRIPTION.all).toContain("Every tool runs without asking")
-    expect(NAMESPACE_DESCRIPTION["ask-changes"]).toContain("Every change asks first")
+    expect(NAMESPACE_DESCRIPTION.all).toContain("At the default `access` `all`, every tool runs without asking")
+    expect(NAMESPACE_DESCRIPTION["ask-changes"]).toContain("At `access` `ask-changes`, reads run without asking and every change asks first")
     expect(NAMESPACE_DESCRIPTION["read-only"]).toContain('"access": "all"')
   })
 })

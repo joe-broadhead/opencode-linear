@@ -7,9 +7,9 @@ If Linear's tools are absent, run `/connect` and choose Linear, or on Jelly call
 
 # Changing Linear
 
-The plugin has Linear's write access, and every tool is allowed by default, so no prompt appears before a change
-unless the user restricts it with `access` or a rule: your sentence is the notice the user gets. Find and read items as
-the `linear` skill says.
+The `access` option decides whether a change asks. At the default `all`, no prompt appears before a change, so your
+sentence is the notice the user gets. At `ask-changes` each change asks first, and at `read-only` changes are denied.
+Find and read items as the `linear` skill says.
 
 Most changes save one kind of item: `linear_save_issue`, `linear_save_comment`, `linear_save_project`,
 `linear_save_document`, `linear_save_milestone`, `linear_save_initiative` and `linear_save_status_update` create an

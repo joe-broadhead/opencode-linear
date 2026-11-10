@@ -73,10 +73,11 @@ return { total, groups }
 
 ## Changes
 
-Every tool Linear lists is allowed by default, so no prompt appears before a change: your sentence is the notice the
-user gets, and the tools are Linear's own (`linear_save_issue`, `linear_delete_comment` and the rest). When the user
-wants a change stopped or asked about, the plugin option `"access": "read-only"` denies every change and
-`"access": "ask-changes"` makes every change ask; either way the user signs in again (run `/connect` and choose Linear).
+The `access` option decides whether a change asks. At the default `all`, every tool Linear lists runs without a prompt,
+so your sentence is the notice the user gets, and the tools are Linear's own (`linear_save_issue`,
+`linear_delete_comment` and the rest). When the user wants a change asked about, set the plugin option
+`"access": "ask-changes"`, which asks before every change. When they want changes denied, set `"access": "read-only"`:
+it denies every change and uses another Linear server, so the user signs in again (run `/connect` and choose Linear).
 Read the `linear-write` skill before a change. Don't look for another way to make a change the rules refuse. If the
 user declines a permission prompt, don't retry or try another tool; in Code Mode a declined call throws, so stop there.
 
