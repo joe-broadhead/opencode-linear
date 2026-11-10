@@ -328,6 +328,15 @@ store. The read-only server and the full one each have their own sign-in, and Op
    `opencode mcp list` no longer lists `linear`.
 5. Remove any Linear rules you copied into your agents' own `permissions`.
 
+## Known limits
+
+- **Linear decides its tools.** The plugin's tool table follows Linear's servers at this release. `npm run drift` compares it with Linear's live list, as a maintainer check that needs a read-only Linear key. A tool Linear adds later runs under `access` (allowed at the default) and is not a script method until the plugin classifies it.
+- **The default `access` is `all`.** Agents can then create, change and delete Linear items without asking. Set `access` to `"ask-changes"` to ask before every change, or to `"read-only"` to deny them.
+- **Switching to or from `"read-only"` needs a new sign-in.** That value uses Linear's read-only server, which has its own sign-in. Switching between `"all"` and `"ask-changes"` keeps the sign-in.
+- **Linear's consent page picks the workspace.** The plugin cannot choose a workspace; the sign-in shows Linear's page.
+- **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6 only.** Other releases in `>=2.2.3 <2.3.0` run untested.
+- **Linear's rate limits and error text are Linear's.**
+
 ## Links
 
 - [Configuration](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/configuration.md)
