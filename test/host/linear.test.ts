@@ -198,7 +198,9 @@ describe(`the default access on OpenCode ${HOST_VERSION}`, () => {
   })
 
   test("P4: a saved 'Always allow' removes the prompt", async () => {
-    const build = await session(host)
+    // At the default access an unknown tool runs without asking, so the prompt comes from an explicit ask rule.
+    const permissions = [{ action: "linear_shiny_new_tool", resource: "*", effect: "ask" as const }]
+    const build = (await host.client.sessions.create({ agent: "build", location: host.location, permissions })).id
     expect(await attempt(host, build, "build", "shiny_new_tool", "always")).toEqual({ asked: "linear_shiny_new_tool", ok: true })
     expect(await attempt(host, build, "build", "shiny_new_tool")).toEqual({ asked: undefined, ok: true })
     const { projectID } = await host.client.sessions.get({ sessionID: build })
@@ -217,7 +219,7 @@ describe(`the default access on OpenCode ${HOST_VERSION}`, () => {
     await linearTools(host)
     const text = await status(host, await session(host))
     expect(text).toContain(`- Connection: connected (${host.fake.endpoints.all}, registered by this plugin)`)
-    expect(text).toContain("- Tools: 4 available, 1 unknown: shiny_new_tool (unknown tools run too)\n")
+    expect(text).toContain("- Tools: 5 available, 1 unknown: shiny_new_tool (unknown tools run too)\n")
     expect(text).toContain(`- Agents without default rules: reviewer\n${AGENT_RULES}\n`)
     expect(text).toContain(`- Next step: ${AGENTS_NEXT_STEP}`)
     expect(text).toContain(`- OpenCode: ${HOST_VERSION} (${TESTED_HOSTS.includes(HOST_VERSION) ? "tested" : "untested"}; supported range ${SUPPORTED_HOST})`)
