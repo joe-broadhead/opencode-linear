@@ -40,8 +40,7 @@ your Linear inbox, with the issue's identifier and link. It only reads, through 
 `events_list` source contract
 ([configuration](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/configuration.md#events-list)).
 
-The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build. A new
-release is a new tag: install it with its own `#v<version>` spec.
+The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build. To update, remove the spec you installed with `opencode plugin remove`, add the new tag's spec with `opencode plugin add`, then run `opencode reload`.
 
 ## Sign in
 
