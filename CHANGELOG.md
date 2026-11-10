@@ -34,6 +34,7 @@ All notable changes to this project are documented here. The format follows [Kee
   both checked against `defaultRules(access)`. The docs' tested-release sentences are checked against `TESTED_HOSTS`:
   2.2.3, 2.2.4, 2.2.5 and 2.2.6. The CI has an `actionlint` job, and `npm run check` runs `actionlint` and the icon
   check.
+- The `OPTIONS_INVALID` next step for `access` names the Git spec, `github:joe-broadhead/opencode-linear#v0.0.0`, not the npm name.
 - The tools RPC is v2: every known tool is a method with its class (the 41 reads and the 36 writes), and `linear_issues` is the owned method `issues` (a direct-only read). A call runs only with a prior explicit `allow` in the agent's or the session's rules: an `ask` is refused before the tool runs, so no prompt waits, and a saved "Always allow" does not authorize an ad-hoc script. With `access: "read-only"` a write is a method but unavailable, since Linear's read-only server does not list it. A tool Linear adds later is still not a method.
 
 ## Earlier releases on npm

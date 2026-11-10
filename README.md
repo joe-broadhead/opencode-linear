@@ -21,6 +21,14 @@ opencode plugin add github:joe-broadhead/opencode-linear#v0.0.0
 Run `opencode reload`, or restart OpenCode. Then run `/linear-status`: it shows `sign-in required` until you sign in
 (see [Sign in](#sign-in)).
 
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-linear#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-linear#v<version>`.
+
+Or add the plugin to `opencode.json` instead, with the same spec:
+
+```json
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.0" }] }
+```
+
 The plugin registers Linear's MCP server under the name `linear`, adds default permission rules, the `/linear-status`
 command, the `/linear` status view, two skills and two tools of its own, `linear_issues` and `linear_events_list`.
 Every other tool is Linear's, and OpenCode handles the connection, the sign-in and the stored credentials.
@@ -40,7 +48,7 @@ your Linear inbox, with the issue's identifier and link. It only reads, through 
 `events_list` source contract
 ([configuration](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/configuration.md#events-list)).
 
-The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build. To update, remove the spec you installed with `opencode plugin remove`, add the new tag's spec with `opencode plugin add`, then run `opencode reload`.
+The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
 
 ## Sign in
 
@@ -114,7 +122,7 @@ Nothing asks first. Restrict it in any of these three ways:
    | `"read-only"` | the read tools | nothing: every write is **denied**, and the plugin uses Linear's read-only server |
 
    ```json
-   { "plugins": [{ "package": "@joe-broadhead/opencode-linear", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.0", "options": { "access": "read-only" } }] }
    ```
 
    `"read"` and `"write"` still work: they mean `"read-only"` and `"all"`, and `/linear-status` says they are
@@ -249,7 +257,7 @@ Set options with the object form of the plugin entry:
 
 ```json
 {
-  "plugins": [{ "package": "@joe-broadhead/opencode-linear", "options": { "access": "read-only" } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.0", "options": { "access": "read-only" } }]
 }
 ```
 
@@ -274,7 +282,7 @@ entry in the system config: `/Library/Application Support/opencode/opencode.json
 
 ```json
 {
-  "plugins": [{ "package": "@joe-broadhead/opencode-linear", "options": { "access": "ask-changes" } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.0", "options": { "access": "ask-changes" } }]
 }
 ```
 
@@ -334,7 +342,7 @@ store. The read-only server and the full one each have their own sign-in, and Op
    `MCP server not found: linear` for a few seconds; wait, then run it again.
 2. If you ever used the other server, sign out of it too. Set `"access"` in the plugin's `plugins` entry in
    `opencode.json` to the other value (`"all"` or `"ask-changes"` for the full server, `"read-only"` for the read-only
-   one), for example `{ "package": "@joe-broadhead/opencode-linear", "options": { "access": "read-only" } }`, run
+   one), for example `{ "package": "github:joe-broadhead/opencode-linear#v0.0.0", "options": { "access": "read-only" } }`, run
    `opencode reload`, then run `opencode mcp logout linear` again.
 3. Check: `opencode auth list` no longer lists **Linear**.
 4. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-linear#v0.0.0` (the spec you installed), then `opencode reload`.
@@ -349,6 +357,7 @@ store. The read-only server and the full one each have their own sign-in, and Op
 - **Linear's consent page picks the workspace.** The plugin cannot choose a workspace; the sign-in shows Linear's page.
 - **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6 only.** Other releases in `>=2.2.3 <2.3.0` run untested.
 - **Linear's rate limits and error text are Linear's.**
+- Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 
 ## Links
 
