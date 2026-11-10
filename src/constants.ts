@@ -32,7 +32,7 @@ export const TESTED_HOSTS: readonly string[] = ["2.2.3", "2.2.4", "2.2.5", "2.2.
  * Every code this plugin's own code raises. The README's Troubleshooting table and the configuration guide's Errors
  * table name each one, and a test fails when they differ either way.
  */
-export type PluginCode =
+type PluginCode =
   | "AUTH_REQUIRED"
   | "HOST_UNTESTED"
   | "OPTIONS_INVALID"
@@ -61,7 +61,7 @@ export const PLUGIN_CODES: readonly PluginCode[] = [
  * The codes the tools RPC shares with every plugin of this family, listed in docs/scripting.md beside this plugin's
  * own. They come from the shared tools RPC module and from OpenCode, not from this plugin's code.
  */
-export type RpcCode =
+type RpcCode =
   | "AUTH_REQUIRED"
   | "CANCELLED"
   | "CONNECTING"
