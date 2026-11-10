@@ -36,10 +36,10 @@ configuration guide's [errors](configuration.md#errors), such as `CURSOR_INVALID
 ## A script runs as a session
 
 Every call names a session, and the session must name an agent. Create it for the script once, with the agent the
-script runs as, and keep its id (`data.id` in the reply):
+script runs as, and keep its id (`data.id` in the reply). Give the project as the session's `location`: a session made without one belongs to the service's default location, where the project's agents may not exist, and each call then fails `Agent not found`:
 
 ```sh
-opencode api post /api/session -d '{"title":"triage digest","agent":"build"}'
+opencode api post /api/session -d '{"title":"triage digest","agent":"build","location":{"directory":"/path/to/project"}}'
 ```
 
 Never borrow a session found through history or a session list: the script would run as that session's agent, under its
@@ -61,7 +61,7 @@ Session rules come after the agent's, so a session can narrow what its script ma
 one script without touching the agent's rules. This one can list and read issues, and comment on one:
 
 ```sh
-opencode api post /api/session -d '{"title":"triage digest","agent":"build","permissions":[
+opencode api post /api/session -d '{"title":"triage digest","agent":"build","location":{"directory":"/path/to/project"},"permissions":[
   {"action":"linear_*","resource":"*","effect":"deny"},
   {"action":"linear_list_issues","resource":"*","effect":"allow"},
   {"action":"linear_get_issue","resource":"*","effect":"allow"},

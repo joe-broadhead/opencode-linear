@@ -14,6 +14,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Each Linear skill's first line says how to sign in when the tools are absent: `/connect`, or on Jelly `jelly_connection_request`.
 - The Code Mode namespace and the `linear` and `linear-write` skills say what `access` decides, in one clause for each value.
 - The `jelly` declaration's `access` setting carries its default, which Jelly displays.
+- `docs/scripting.md` says a script's session needs the project as its `location`; without one, each call fails `Agent not found`.
 
 - **`access` takes the family's values: `"all"` (the default), `"ask-changes"` and `"read-only"`.** `"all"` is the
   new default and uses Linear's full server, so the sign-in asks for write scope and every tool runs without asking;

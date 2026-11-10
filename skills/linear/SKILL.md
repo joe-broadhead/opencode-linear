@@ -94,7 +94,7 @@ Name each item by its identifier (or a project's name) and give the `url` Linear
 
 A cron job or shell script can run the same reads with no model through the tools RPC `linear.workspace.tools`;
 writes are never available there. It runs as a session's agent, under its rules, so a script, or a test of one, uses
-a session created for it (`opencode api post /api/session -d '{"title":"…","agent":"build"}'`, keep `data.id`).
+a session created for it (`opencode api post /api/session -d '{"title":"…","agent":"build","location":{"directory":"/path/to/project"}}'`, keep `data.id`).
 Never borrow an existing session found through history or a list. Details:
 https://raw.githubusercontent.com/joe-broadhead/opencode-linear/HEAD/docs/scripting.md
 
