@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.0.0] - 2026-11-10
+
 ### Added
 
 - `assets/icon-128.png` and `assets/icon-256.png`, with `opencode.icons` and `opencode.vendor` in `package.json`, and
@@ -206,7 +208,7 @@ All notable changes to this project are documented here. The format follows [Kee
   is refused at once because no one is there to answer it. `describe` lists the methods with each tool's live input
   schema. Linear's write tools and tools Linear adds later are never methods. `docs/scripting.md` explains it.
 
-## [0.0.0] - 2026-11-01
+## [0.0.0-superseded] - 2026-11-01
 
 ### Added
 

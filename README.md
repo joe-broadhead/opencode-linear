@@ -15,7 +15,7 @@ Unofficial; not affiliated with Linear.
 ## Install
 
 ```sh
-opencode plugin add @joe-broadhead/opencode-linear
+opencode plugin add github:joe-broadhead/opencode-linear#v0.0.0
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/linear-status`: it shows `sign-in required` until you sign in
@@ -40,9 +40,8 @@ your Linear inbox, with the issue's identifier and link. It only reads, through 
 `events_list` source contract
 ([configuration](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/configuration.md#events-list)).
 
-**Update** with `opencode plugin update @joe-broadhead/opencode-linear`, then run `opencode reload`. An entry pinned
-to a version, such as `@joe-broadhead/opencode-linear@0.0.1`, does not update: remove the `@version` from its
-`plugins` entry first.
+The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build. A new
+release is a new tag: install it with its own `#v<version>` spec.
 
 ## Sign in
 
@@ -339,7 +338,7 @@ store. The read-only server and the full one each have their own sign-in, and Op
    one), for example `{ "package": "@joe-broadhead/opencode-linear", "options": { "access": "read-only" } }`, run
    `opencode reload`, then run `opencode mcp logout linear` again.
 3. Check: `opencode auth list` no longer lists **Linear**.
-4. Remove the plugin: `opencode plugin remove @joe-broadhead/opencode-linear`, then `opencode reload`.
+4. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-linear#v0.0.0` (the spec you installed), then `opencode reload`.
    `opencode mcp list` no longer lists `linear`.
 5. Remove any Linear rules you copied into your agents' own `permissions`.
 

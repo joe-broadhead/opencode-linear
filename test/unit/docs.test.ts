@@ -41,7 +41,7 @@ describe("docs", () => {
     expect([first, other, second].every((index) => index >= 0)).toBe(true)
     expect(at("opencode reload", other)).toBeLessThan(second)
     expect(at("opencode auth list", second)).toBeGreaterThan(second)
-    expect(at("opencode plugin remove @joe-broadhead/opencode-linear")).toBeGreaterThan(at("opencode auth list", second))
+    expect(at("opencode plugin remove github:joe-broadhead/opencode-linear#v0.0.0")).toBeGreaterThan(at("opencode auth list", second))
   })
 
   test("the README and the configuration guide give linear_issues its allow rule and say why it is a direct tool", () => {
