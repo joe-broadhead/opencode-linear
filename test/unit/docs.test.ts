@@ -17,6 +17,11 @@ const FILES = [
 ]
 const text = (file: string) => readFileSync(join(ROOT, file), "utf8").replace(/\s+/g, " ")
 
+/** The release the install specs name: package.json's version. */
+const VERSION = (JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { version: string }).version
+/** The README's upgrade example removes an earlier release's entry; it must name one before VERSION. */
+const UPGRADE_FROM = /remove the old entry with `opencode plugin remove github:joe-broadhead\/opencode-linear#v(\d+)\.(\d+)\.(\d+)`/
+
 describe("docs", () => {
   test.each(FILES)("%s states the current number of read and write tools", (file) => {
     const reads = [...text(file).matchAll(/\b(\d+) (?:known )?read(?:s| tools)\b/g)].map((match) => Number(match[1]))
@@ -41,7 +46,7 @@ describe("docs", () => {
     expect([first, other, second].every((index) => index >= 0)).toBe(true)
     expect(at("opencode reload", other)).toBeLessThan(second)
     expect(at("opencode auth list", second)).toBeGreaterThan(second)
-    expect(at("opencode plugin remove github:joe-broadhead/opencode-linear#v0.0.0")).toBeGreaterThan(at("opencode auth list", second))
+    expect(at(`opencode plugin remove github:joe-broadhead/opencode-linear#v${VERSION}`)).toBeGreaterThan(at("opencode auth list", second))
   })
 
   test("the README and the configuration guide give linear_issues its allow rule and say why it is a direct tool", () => {
@@ -64,5 +69,16 @@ describe("docs", () => {
     expect(guide).toContain(`${READ_TOOLS.length} reads and the ${WRITE_TOOLS.length}`)
     expect(guide).toContain("`issues`")
     expect(guide).toContain("x-opencode-directory")
+  })
+})
+
+describe("the upgrade example", () => {
+  test("removes an earlier release than the one the install specs name", () => {
+    const match = UPGRADE_FROM.exec(text("README.md"))
+    expect(match).not.toBeNull()
+    const earlier = match!.slice(1, 4).map(Number)
+    const current = VERSION.split(".").map(Number)
+    const order = earlier.map((part, index) => part - current[index]!).find((difference) => difference !== 0) ?? 0
+    expect(order).toBeLessThan(0)
   })
 })

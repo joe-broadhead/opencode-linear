@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
-import { parseOptions } from "../../src/options.js"
+import { ACCESS_VALUES, parseOptions } from "../../src/options.js"
 import { defaultRules, evaluate, type Rule } from "../../src/permissions.js"
 import { type Declaration, type DeclaredTool, declarationProblems, docProblems, readPackage } from "../support/jelly-kit.js"
+import { ACCESS_CHOICES, type PluginSetting, settingChoices, settingsProblems, settingValueIssue } from "../support/jelly-settings.js"
 
 const ISSUES_ACTION = "linear_issues"
 const EVENTS_ACTION = "linear_events_list"
@@ -30,6 +31,26 @@ describe("the jelly declaration", () => {
     expect(parseOptions({ access: "read-only" }).access).toBe("read-only")
     expect(jelly.contributes.settings[0]?.default).toBe(parseOptions({}).access)
   })
+  test("Jelly's setting schema reads the settings", () => {
+    expect(settingsProblems(jelly.contributes.settings)).toEqual([])
+  })
+
+  test("access offers Jelly's three choices, word for word, and the options parser takes each of them", () => {
+    const access = jelly.contributes.settings.find((setting) => setting.key === "access") as PluginSetting
+    expect(access.choices).toEqual([...ACCESS_CHOICES])
+    expect(settingChoices(access)?.map((choice) => choice.value)).toEqual([...ACCESS_VALUES])
+    for (const { value } of ACCESS_CHOICES) expect(parseOptions({ access: value }).access as string).toBe(value)
+    for (const value of ["none", "ALL", "admin"]) {
+      expect(settingValueIssue(access, value)).not.toBeNull()
+      expect(() => parseOptions({ access: value })).toThrow()
+    }
+    // The deprecated values stay accepted in opencode.json, but Jelly never offers them.
+    for (const value of ["read", "write"]) {
+      expect(settingValueIssue(access, value)).not.toBeNull()
+      expect(parseOptions({ access: value }).deprecation).toBeDefined()
+    }
+  })
+
   test("follows the plugin authors' standard, with the effects the plugin's own default rules give", () => {
     expect(declarationProblems(ROOT, { effectOf: (permission) => evaluate([BASE_ALLOW, ...defaultRules()], permission) })).toEqual([])
   })
