@@ -16,7 +16,7 @@ interface Options {
   readonly deprecation?: string
 }
 
-const EXAMPLE = `"plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.0", "options": { "access": "read-only" } }]`
+const EXAMPLE = `"plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.1", "options": { "access": "read-only" } }]`
 const ACCEPTED = {
   access: `"all" (the default), "ask-changes" or "read-only"`,
   allowUntestedHost: "true or false (the default)",
