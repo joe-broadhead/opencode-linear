@@ -625,7 +625,12 @@
           "label": "Access",
           "type": "string",
           "default": "all",
-          "description": "all, ask-changes or read-only. Read-only uses Linear's read-only server and may require signing in again."
+          "choices": [
+            { "value": "all", "label": "Allowed", "description": "Every tool runs without asking, reads and changes alike." },
+            { "value": "ask-changes", "label": "Ask before changes", "description": "Reads run without asking. Each change asks you first." },
+            { "value": "read-only", "label": "Read only", "description": "Reads run. Changes never run." }
+          ],
+          "description": "What Linear's tools may do without asking. Read only uses Linear's read-only server and may require signing in again."
         }
       ]
     }

@@ -357,6 +357,8 @@ store. The read-only server and the full one each have their own sign-in, and Op
 - **Linear's consent page picks the workspace.** The plugin cannot choose a workspace; the sign-in shows Linear's page.
 - **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6 only.** Other releases in `>=2.2.3 <2.3.0` run untested.
 - **Linear's rate limits and error text are Linear's.**
+- **Jelly's settings need a recent Jelly.** The `jelly` settings declare their choices, which a Jelly without app#1301
+  does not read: it refuses the plugin's declaration.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
 
 ## Links
