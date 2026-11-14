@@ -62,7 +62,7 @@ describe("the jelly declaration", () => {
     // Memory's collector runs linear_events_list unattended, so it never asks.
     expect(byPermission.get(EVENTS_ACTION)).toMatchObject({ name: "linear.events_list", effect: "allow", readOnly: true })
     expect(jelly.tools).toHaveLength(READ_TOOLS.length + WRITE_TOOLS.length + 2)
-    // Exactly the known tools: none Linear no longer serves, such as whoami.
+    // Exactly the known tools, whoami included, and none Linear no longer serves.
     expect([...byPermission.keys()].sort()).toEqual([...READ_TOOLS, ...WRITE_TOOLS].map((tool) => `linear_${tool}`).concat(ISSUES_ACTION, EVENTS_ACTION).sort())
   })
 
