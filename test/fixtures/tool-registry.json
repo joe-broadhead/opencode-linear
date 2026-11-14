@@ -1,3 +1,13 @@
 {
-  "own": ["events_list", "issues"]
+  "own": [
+    "events_list",
+    "issues"
+  ],
+  "captureWording": [
+    {
+      "rule": "internal-wording",
+      "phrase": "the lead team",
+      "reason": "Linear's own tool descriptions, recorded verbatim, say it: Linear's words, not ours."
+    }
+  ]
 }
