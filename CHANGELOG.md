@@ -15,7 +15,6 @@ All notable changes to this project are documented here. The format follows [Kee
   `"constructor"`, `"toString"` or `"__proto__"` is refused as an access value instead of passing the alias lookup.
 - The icon is Linear's logomark, unaltered, on a tile in Linear's own colours, used under Linear's brand guidelines.
   `opencode.vendor.mark` is `true`, and the README carries Linear's trademark line.
-- `package.json` is `"private": true`: releases install from their GitHub tag, never from npm.
 
 ### Added
 
