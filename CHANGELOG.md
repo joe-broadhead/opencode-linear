@@ -19,8 +19,9 @@ All notable changes to this project are documented here. The format follows [Kee
 - `whoami`, which Linear serves and marks `readOnlyHint: false`, is a known tool and is declared for Jelly as not
   read-only: it follows `access` like a change, and a read-only helper in Jelly is never given it. `get_user` with
   `me` reads the same account at every access value.
-- Jelly's sign-in declares `relay: {}`, so a Jelly sign-in from a browser tab can come back through Jelly's relay:
-  Linear's server registers clients dynamically and accepts a client metadata document.
+- Jelly's sign-in declares `relay: {}`, so a Jelly sign-in from a browser tab may come back through Jelly's relay.
+  It is not yet checked with Linear: it rests on Linear's server metadata (dynamic registration and client metadata
+  documents), Linear documents no redirect rules, and no relay sign-in has been made.
 - `test/fixtures/live-tools.json`, Linear's tool list captured live on 14 November 2026, and a test that fails when the
   declaration and that list disagree. The known reads are tied to the tools Linear marks read-only in that capture.
 

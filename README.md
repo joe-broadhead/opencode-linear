@@ -21,7 +21,9 @@ opencode plugin add github:joe-broadhead/opencode-linear#v0.0.1
 Run `opencode reload`, or restart OpenCode. Then run `/linear-status`: it shows `sign-in required` until you sign in
 (see [Sign in](#sign-in)).
 
-Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-linear#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-linear#v<version>`.
+Each release has its own tag, and a Git install does not update by itself. To move to a newer release, remove the old entry with `opencode plugin remove github:joe-broadhead/opencode-linear#v0.0.0`, then add the new tag with `opencode plugin add github:joe-broadhead/opencode-linear#v<version>`. If you used
+`"access": "read-only"` with an earlier release, sign in once more after updating: that release used Linear's read-only
+server, which has its own sign-in.
 
 Or add the plugin to `opencode.json` instead, with the same spec:
 
@@ -348,6 +350,9 @@ store.
 - **Linear's consent page picks the workspace.** The plugin cannot choose a workspace; the sign-in shows Linear's page.
 - **Tested on OpenCode 2.2.3, 2.2.4, 2.2.5 and 2.2.6 only.** Other releases in `>=2.2.3 <2.3.0` run untested.
 - **Linear's rate limits and error text are Linear's.**
+- **Jelly's relay sign-in is not yet checked with Linear.** The Jelly declaration lets a sign-in come back through
+  Jelly's relay, based only on Linear's server metadata; Linear does not document its redirect rules, and no relay
+  sign-in has been made yet.
 - **Jelly's settings need a recent Jelly.** The `jelly` settings declare their choices, which a Jelly without app#1301
   does not read: it refuses the plugin's declaration.
 - Updates are not automatic for a Git install, and `opencode plugin update` and `opencode plugin check` do not work on one: to move to a newer release, remove the old entry and add the new tag.
