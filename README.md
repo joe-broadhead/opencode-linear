@@ -5,6 +5,8 @@ projects, cycles, documents and comments, and change them only if you allow it.
 
 Unofficial; not affiliated with Linear.
 
+Linear is a trademark of Linear Orbit, Inc.; this unofficial plugin is not endorsed by them.
+
 ## Requirements
 
 - OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Outside that range the plugin does not start, unless

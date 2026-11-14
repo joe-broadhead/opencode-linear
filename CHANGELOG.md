@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The icon is Linear's logomark, unaltered, on a tile in Linear's own colours, used under Linear's brand guidelines.
+  `opencode.vendor.mark` is `true`, and the README carries Linear's trademark line.
+
 ## [0.0.1] - 2026-11-13
 
 ### Added
