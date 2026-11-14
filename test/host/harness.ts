@@ -67,7 +67,7 @@ export async function startHost(input: HostInput = {}) {
   mkdirSync(work, { recursive: true })
   const fake = await startFakeMcp(input.fake)
   fake.challenge = input.challenge ?? false
-  const linear = createLinearPlugin({ endpoints: fake.endpoints, ...(input.oauth ? {} : { oauth: false as const }), skillsDir })
+  const linear = createLinearPlugin({ endpoint: fake.endpoint, ...(input.oauth ? {} : { oauth: false as const }), skillsDir })
   const withOptions = Plugin.define({ id: linear.id, setup: (ctx) => linear.setup({ ...ctx, options: input.options ?? {} }) })
   const probes = new Map<string, Plugin.Context>()
   const probe = Plugin.define({ id: "linear.host-test.probe", setup: (ctx) => void probes.set(ctx.location.directory, ctx) })

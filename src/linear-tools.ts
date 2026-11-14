@@ -1,7 +1,7 @@
 // Linear's tool names, without the `linear_` server prefix. Keep this file free of runtime imports:
 // scripts/check-linear-tools.mjs loads it with Node's type stripping to report upstream drift.
 
-/** Known reads: exactly the tools Linear's read-only server lists. They run without a prompt. */
+/** Known reads: exactly the tools Linear marks `readOnlyHint: true` (test/fixtures/live-tools.json). They always run. */
 export const READ_TOOLS: readonly string[] = [
   "extract_images",
   "get_agent_skill",
@@ -46,7 +46,12 @@ export const READ_TOOLS: readonly string[] = [
   "search_documentation",
 ]
 
-/** Known writes. They ask before they run; Linear's read-only server does not list them. */
+/**
+ * Every other known tool: the ones Linear marks `readOnlyHint: false`. They follow the `access` option: allowed at
+ * `all` (the default), asked about at `ask-changes` and denied at `read-only`. `whoami` only reports the signed-in
+ * user and workspace, but Linear marks it not read-only, so it is classed with the changes; `get_user` with `me`
+ * reads the same account at every access value.
+ */
 export const WRITE_TOOLS: readonly string[] = [
   "create_attachment",
   "create_attachment_from_upload",
@@ -84,6 +89,7 @@ export const WRITE_TOOLS: readonly string[] = [
   "submit_diff_review",
   "unshare_issue",
   "update_diff",
+  "whoami",
 ]
 
 type ToolClass = "read" | "write" | "unknown"

@@ -11,8 +11,8 @@ const NOTHING_TO_DO = "Nothing to do."
 const AGENT_RULES = defaultRules().map((rule, index, rules) => `  ${JSON.stringify(rule)}${index < rules.length - 1 ? "," : ""}`).join("\n")
 
 const host = checkHost("2.2.3", false)
-const READ_URL = "https://mcp.linear.app/mcp/readonly"
-const base: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: READ_URL }, access: "all", host }
+const URL_ = "https://mcp.linear.app/mcp"
+const base: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: URL_ }, access: "all", host }
 const guarded = { id: "build", permissions: [allow("*"), ...defaultRules()] }
 
 describe("buildStatus", () => {
@@ -23,7 +23,7 @@ describe("buildStatus", () => {
       state: "connected",
       account: "Acme",
       access: "all",
-      source: { type: "plugin", url: READ_URL },
+      source: { type: "plugin", url: URL_ },
       tools: 1,
       unknownCount: 0,
       unknownTools: [],
@@ -35,7 +35,7 @@ describe("buildStatus", () => {
     expect(formatStatus(status)).toBe(
       [
         "Linear status",
-        "- Connection: connected (https://mcp.linear.app/mcp/readonly, registered by this plugin)",
+        "- Connection: connected (https://mcp.linear.app/mcp, registered by this plugin)",
         "- Account: Acme",
         "- Access: every tool runs without asking, reads, changes and new tools included",
         "- Tools: 1 available, 0 unknown",
@@ -61,9 +61,9 @@ describe("buildStatus", () => {
   })
 
   test("shows a failure's reason on one short line, without URL queries, and never the text of a needed sign-in", () => {
-    const failed = buildStatus({ ...base, server: { status: "failed", error: "SSE error:\n  fetch https://mcp.linear.app/mcp/readonly?token=secret-123 failed.\n" } })
-    expect(failed.error).toBe("SSE error: fetch https://mcp.linear.app/mcp/readonly failed")
-    expect(formatStatus(failed)).toContain(`- Connection: failed (SSE error: fetch https://mcp.linear.app/mcp/readonly failed; ${READ_URL}, registered by this plugin)`)
+    const failed = buildStatus({ ...base, server: { status: "failed", error: "SSE error:\n  fetch https://mcp.linear.app/mcp?token=secret-123 failed.\n" } })
+    expect(failed.error).toBe("SSE error: fetch https://mcp.linear.app/mcp failed")
+    expect(formatStatus(failed)).toContain(`- Connection: failed (SSE error: fetch https://mcp.linear.app/mcp failed; ${URL_}, registered by this plugin)`)
     expect(shortReason("x".repeat(400))).toHaveLength(160)
     expect(shortReason(" \n. ")).toBeUndefined()
     const signIn = buildStatus({ ...base, server: { status: "needs_auth", error: "Visit https://mcp.linear.app/authorize?code=abc to sign in" } })
@@ -80,11 +80,11 @@ describe("buildStatus", () => {
   })
 
   test("adopted and conflicting servers", () => {
-    expect(formatStatus(buildStatus({ ...base, source: { type: "adopted", url: READ_URL } }))).toContain(`- Connection: connected (${READ_URL}, your own mcp.servers.linear, used unchanged)`)
-    const conflict = buildStatus({ ...base, source: { type: "conflict", url: "https://linear.example.com/mcp", expected: READ_URL } })
+    expect(formatStatus(buildStatus({ ...base, source: { type: "adopted", url: URL_ } }))).toContain(`- Connection: connected (${URL_}, your own mcp.servers.linear, used unchanged)`)
+    const conflict = buildStatus({ ...base, source: { type: "conflict", url: "https://linear.example.com/mcp", expected: URL_ } })
     expect(conflict.state).toBe("conflict")
     expect(conflict.nextStep).toBe(
-      `Your OpenCode config defines mcp.servers.linear with https://linear.example.com/mcp, but access "all" uses ${READ_URL}. Point it at ${READ_URL} or remove it, then restart OpenCode.`,
+      `Your OpenCode config defines mcp.servers.linear with https://linear.example.com/mcp, but this plugin uses ${URL_}. Point it at ${URL_} or remove it, then restart OpenCode.`,
     )
     expect(formatStatus(conflict)).toContain("- Connection: conflict (your mcp.servers.linear points at https://linear.example.com/mcp)")
   })
@@ -142,7 +142,7 @@ describe("buildStatus", () => {
     const status = buildStatus({ ...base, server: { status: "needs_auth", error: "x" }, agents: [{ id: "reviewer", permissions: [allow("*")] }] })
     expect(status.nextStep).toBe(SIGN_IN)
     const text = formatStatus(status)
-    expect(text).toContain(`- Connection: sign-in required (${READ_URL}, registered by this plugin)`)
+    expect(text).toContain(`- Connection: sign-in required (${URL_}, registered by this plugin)`)
     expect(text).toContain("- Agents without default rules: reviewer\n")
     expect(text.match(/Next step/g)).toHaveLength(1)
   })
@@ -196,7 +196,7 @@ function statusContext(overrides: { account?: Promise<unknown>; integrationID?: 
 describe("readStatus", () => {
   test("reads connection, account, tools and agents through public APIs", async () => {
     const account = Promise.resolve({ type: "credential", id: "c", label: "Acme workspace", method: "oauth" })
-    const status = await readStatus(statusContext({ integrationID: "mcp_1", account }), { source: { type: "plugin", url: READ_URL }, access: "all", host, problems: [] })
+    const status = await readStatus(statusContext({ integrationID: "mcp_1", account }), { source: { type: "plugin", url: URL_ }, access: "all", host, problems: [] })
     expect(status).toMatchObject({ state: "connected", account: "Acme workspace", unknownTools: ["shiny_new_tool"], unguardedAgents: ["reviewer"] })
   })
 
@@ -291,7 +291,7 @@ describe("status RPC", () => {
     const { properties, required } = StatusRpc.methods.status.output
     const statuses: Status[] = [
       buildStatus({ ...base, account: "Acme", tools: ["shiny_new_tool"], agents: [{ id: "reviewer", permissions: [allow("*")] }], problems: ["p"] }),
-      buildStatus({ ...base, server: { status: "failed", error: "fetch failed" }, source: { type: "conflict", url: "https://x.example/mcp", expected: READ_URL }, host: checkHost("2.3.0", true) }),
+      buildStatus({ ...base, server: { status: "failed", error: "fetch failed" }, source: { type: "conflict", url: "https://x.example/mcp", expected: URL_ }, host: checkHost("2.3.0", true) }),
     ]
     for (const status of statuses) {
       expect(Object.keys(status).filter((key) => !(key in properties))).toEqual([])

@@ -77,7 +77,7 @@ The `access` option decides whether a change asks. At the default `all`, every t
 so your sentence is the notice the user gets, and the tools are Linear's own (`linear_save_issue`,
 `linear_delete_comment` and the rest). When the user wants a change asked about, set the plugin option
 `"access": "ask-changes"`, which asks before every change. When they want changes denied, set `"access": "read-only"`:
-it denies every change and uses another Linear server, so the user signs in again (run `/connect` and choose Linear).
+it denies every change. Changing `access` keeps the sign-in.
 Read the `linear-write` skill before a change. Don't look for another way to make a change the rules refuse. If the
 user declines a permission prompt, don't retry or try another tool; in Code Mode a declined call throws, so stop there.
 

@@ -8,7 +8,7 @@ export type Access = (typeof ACCESS_VALUES)[number]
 const OLD_VALUES: Readonly<Record<string, Access>> = { read: "read-only", write: "all" }
 
 interface Options {
-  /** What the generated default rules allow, which of Linear's servers is used, and what the sign-in asks for. */
+  /** What the generated default rules allow. The server and the sign-in are the same for every value. */
   readonly access: Access
   /** Run on an OpenCode version outside the tested line, with a warning in status. */
   readonly allowUntestedHost: boolean
@@ -47,7 +47,7 @@ export function parseOptions(raw: unknown): Options {
   return {
     access: (old ?? access) as Access,
     allowUntestedHost,
-    ...(old === undefined ? {} : { deprecation: `The access value "${access}" is deprecated: it means "${old}". Set "${old}" and sign in again.` }),
+    ...(old === undefined ? {} : { deprecation: `The access value "${access}" is deprecated: it means "${old}". Set "${old}".` }),
   }
 }
 

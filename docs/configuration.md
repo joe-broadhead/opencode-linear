@@ -25,30 +25,25 @@ To set options, use the object form:
 
 | | `"all"` (the default) | `"ask-changes"` | `"read-only"` |
 | --- | --- | --- | --- |
-| Server the plugin registers as `linear` | `https://mcp.linear.app/mcp` | `https://mcp.linear.app/mcp` | `https://mcp.linear.app/mcp/readonly` |
-| OAuth scope | `read write` | `read write` | `read` |
+| Server the plugin registers as `linear` | `https://mcp.linear.app/mcp` | `https://mcp.linear.app/mcp` | `https://mcp.linear.app/mcp` |
+| OAuth scope | `read write` | `read write` | `read write` |
 | Default rules | every tool allows, and so does the `linear_*` pattern | reads allow; every other tool asks | reads allow; every other tool is denied |
-| Tools | Linear's read and write tools, and `linear_issues` | Linear's read and write tools, and `linear_issues` | Linear's read tools only, and `linear_issues` |
+| Tools the model sees | Linear's tools, and `linear_issues` | Linear's tools, and `linear_issues` | Linear's read tools, and `linear_issues`: a denied tool is hidden |
 | Skills | `linear` and `linear-write` | `linear` and `linear-write` | `linear` |
 
-Linear's read-only server lists only tools that read, and refuses changes itself. The generated rules for each value
-are printed in full under [Permissions](#permissions).
+The server and the sign-in are the same for every value, so changing `access` never needs a new sign-in: the generated
+rules do the gating, and they are printed in full under [Permissions](#permissions). The reads are the tools Linear
+marks `readOnlyHint: true`; every other tool, `whoami` included (Linear marks it not read-only), follows `access`.
+Linear's own read-only server, `https://mcp.linear.app/mcp/readonly`, is not used: at `"read-only"` the sign-in can
+still write, and OpenCode's rules deny it. An agent without the default rules is named by `/linear-status`.
 
 `"read"` and `"write"` are the values the option accepted before this one: `"read"` means `"read-only"` and `"write"`
-means `"all"`, and `/linear-status` says so in the Access row. Set the new value, and sign in again if the server
-address changed.
+means `"all"`, and `/linear-status` says so in the Access row. Set the new value.
 
-OpenCode keeps sign-ins per server name and address, so the read-only server and the full one each have their own
-sign-in. Linear's consent page decides the workspace of each one, so the two can be in different workspaces.
-
-- Switching to a server you have never signed in with: run `/connect` and choose Linear, then press `o` or Enter to
-  open the link. In a terminal, `opencode mcp auth linear` opens it automatically.
-- Switching to a server you signed in with before: OpenCode reuses that sign-in without asking, in whatever
-  workspace it was made. Ask the model which Linear workspace it is connected to; Linear's `get_workspace` answers.
-- Changing the workspace of one server: with that access configured, run `opencode mcp logout linear` in the project
-  where the plugin is configured. It removes every stored sign-in for the current `linear` address, and leaves the
-  other server's sign-in alone. Or remove the account in `/connect` → Linear. Then sign in again and pick the
-  workspace on Linear's consent page.
+Linear's consent page decides the workspace of the sign-in. Ask the model which Linear workspace it is connected to;
+Linear's `get_workspace` answers. To change it, run `opencode mcp logout linear` in the project where the plugin is
+configured, or remove the account in `/connect` → Linear, then sign in again and pick the workspace on Linear's consent
+page.
 
 ### `allowUntestedHost`
 
@@ -80,11 +75,11 @@ If your config defines no server named `linear`, the plugin registers one:
 { "type": "remote", "url": "https://mcp.linear.app/mcp", "oauth": { "scope": "read write" } }
 ```
 
-With `access: "read-only"`, the URL is `https://mcp.linear.app/mcp/readonly` and the scope `read`. OpenCode's own
-defaults apply to everything else, and it registers its OAuth client with Linear automatically.
+It is the same for every `access` value. OpenCode's own defaults apply to everything else, and it registers its OAuth
+client with Linear automatically.
 
 To change anything else, for example to use a pre-registered OAuth client, define `mcp.servers.linear` yourself, at
-the URL for your `access`. The plugin then **adopts** your entry unchanged, and `/linear-status` shows "Connection:
+`https://mcp.linear.app/mcp`. The plugin then **adopts** your entry unchanged, and `/linear-status` shows "Connection:
 connected (…, your own mcp.servers.linear, used unchanged)". The permission rules and skills still follow `access`.
 
 ```json
@@ -93,8 +88,8 @@ connected (…, your own mcp.servers.linear, used unchanged)". The permission ru
     "servers": {
       "linear": {
         "type": "remote",
-        "url": "https://mcp.linear.app/mcp/readonly",
-        "oauth": { "client_id": "<your client ID>", "scope": "read" }
+        "url": "https://mcp.linear.app/mcp",
+        "oauth": { "client_id": "<your client ID>", "scope": "read write" }
       }
     }
   }
@@ -102,11 +97,11 @@ connected (…, your own mcp.servers.linear, used unchanged)". The permission ru
 ```
 
 The plugin compares origin and path, so a trailing slash or a query string still matches. Any other URL, including
-Linear's other server, or a local command, is a **conflict**: the plugin leaves your entry alone, adds nothing, status
+Linear's read-only server, or a local command, is a **conflict**: the plugin leaves your entry alone, adds nothing, status
 shows "Connection: conflict", and gives the next step:
 
 ```text
-- Next step: Your OpenCode config defines mcp.servers.linear with https://mcp.linear.app/mcp/readonly, but access "all" uses https://mcp.linear.app/mcp. Point it at https://mcp.linear.app/mcp or remove it, then restart OpenCode.
+- Next step: Your OpenCode config defines mcp.servers.linear with https://mcp.linear.app/mcp/readonly, but this plugin uses https://mcp.linear.app/mcp. Point it at https://mcp.linear.app/mcp or remove it, then restart OpenCode.
 ```
 
 ## Permissions
@@ -199,7 +194,8 @@ default.** The plugin adds the rules for the `access` option to every agent that
   {"action":"linear_share_issue","resource":"*","effect":"allow"},
   {"action":"linear_submit_diff_review","resource":"*","effect":"allow"},
   {"action":"linear_unshare_issue","resource":"*","effect":"allow"},
-  {"action":"linear_update_diff","resource":"*","effect":"allow"}
+  {"action":"linear_update_diff","resource":"*","effect":"allow"},
+  {"action":"linear_whoami","resource":"*","effect":"allow"}
 ]
 ```
 
@@ -286,12 +282,13 @@ default.** The plugin adds the rules for the `access` option to every agent that
   {"action":"linear_share_issue","resource":"*","effect":"ask"},
   {"action":"linear_submit_diff_review","resource":"*","effect":"ask"},
   {"action":"linear_unshare_issue","resource":"*","effect":"ask"},
-  {"action":"linear_update_diff","resource":"*","effect":"ask"}
+  {"action":"linear_update_diff","resource":"*","effect":"ask"},
+  {"action":"linear_whoami","resource":"*","effect":"ask"}
 ]
 ```
 
-`access: "read-only"` allows the reads and denies every write, and a tool Linear adds later. It also registers
-Linear's read-only server, so its write tools are not listed at all:
+`access: "read-only"` allows the reads and denies every other tool, and a tool Linear adds later. A denied tool is
+hidden from the model:
 
 ```json
 [
@@ -374,7 +371,8 @@ Linear's read-only server, so its write tools are not listed at all:
   {"action":"linear_share_issue","resource":"*","effect":"deny"},
   {"action":"linear_submit_diff_review","resource":"*","effect":"deny"},
   {"action":"linear_unshare_issue","resource":"*","effect":"deny"},
-  {"action":"linear_update_diff","resource":"*","effect":"deny"}
+  {"action":"linear_update_diff","resource":"*","effect":"deny"},
+  {"action":"linear_whoami","resource":"*","effect":"deny"}
 ]
 ```
 
