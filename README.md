@@ -5,6 +5,8 @@ projects, cycles, documents and comments, and change them only if you allow it.
 
 Unofficial; not affiliated with Linear.
 
+Linear is a trademark of Linear Orbit, Inc. The icon is Linear's logomark, unaltered, on a tile in Linear's own colours, used under [Linear's brand guidelines](https://linear.app/brand) only to identify the service this plugin connects to.
+
 ## Requirements
 
 - OpenCode `>=2.2.3 <2.3.0`, tested on 2.2.3, 2.2.4, 2.2.5 and 2.2.6. Outside that range the plugin does not start, unless
