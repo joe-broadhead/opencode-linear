@@ -14,14 +14,14 @@ opencode api post /api/rpc/linear.workspace.tools/<method> -H "x-opencode-direct
 | `issues` | read | `linear_issues`, the plugin's own: your assigned issues as a table, one row each |
 | `describe` | none | none: lists every method with its class, its permission action, whether OpenCode lists its tool now, and its input as JSON Schema; given a session, it also gives each method's `permission` |
 
-The methods are exactly the tools this plugin knows (`METHODS` in `src/host/tools-rpc.ts`): the 41 reads and the 36
-writes of `READ_TOOLS` and `WRITE_TOOLS` in `src/linear-tools.ts`, plus the plugin's own `issues`, appended at
+The methods are exactly the tools this plugin knows (`METHODS` in `src/host/tools-rpc.ts`): the 41 reads and the 37
+other tools of `READ_TOOLS` and `WRITE_TOOLS` in `src/linear-tools.ts` (Linear's changes, and `whoami`, which Linear
+marks not read-only), plus the plugin's own `issues`, appended at
 registration. A tool Linear adds later is not a method.
 
 Each method runs Linear's own tool with the same input, through OpenCode's own connection and sign-in. The plugin
-never sees the OAuth token. `access` decides which of Linear's two servers is registered: `read-only` uses the
-read-only server, so `describe` marks every write unavailable and a write fails with `TOOL_UNAVAILABLE`; otherwise the
-full server lists them, and a write runs under the rules.
+never sees the OAuth token. Every `access` value uses Linear's one server, so every method is listed, and a write runs
+under the rules: at `read-only` the default rules deny it before it runs (`PERMISSION_DENIED`).
 
 `issues` runs the plugin's own `linear_issues`, as the model does: it reads through the host's `linear_list_issues`
 executor, so that read's rules apply too. Its input is `{ "limit"?: 1 to 100 }`, 25 by default. It returns
@@ -136,8 +136,8 @@ standard output.
 | `PERMISSION_DENIED` | The rules ask or deny. An `ask` is refused before dispatch: the message says the action would ask, and the next step says to add an allow rule. A `deny` names the denied action, such as `linear_save_issue`, and its next step says to remove or narrow that deny rule, add a later allow rule to the session, or use a session whose agent allows it. The action may be an inner one: `issues` reads through `linear_list_issues`, and names it. |
 | `SESSION_UNKNOWN` | OpenCode says the session does not exist in this location. Any other failure to look the session up is OpenCode's own error. |
 | `SESSION_AGENT_REQUIRED` | The session names no agent, or an agent that does not exist. |
-| `TOOL_UNAVAILABLE` | The server is connected, but OpenCode does not list the tool, such as a write while the plugin uses Linear's read-only server. |
-| `SERVER_CONFLICT` | Your `opencode.json` defines its own `linear` server at a URL other than the one your `access` uses. `/linear-status` names both. |
+| `TOOL_UNAVAILABLE` | The server is connected, but OpenCode does not list the tool, such as one Linear no longer serves. |
+| `SERVER_CONFLICT` | Your `opencode.json` defines its own `linear` server at a URL other than `https://mcp.linear.app/mcp`. `/linear-status` names both. |
 | `AUTH_REQUIRED`, `CONNECTING`, `CONNECTION_FAILED`, `DISABLED`, `NOT_REGISTERED` | The `linear` server needs a sign-in, is still connecting, could not connect, is disabled, or is missing. `/linear-status` gives the details. |
 | `UPSTREAM_ERROR` | Linear answered with an error, such as an invalid input or an item that does not exist. The message holds the first line of Linear's text, at most 300 characters, with tokens and URL query strings removed. |
 | `CANCELLED` | The request was cancelled. |
@@ -156,8 +156,7 @@ and `rpc.invalid_input` for a body that is not the envelope above, with one mess
 
 ## What scripts cannot do
 
-- Run a write without a prior explicit `allow` in the agent's or the session's rules, or at all when the plugin uses
-  Linear's read-only server.
+- Run a write without a prior explicit `allow` in the agent's or the session's rules.
 - Call a tool that is not a known one, even with an allow rule.
 - Answer an approval prompt: an `ask` is refused.
 - Use a token: the plugin has none to give.

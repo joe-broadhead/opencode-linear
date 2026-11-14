@@ -1,0 +1,27 @@
+{
+  "captures": [
+    {
+      "fixture": "live-tools.json",
+      "evidence": "live-observed",
+      "listedAt": "2026-11-14",
+      "server": "linear",
+      "endpoint": "https://mcp.linear.app/mcp",
+      "source": "scripts/capture-tools.mjs, signed in",
+      "host": "2.2.6",
+      "protocol": "2025-06-18",
+      "count": 78,
+      "annotations": "every tool",
+      "schemas": "recorded",
+      "digest": {
+        "algorithm": "sha256",
+        "of": "canonical JSON of the recorded tools, sorted by name",
+        "value": "fb802b7c375ef30c045544b0cbcff8b3acdea1124ae18601ac34e9a88b03bf12"
+      }
+    }
+  ],
+  "live": {
+    "fixture": "live-tools.json",
+    "listedAt": "2026-11-14"
+  },
+  "note": "Digests are for drift detection, not a security signature. live names the newest live-observed capture, which the release gate requires to be at most 14 days old."
+}

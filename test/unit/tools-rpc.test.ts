@@ -684,10 +684,10 @@ describe("registration", () => {
 })
 
 describe("Linear's block", () => {
-  test("classifies every known tool: 41 reads and 36 writes, and leaves unknown tools out", () => {
-    expect(METHODS).toHaveLength(77)
+  test("classifies every known tool: 41 reads and 37 other tools, and leaves unknown tools out", () => {
+    expect(METHODS).toHaveLength(78)
     expect(METHODS.filter((method) => method.class === "read")).toHaveLength(41)
-    expect(METHODS.filter((method) => method.class === "write")).toHaveLength(36)
+    expect(METHODS.filter((method) => method.class === "write")).toHaveLength(37)
     for (const method of METHODS) expect(method.kind).toBe("mcp")
     expect(METHODS.map((method) => method.name)).toContain("save_issue")
     expect(METHODS.map((method) => method.name)).not.toContain("shiny_new_tool")

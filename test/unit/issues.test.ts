@@ -30,7 +30,7 @@ function host(answer: unknown) {
   return { tool: { list }, calls }
 }
 
-const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp/readonly" }, access: "all", host: checkHost("2.2.3", false) }
+const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "all", host: checkHost("2.2.3", false) }
 const status = (more: Partial<StatusFacts> = {}) => async () => buildStatus({ ...facts, ...more })
 const owned = () => true
 const SIGN_IN = "Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth linear opens it automatically)."
@@ -87,7 +87,7 @@ describe("linear_issues", () => {
 
   test("never calls a linear server that is not Linear's for this access", async () => {
     const { tool, calls } = host({ issues: [] })
-    const conflict = status({ source: { type: "conflict", url: "https://example.com/mcp", expected: "https://mcp.linear.app/mcp/readonly" } })
+    const conflict = status({ source: { type: "conflict", url: "https://example.com/mcp", expected: "https://mcp.linear.app/mcp" } })
     const run = issuesTool({ tool, owned: () => false, status: conflict }).execute({}, context)
     await expect(run).rejects.toThrow(
       /^SERVER_CONFLICT: Your mcp\.servers\.linear is not Linear's server for access "all", so linear_issues does not call it\. Next step: Your OpenCode config defines mcp\.servers\.linear with https:\/\/example\.com\/mcp/,

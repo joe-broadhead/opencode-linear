@@ -1,6 +1,6 @@
 // A loopback Streamable-HTTP MCP server. By default it lists one read, one write and one tool the plugin has never
-// seen, on both paths. With `catalog: "linear"` it lists what Linear's servers list: the read-only path every known read
-// and the new tool, the full path every known read, every known write and the new tool. It answers JSON-RPC POSTs with
+// seen. With `catalog: "linear"` it lists what Linear's server lists: every known read, every other known tool and the
+// new tool. It answers JSON-RPC POSTs with
 // plain JSON (no SSE stream) and records every tool call, its path and every request header. A `tools/call` answers
 // with the tool's name, the path and its arguments as structured content; for a `query` that starts with "text", with
 // text alone; or, for a `query` that starts with "fail", with an upstream error (`isError`) whose first line holds a
@@ -22,19 +22,16 @@ const TOOLS = [
   NEW_TOOL,
 ].map((tool) => ({ ...tool, inputSchema: { type: "object", properties: {} } }))
 const linearTool = (name: string, readOnlyHint: boolean) => ({ name, description: `Linear ${name}`, annotations: { readOnlyHint }, inputSchema: schema })
-const LINEAR = {
-  read: [...READ_TOOLS.map((name) => linearTool(name, true)), { ...NEW_TOOL, inputSchema: schema }],
-  write: [...READ_TOOLS.map((name) => linearTool(name, true)), ...WRITE_TOOLS.map((name) => linearTool(name, false)), { ...NEW_TOOL, inputSchema: schema }],
-}
+const LINEAR = [...READ_TOOLS.map((name) => linearTool(name, true)), ...WRITE_TOOLS.map((name) => linearTool(name, false)), { ...NEW_TOOL, inputSchema: schema }]
 
 /** The upstream error a "fail" query gets: two lines, the first with a signed URL. */
 export const UPSTREAM_FAILURE = "Linear refused https://uploads.linear.app/a.png?signature=fake-signature-123 for this input\nTraceback: second line"
 
-/** The scope the plugin asks for on a read access, and the fake's challenge names. */
-export const SCOPES = "read"
+/** The scopes the plugin asks for at every access value, and the fake's challenge names. */
+export const SCOPES = "read write"
 
 export interface FakeMcpOptions {
-  /** `linear` lists Linear's known tools per path, as Linear's read-only and full servers do. */
+  /** `linear` lists Linear's known tools, as Linear's server does. */
   readonly catalog?: "linear"
   /**
    * Whether the token endpoint issues a refresh token. Without one, a 401 later needs a new sign-in and leaves the
@@ -45,8 +42,8 @@ export interface FakeMcpOptions {
 
 export interface FakeMcp {
   readonly url: string
-  /** Two paths on the same server, standing in for Linear's read-only and full servers. */
-  readonly endpoints: { readonly all: string; readonly "ask-changes": string; readonly "read-only": string }
+  /** The server's address, standing in for Linear's. */
+  readonly endpoint: string
   /**
    * While true, every MCP request gets 401 with a bearer challenge, as Linear's server answers before a sign-in or
    * after its tokens are revoked. The sign-in server keeps answering.
@@ -94,7 +91,7 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
       case "initialize":
         return reply({ protocolVersion: message.params?.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "fake-linear", version: "0.0.0" } })
       case "tools/list":
-        return reply({ tools: options.catalog === "linear" ? LINEAR[path.endsWith("/readonly") ? "read" : "write"] : TOOLS })
+        return reply({ tools: options.catalog === "linear" ? LINEAR : TOOLS })
       case "tools/call": {
         const tool = message.params?.name ?? ""
         calls.push(tool)
@@ -117,7 +114,7 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
     const json = (status: number, body: unknown) => void response.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(body))
     const issuer = `${fake.origin}/oauth`
     if (route.startsWith("/.well-known/oauth-protected-resource")) {
-      // The resource is the server path the challenge came from, such as Linear's read-only path.
+      // The resource is the server path the challenge came from.
       const resource = `${fake.origin}${route.slice("/.well-known/oauth-protected-resource".length) || "/mcp"}`
       return json(200, { resource, authorization_servers: [issuer], scopes_supported: SCOPES.split(" "), bearer_methods_supported: ["header"] })
     }
@@ -182,7 +179,7 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
   const { port } = server.address() as AddressInfo
   Object.assign(fake, {
     url: `http://127.0.0.1:${port}/mcp`,
-    endpoints: { all: `http://127.0.0.1:${port}/mcp`, "ask-changes": `http://127.0.0.1:${port}/mcp`, "read-only": `http://127.0.0.1:${port}/mcp/readonly` },
+    endpoint: `http://127.0.0.1:${port}/mcp`,
     origin: `http://127.0.0.1:${port}`,
     tokens,
     calls,

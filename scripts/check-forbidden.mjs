@@ -32,6 +32,8 @@ const RULES = [
     id: "internal-wording",
     pattern: /\bowner(?:'s)? (?:decision|ruling)\b|\bthe lead\b|\blane\s+[A-Z]\d*\b|\bhey-jelly\s*#\d+|\bG[1-4] lane\b|\breconcile lane\b/i,
     why: "internal process wording (a decision's author, a lane, or a ticket of our own) does not belong in shipped docs or code",
+    // Linear's own tool descriptions, recorded verbatim, say "the lead team": Linear's words, not ours.
+    except: ["test/fixtures/live-tools.json"],
   },
   { id: "absolute-path", pattern: /\/Users\/[^/\s"'`]+\/|\/home\/[^/\s"'`]+\/|\/(?:private\/)?var\/folders\/|(?<![\w.:/-])\/tmp\/|[A-Za-z]:\\\\?Users\\/, why: "machine-local home and temp paths do not belong in the repository; make temp folders with mkdtemp under realpathSync(\"/tmp\"), or use a relative path" },
 ]

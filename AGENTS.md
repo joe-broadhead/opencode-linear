@@ -33,8 +33,8 @@ the checks and the release steps.
   failure's reason to one line of 160 characters without URL queries, and names at most 20 unknown tools, plain names
   only. A status it cannot read is the declared RPC error `unavailable`, with a next step.
 - **`src/linear-tools.ts` and `src/constants.ts` have no runtime imports.** The drift script and `scripts/check.mjs`
-  load them with Node's type stripping. `READ_TOOLS` is exactly what Linear's read-only server lists
-  (`test/unit/linear-catalog.ts`).
+  load them with Node's type stripping. `READ_TOOLS` is exactly the tools Linear marks `readOnlyHint: true`,
+  and `WRITE_TOOLS` the rest, in Linear's live list (`test/fixtures/live-tools.json`).
 - **`linear_issues` is the one model tool of the plugin's own.** It reads through the host's `linear_list_issues`
   executor, never with a credential of its own, and its default rule allows it. It stays a direct tool
   (`codemode: false`) on purpose: Jelly draws its `table` card only from a direct call's result. That makes it present

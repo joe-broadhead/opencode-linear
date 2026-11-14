@@ -5,14 +5,14 @@ import { METHODS, registerToolsRpc } from "./host/tools-rpc.js"
 import { eventsMethod, registerEventsTool } from "./events.js"
 import { watchIntegration } from "./integration.js"
 import { issuesMethod, registerIssuesTool } from "./issues.js"
-import { parseOptions, type Access } from "./options.js"
+import { parseOptions } from "./options.js"
 import { defaultRules, registerDefaultRules } from "./permissions.js"
 import { loadSkills, registerSkills } from "./skills.js"
 import { readStatus, registerStatusCommand, registerStatusRpc, type ServerSource } from "./status.js"
 
 /** Internal seam: tests point the server at a loopback fake without OAuth, and at their own skills. */
 interface LinearSeam {
-  readonly endpoints: Readonly<Record<Access, string>>
+  readonly endpoint: string
   readonly oauth?: false
   readonly skillsDir?: string
 }
@@ -20,11 +20,11 @@ interface LinearSeam {
 type RemoteConfig = Extract<Mcp.ServerConfig, { type: "remote" }>
 
 /** No protocol, codemode, timeout or headers: the host defaults apply. */
-export const serverConfig = (seam: LinearSeam, access: Access): RemoteConfig => ({
+export const serverConfig = (seam: LinearSeam): RemoteConfig => ({
   type: "remote",
-  url: seam.endpoints[access],
-  // The sign-in asks for write scope by default: only `read-only` narrows it.
-  oauth: seam.oauth ?? { scope: access === "read-only" ? "read" : "read write" },
+  url: seam.endpoint,
+  // One sign-in for every access value: `access` is enforced by the default rules, so changing it keeps the sign-in.
+  oauth: seam.oauth ?? { scope: "read write" },
 })
 
 /** Origin and path only, so a token in a query string never reaches status. */
@@ -38,9 +38,9 @@ export function displayUrl(url: string) {
 }
 
 /**
- * Registers `linear`, or adopts the user's own `mcp.servers.linear` unchanged when it points at the URL for the chosen
- * access: user config is applied first, and a later `set` would replace it. Any other URL, Linear's other server
- * included, is a conflict, and nothing is added. Synchronous and never throws.
+ * Registers `linear`, or adopts the user's own `mcp.servers.linear` unchanged when it points at Linear's server: user
+ * config is applied first, and a later `set` would replace it. Any other URL, Linear's read-only server included, is a
+ * conflict, and nothing is added. Synchronous and never throws.
  */
 export function registerServer(
   mcp: Pick<Plugin.Context["mcp"], "transform">,
@@ -76,7 +76,7 @@ export function createLinearPlugin(seam: LinearSeam) {
       const report = (area: string) => (problem: string | undefined) => void (problem ? problems.set(area, problem) : problems.delete(area))
       let source: ServerSource | undefined
 
-      await registerServer(ctx.mcp, serverConfig(seam, options.access), (next, problem) => {
+      await registerServer(ctx.mcp, serverConfig(seam), (next, problem) => {
         source = next
         report("server")(problem)
       })
