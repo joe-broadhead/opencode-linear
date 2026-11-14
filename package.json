@@ -565,6 +565,12 @@
         "permission": "linear_update_diff",
         "effect": "allow",
         "readOnly": false
+      },
+      {
+        "name": "linear.whoami",
+        "permission": "linear_whoami",
+        "effect": "allow",
+        "readOnly": false
       }
     ],
     "skills": [
@@ -590,7 +596,8 @@
       {
         "id": "linear",
         "label": "Linear",
-        "server": "linear"
+        "server": "linear",
+        "relay": {}
       }
     ],
     "contributes": {

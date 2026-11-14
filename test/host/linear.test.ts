@@ -218,7 +218,7 @@ describe(`the default access on OpenCode ${HOST_VERSION}`, () => {
   test("H5: /linear-status reports the connection, new tools, the unguarded agent and its fix", async () => {
     await linearTools(host)
     const text = await status(host, await session(host))
-    expect(text).toContain(`- Connection: connected (${host.fake.endpoints.all}, registered by this plugin)`)
+    expect(text).toContain(`- Connection: connected (${host.fake.endpoint}, registered by this plugin)`)
     expect(text).toContain("- Tools: 5 available, 1 unknown: shiny_new_tool (unknown tools run too)\n")
     expect(text).toContain(`- Agents without default rules: reviewer\n${AGENT_RULES}\n`)
     expect(text).toContain(`- Next step: ${AGENTS_NEXT_STEP}`)
@@ -253,7 +253,7 @@ describe("write access with the user's own linear server", () => {
     expect(host.fake.markers.length).toBeGreaterThan(0)
     expect(new Set(host.fake.markers)).toEqual(new Set(["user"]))
     const text = await status(host, await session(host))
-    expect(text).toContain(`- Connection: connected (${host.fake.endpoints.all}, your own mcp.servers.linear, used unchanged)`)
+    expect(text).toContain(`- Connection: connected (${host.fake.endpoint}, your own mcp.servers.linear, used unchanged)`)
     expect(text).toContain("- Access: every tool runs without asking, reads, changes and new tools included")
   })
 
@@ -309,7 +309,7 @@ describe("a user linear server that points elsewhere", () => {
     const text = await status(host, await session(host))
     const other = host.fake.url.replace(/\/mcp$/, "/other")
     expect(text).toContain(`- Connection: conflict (your mcp.servers.linear points at ${other})`)
-    expect(text).toContain(`- Next step: Your OpenCode config defines mcp.servers.linear with ${other}, but access "all" uses ${host.fake.endpoints.all}.`)
+    expect(text).toContain(`- Next step: Your OpenCode config defines mcp.servers.linear with ${other}, but this plugin uses ${host.fake.endpoint}.`)
   })
 })
 

@@ -15,7 +15,7 @@ import { createServer } from "node:net"
 import { arch, platform } from "node:os"
 import { basename, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
-import { ENDPOINTS, SUPPORTED_HOST, TESTED_HOSTS } from "../../src/constants.js"
+import { ENDPOINT, SUPPORTED_HOST, TESTED_HOSTS } from "../../src/constants.js"
 import { TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 import { defaultRules, type Rule } from "../../src/permissions.js"
@@ -182,13 +182,13 @@ describe.each(HOST_VERSIONS)("installed alone, in stock OpenCode %s", (version) 
       })
       expect(plugin.state).toEqual({ status: "active" })
 
-      // Read access registers Linear's read-only server, write access the full one, each under the name linear.
+      // Every access value registers Linear's one server under the name linear, so both share one sign-in.
       for (const [access, directory] of [["read-only", host.directory], ["all", host.writeDirectory]] as const) {
         const server = await host.until(`the linear server is registered for ${access} access`, async () => {
           const { data } = await host.api<{ data: { name: string; integrationID?: string }[] }>("GET", "/api/mcp", undefined, directory)
           return data.find((item) => item.name === "linear")
         })
-        expect(server.integrationID).toBe(integrationID("linear", ENDPOINTS[access]))
+        expect(server.integrationID).toBe(integrationID("linear", ENDPOINT))
         // /connect lists integrations from this endpoint, MCP servers first; Linear's sign-in shows under its brand.
         const listed = await host.until(`/connect lists the ${access} server as Linear`, async () => {
           const { data } = await host.api<{ data: { id: string; name: string; metadata?: { source?: string } }[] }>("GET", "/api/integration", undefined, directory)
@@ -211,7 +211,7 @@ describe.each(HOST_VERSIONS)("installed alone, in stock OpenCode %s", (version) 
       expect(output).toMatchObject({
         version: pkg.version,
         access: "read-only",
-        source: { type: "plugin", url: ENDPOINTS["read-only"] },
+        source: { type: "plugin", url: ENDPOINT },
         unguardedAgents: ["reviewer"],
         host: { version, range: SUPPORTED_HOST, tested: true },
         problems: [],
@@ -230,19 +230,16 @@ describe.each(HOST_VERSIONS)("installed alone, in stock OpenCode %s", (version) 
   }, 600_000)
 })
 
-/** A copy of the installed package whose two Linear URLs point at the fake's read-only and full paths. */
+/** A copy of the installed package whose Linear URL points at the fake. */
 function pointedAt(fake: FakeMcp, name: string) {
   const copy = join(work, "pointed", name)
   cpSync(installedPackage(false), copy, { recursive: true })
   const entry = join(copy, "dist", "index.js")
   let text = readFileSync(entry, "utf8")
-  // The full server's URL is a prefix of the read-only one's, and two access values share it: replace the longest
-  // first, and every occurrence, so no real Linear address is left in the copy.
-  for (const access of ["read-only", "all"] as const) {
-    const quoted = JSON.stringify(ENDPOINTS[access])
-    expect({ access, found: text.split(quoted).length - 1 > 0 }).toEqual({ access, found: true })
-    text = text.split(quoted).join(JSON.stringify(fake.endpoints[access]))
-  }
+  // Every occurrence, so no real Linear address is left in the copy.
+  const quoted = JSON.stringify(ENDPOINT)
+  expect(text.split(quoted).length - 1).toBeGreaterThan(0)
+  text = text.split(quoted).join(JSON.stringify(fake.endpoint))
   expect(text).not.toContain("mcp.linear.app")
   writeFileSync(entry, text)
   return copy
@@ -278,7 +275,8 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
       agents: { locked: { permissions: [rule("linear_*", "deny")] }, careful: { permissions: [rule("linear_list_issues", "ask")] } },
     })
     // The server's tools and the fake's new one, plus the plugin's own linear_issues and linear_events_list in the same namespace.
-    for (const [access, tools] of [["read-only", READ_TOOLS.length + 3], ["all", READ_TOOLS.length + WRITE_TOOLS.length + 3]] as const) {
+    // One server for every access value: read-only lists every tool too, and its rules deny the changes.
+    for (const [access, tools] of [["read-only", READ_TOOLS.length + WRITE_TOOLS.length + 3], ["all", READ_TOOLS.length + WRITE_TOOLS.length + 3]] as const) {
       await host.until(`linear is connected in ${access} access with its ${tools} tools`, async () => {
         const { output } = await host.api<{ output: { state: string; tools: number; unknownCount: number } }>("POST", "/api/rpc/linear.workspace/status", { input: {} }, where(access))
         // Only the fake's new tool is unknown: linear_issues and linear_events_list are the plugin's own.
@@ -308,7 +306,7 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     const { value } = await script(access, "describe", {})
     expect(value.id).toBe(TOOLS_RPC_ID)
     expect(value.methods.map((method: { name: string }) => method.name)).toEqual([...READ_TOOLS, ...WRITE_TOOLS, "issues", "events_list"])
-    const listed = new Set(access === "read-only" ? READ_TOOLS : [...READ_TOOLS, ...WRITE_TOOLS])
+    const listed = new Set([...READ_TOOLS, ...WRITE_TOOLS])
     for (const method of value.methods.slice(0, -2)) {
       const name = method.name as string
       expect({ name, kind: method.kind, action: method.action, available: method.available }).toEqual({
@@ -334,7 +332,7 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
       expect({ method, name, code: refused.code }).toEqual({ method, name, code: "PERMISSION_DENIED" })
     }
     expect(fake.calls.slice(from)).toEqual([])
-    // At `all` a write runs; at `read-only` the plugin uses Linear's read-only server, which lists no write at all.
+    // At `all` a write runs; at `read-only` the default rules deny it before dispatch, on the same server.
     if (access === "all") {
       expect((await call("all", "build", "save_issue", { query: "q" })).value).toMatchObject({ output: { tool: "save_issue" } })
       expect(fake.calls.slice(from)).toEqual(["save_issue"])
@@ -352,10 +350,10 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     expect(fake.called.slice(from).map((entry) => entry.tool)).toEqual(["list_issues"])
   })
 
-  test.each(["read-only", "all"] as const)("in %s access, runs a known read as the session's agent, on that access's server, with no model turn", async (access) => {
+  test.each(["read-only", "all"] as const)("in %s access, runs a known read as the session's agent, on Linear's one server, with no model turn", async (access) => {
     const from = fake.called.length
     const result = await call(access, "build", "list_issues", { query: "hello" })
-    const path = new URL(fake.endpoints[access]).pathname
+    const path = new URL(fake.endpoint).pathname
     expect(result).toEqual({ value: { output: { tool: "list_issues", path, arguments: { query: "hello" } }, text: "called list_issues" } })
     expect(fake.called.slice(from)).toEqual([{ tool: "list_issues", path }])
     const { data: info } = await host.api<{ data: Record<string, any> }>("GET", `/api/session/${sessions[access].build}`, undefined, where(access))

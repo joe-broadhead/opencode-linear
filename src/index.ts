@@ -1,4 +1,4 @@
-import { ENDPOINTS } from "./constants.js"
+import { ENDPOINT } from "./constants.js"
 import { createLinearPlugin } from "./plugin.js"
 
-export default createLinearPlugin({ endpoints: ENDPOINTS })
+export default createLinearPlugin({ endpoint: ENDPOINT })

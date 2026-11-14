@@ -35,18 +35,16 @@ describe("docs", () => {
     expect(named.filter((tool) => ![...READ_TOOLS, ...WRITE_TOOLS, "issues", "events_list"].includes(tool))).toEqual([])
   })
 
-  // Once the plugin is removed and OpenCode reloads, `mcp logout linear` finds no server, and each access keeps its own
-  // sign-in: the README signs out of both first, then removes the plugin.
-  test("the README's Uninstall signs out of both accesses before it removes the plugin", () => {
-    const uninstall = /## Uninstall(.*?)## Links/.exec(text("README.md"))?.[1] ?? ""
+  // Once the plugin is removed and OpenCode reloads, `mcp logout linear` finds no server: the README signs out first,
+  // once, since every access uses the one sign-in, then removes the plugin.
+  test("the README's Uninstall signs out once before it removes the plugin", () => {
+    const uninstall = /## Uninstall(.*?)## Links/s.exec(text("README.md"))?.[1] ?? ""
     const at = (needle: string, from = 0) => uninstall.indexOf(needle, from)
-    const first = at("opencode mcp logout linear")
-    const other = at('"access"', first)
-    const second = at("opencode mcp logout linear", other)
-    expect([first, other, second].every((index) => index >= 0)).toBe(true)
-    expect(at("opencode reload", other)).toBeLessThan(second)
-    expect(at("opencode auth list", second)).toBeGreaterThan(second)
-    expect(at(`opencode plugin remove github:joe-broadhead/opencode-linear#v${VERSION}`)).toBeGreaterThan(at("opencode auth list", second))
+    const logout = at("opencode mcp logout linear")
+    expect(logout).toBeGreaterThanOrEqual(0)
+    expect(at('"access"')).toBe(-1)
+    expect(at("opencode auth list", logout)).toBeGreaterThan(logout)
+    expect(at(`opencode plugin remove github:joe-broadhead/opencode-linear#v${VERSION}`)).toBeGreaterThan(at("opencode auth list", logout))
   })
 
   test("the README and the configuration guide give linear_issues its allow rule and say why it is a direct tool", () => {

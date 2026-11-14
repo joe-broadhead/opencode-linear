@@ -15,12 +15,12 @@ describe("Linear's tools RPC", () => {
     expect(TOOLS_RPC_ID).toBe("linear.workspace.tools")
   })
 
-  test("its MCP methods are exactly the 41 known reads and the 36 known writes, each with its class", () => {
+  test("its MCP methods are exactly the 41 known reads and the 37 other known tools, each with its class", () => {
     expect(METHODS.map((method) => method.name)).toEqual([...READ_TOOLS, ...WRITE_TOOLS])
     expect(METHODS.filter((method) => method.class === "read").map((method) => method.name)).toEqual([...READ_TOOLS])
     expect(METHODS.filter((method) => method.class === "write").map((method) => method.name)).toEqual([...WRITE_TOOLS])
     expect(READ_TOOLS).toHaveLength(41)
-    expect(WRITE_TOOLS).toHaveLength(36)
+    expect(WRITE_TOOLS).toHaveLength(37)
     // Every known tool is allowed by default, the pattern that covers a tool Linear adds later included; the plugin's
     // own linear_issues is the owned method `issues`, not an MCP one.
     const allowed = defaultRules().filter((rule) => rule.effect === "allow").map((rule) => rule.action)

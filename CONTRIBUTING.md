@@ -118,21 +118,21 @@ LINEAR_API_KEY=<read-only key> npm run drift -- --strict --endpoint <url>
 - `--endpoint` takes another HTTPS URL, or plain HTTP on a loopback address.
 - Exit codes: `0` for no drift, or drift without `--strict`; `1` for drift with `--strict`; `2` for a usage, sign-in
   or connection error.
-- Without a key, compare `READ_TOOLS` with the tools OpenCode lists for a signed-in `linear` server instead: the Code
-  Mode catalog's `linear` namespace. With `access: "read"` that is Linear's read-only list, which `READ_TOOLS` must
-  equal (`test/unit/linear-catalog.ts` records it); with `access: "write"` it is the full list.
+- Without a key, compare the lists with the tools OpenCode lists for a signed-in `linear` server instead: the Code
+  Mode catalog's `linear` namespace.
 
 ### Updating the tool lists
 
 1. Run the drift check.
 2. For each name it reports, read the tool's description and schema, and check what it does.
 3. Add a tool to `READ_TOOLS` only if it never changes anything in Linear, because reads run without a prompt and
-   each one is also a method of the tools RPC for scripts. Add tools that change anything to `WRITE_TOOLS`. Leave a
+   each one is also a method of the tools RPC for scripts. Add tools that change anything, or that Linear marks not read-only, to `WRITE_TOOLS`. Leave a
    tool out if you are not sure: it then asks before every call, and scripts cannot call it.
 4. Remove names that Linear no longer serves.
-5. Update `test/unit/linear-catalog.ts` to the read-only server's list, and the counts in the docs. Run
-   `npm run check`. The tool-list test fails if `READ_TOOLS` differs from that list, the docs test fails on a stale
-   count or method list, and the skills test fails if a skill names a tool that is in neither list.
+5. Replace `test/fixtures/live-tools.json` and `provenance.json` with a new live capture, and update the declaration
+   and the counts in the docs. Run `npm run check`. The tool-list test fails if `READ_TOOLS` differs from the tools
+   Linear marks read-only, the live-tools test fails if the declaration and the capture disagree, the docs test fails on
+   a stale count or method list, and the skills test fails if a skill names a tool that is in neither list.
 6. Record the change in `CHANGELOG.md`. Moving a tool between the lists changes the default rules and the tools RPC's
    methods, which are part of the plugin's contract. Update the counts in `README.md`, `docs/configuration.md`,
    `docs/scripting.md` and `SECURITY.md` too.

@@ -12,7 +12,7 @@ import { VERSION } from "./version.js"
 type State = "connected" | "sign_in_required" | "connecting" | "disabled" | "failed" | "not_configured" | "conflict"
 /**
  * Who owns the `linear` server: this plugin, the user's own config (adopted unchanged), or a server at another URL than
- * the one the chosen access uses (`expected`). URLs are shown as origin and path only.
+ * Linear's, which this plugin uses for every access value (`expected`). URLs are shown as origin and path only.
  */
 export type ServerSource =
   | { readonly type: "plugin"; readonly url: string }
@@ -124,7 +124,7 @@ function nextStepOf(status: Omit<Status, "nextStep">): string {
   switch (status.state) {
     case "conflict": {
       const { url, expected } = status.source as Extract<ServerSource, { type: "conflict" }>
-      return `Your OpenCode config defines mcp.servers.${SERVER_NAME} with ${url}, but access "${status.access}" uses ${expected}. Point it at ${expected} or remove it, then restart OpenCode.`
+      return `Your OpenCode config defines mcp.servers.${SERVER_NAME} with ${url}, but this plugin uses ${expected}. Point it at ${expected} or remove it, then restart OpenCode.`
     }
     case "not_configured":
       return `OpenCode has no ${SERVER_NAME} MCP server. Check that no organisation policy (mcp.use) or other plugin removes it, then restart OpenCode.`
