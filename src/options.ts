@@ -36,13 +36,14 @@ export function parseOptions(raw: unknown): Options {
     }
   }
   const { access = "all", allowUntestedHost = false } = input
-  if (typeof access !== "string" || (typeof access === "string" && !(ACCESS_VALUES as readonly string[]).includes(access) && OLD_VALUES[access] === undefined)) {
+  if (typeof access !== "string" || (typeof access === "string" && !(ACCESS_VALUES as readonly string[]).includes(access) && !Object.hasOwn(OLD_VALUES, access))) {
     throw invalid(`The option "access" must be ${ACCEPTED.access}, found ${describe(access)}`)
   }
   if (typeof allowUntestedHost !== "boolean") {
     throw invalid(`The option "allowUntestedHost" must be ${ACCEPTED.allowUntestedHost}, found ${describe(allowUntestedHost)}`)
   }
-  const old = OLD_VALUES[access]
+  // Own keys only: `constructor`, `toString` and `__proto__` are not access values.
+  const old = Object.hasOwn(OLD_VALUES, access) ? OLD_VALUES[access] : undefined
   return {
     access: (old ?? access) as Access,
     allowUntestedHost,

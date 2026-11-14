@@ -12,6 +12,10 @@ describe("parseOptions", () => {
     expect(parseOptions({ access: "read-only", allowUntestedHost: true })).toEqual({ access: "read-only", allowUntestedHost: true })
   })
 
+  test.each(["constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"])("refuses %j, an inherited name and not an access value", (access) => {
+    expect(() => parseOptions({ access })).toThrow(`The option "access" must be "all" (the default), "ask-changes" or "read-only", found "${access}"`)
+  })
+
   test.each([
     [{ account: "work" }, 'Unknown option "account". Accepted options: "access", "allowUntestedHost"'],
     [{ allowTools: ["create_issue"] }, 'Unknown option "allowTools"'],
