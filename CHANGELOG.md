@@ -13,7 +13,6 @@ All notable changes to this project are documented here. The format follows [Kee
   If you used `"read-only"` before, sign in once more after updating.
 - The deprecated access values `"read"` and `"write"` no longer say to sign in again, and an inherited name such as
   `"constructor"`, `"toString"` or `"__proto__"` is refused as an access value instead of passing the alias lookup.
-- `package.json` is `"private": true`: releases install from their GitHub tag, never from npm.
 
 ### Added
 
