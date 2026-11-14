@@ -107,7 +107,7 @@ function linear(data = fixture(), pageSize = 3) {
   return { tool: { list: list as never }, calls, data }
 }
 
-const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp/readonly" }, access: "read-only", host: checkHost("2.2.3", false) }
+const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "read-only", host: checkHost("2.2.3", false) }
 const status = async () => buildStatus(facts)
 const context = { sessionID: "ses_1", agent: "build", messageID: "msg_1", id: "call_1", signal: new AbortController().signal } as never
 
@@ -269,7 +269,7 @@ describe("linear_events_list", () => {
 
   test("never calls a linear server that is not Linear's for this access", async () => {
     const host = linear()
-    const conflict = async () => buildStatus({ ...facts, source: { type: "conflict", url: "https://mcp.linear.app/mcp", expected: "https://mcp.linear.app/mcp/readonly" } })
+    const conflict = async () => buildStatus({ ...facts, source: { type: "conflict", url: "https://mcp.linear.app/mcp/readonly", expected: "https://mcp.linear.app/mcp" } })
     const tool = eventsTool({ ...options(host), owned: () => false, status: conflict })
     await expect(tool.execute({}, context)).rejects.toThrow(/^SERVER_CONFLICT: .*so linear_events_list does not call it\./)
     expect(host.calls).toEqual([])

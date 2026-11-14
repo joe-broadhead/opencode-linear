@@ -9,7 +9,7 @@ the known tools through a tools RPC. It has no runtime dependencies.
 
 | Path | Role |
 | --- | --- |
-| `src/index.ts` | The server part: the plugin `linear.workspace`, pointed at Linear's two servers |
+| `src/index.ts` | The server part: the plugin `linear.workspace`, pointed at Linear's server |
 | `src/plugin.ts` | Setup, and server registration or adoption |
 | `src/integration.ts` | The `/connect` entry: its name "Linear", and the sign-in problem on its account |
 | `src/options.ts` | Option parsing and validation |

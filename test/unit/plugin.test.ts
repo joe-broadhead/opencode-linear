@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Plugin } from "@opencode/plugin"
-import { ENDPOINTS, NAMESPACE_DESCRIPTION } from "../../src/constants.js"
+import { ENDPOINT, NAMESPACE_DESCRIPTION } from "../../src/constants.js"
 import linear from "../../src/index.js"
 import { createLinearPlugin, displayUrl, registerServer, serverConfig } from "../../src/plugin.js"
 import type { ServerSource } from "../../src/status.js"
@@ -15,62 +15,57 @@ for (const name of ["linear", "linear-write"]) {
   mkdirSync(join(skillsDir, name))
   writeFileSync(join(skillsDir, name, "SKILL.md"), `---\nname: ${name}\ndescription: Use Linear.\n---\nBody.\n`)
 }
-const seam = { endpoints: ENDPOINTS, skillsDir }
+const seam = { endpoint: ENDPOINT, skillsDir }
 
-async function register(initial: Parameters<typeof mcpEditor>[0] = {}, access: "all" | "read-only" = "read-only") {
+async function register(initial: Parameters<typeof mcpEditor>[0] = {}) {
   const { transform, run } = transforms<McpEditor>()
   const records: [ServerSource | undefined, string | undefined][] = []
-  await registerServer({ transform }, serverConfig(seam, access), (source, problem) => records.push([source, problem]))
+  await registerServer({ transform }, serverConfig(seam), (source, problem) => records.push([source, problem]))
   const { editor, servers } = mcpEditor(initial)
   run(editor)
   return { servers, records }
 }
 
 describe("the linear server", () => {
-  test("is Linear's read-only server with the read scope for read-only, and the full server with both scopes otherwise", () => {
-    expect(serverConfig(seam, "read-only")).toEqual({ type: "remote", url: "https://mcp.linear.app/mcp/readonly", oauth: { scope: "read" } })
-    for (const access of ["all", "ask-changes"] as const)
-      expect(serverConfig(seam, access)).toEqual({ type: "remote", url: "https://mcp.linear.app/mcp", oauth: { scope: "read write" } })
-    const loopback = { all: "http://127.0.0.1:1/mcp", "ask-changes": "http://127.0.0.1:1/mcp", "read-only": "http://127.0.0.1:1/mcp/readonly" }
-    expect(serverConfig({ endpoints: loopback, oauth: false }, "all")).toEqual({ type: "remote", url: "http://127.0.0.1:1/mcp", oauth: false })
+  test("is Linear's one server with both scopes, whatever the access, so changing access keeps the sign-in", () => {
+    expect(serverConfig(seam)).toEqual({ type: "remote", url: "https://mcp.linear.app/mcp", oauth: { scope: "read write" } })
+    expect(serverConfig({ endpoint: "http://127.0.0.1:1/mcp", oauth: false })).toEqual({ type: "remote", url: "http://127.0.0.1:1/mcp", oauth: false })
   })
 
   test("is registered under the stable name when the user has none", async () => {
     const { servers, records } = await register({ github: { type: "remote", url: "https://example.com/mcp" } })
-    expect(servers.get("linear")).toEqual(serverConfig(seam, "read-only"))
+    expect(servers.get("linear")).toEqual(serverConfig(seam))
     expect(servers.get("github")).toEqual({ type: "remote", url: "https://example.com/mcp" })
-    expect(records).toEqual([[{ type: "plugin", url: "https://mcp.linear.app/mcp/readonly" }, undefined]])
+    expect(records).toEqual([[{ type: "plugin", url: "https://mcp.linear.app/mcp" }, undefined]])
   })
 
-  test("adopts the user's own server for the access's URL, unchanged", async () => {
-    const own = { type: "remote" as const, url: "https://mcp.linear.app/mcp/readonly/", oauth: { client_id: "pre-registered", callback_port: 19876 }, timeout: { execution: 60_000 } }
+  test("adopts the user's own server for Linear's URL, unchanged", async () => {
+    const own = { type: "remote" as const, url: "https://mcp.linear.app/mcp/", oauth: { client_id: "pre-registered", callback_port: 19876 }, timeout: { execution: 60_000 } }
     const { servers, records } = await register({ linear: own })
     expect(servers.get("linear")).toEqual(own)
-    expect(records).toEqual([[{ type: "adopted", url: "https://mcp.linear.app/mcp/readonly" }, undefined]])
-    const write = await register({ linear: { type: "remote", url: "https://mcp.linear.app/mcp" } }, "all")
-    expect(write.records).toEqual([[{ type: "adopted", url: "https://mcp.linear.app/mcp" }, undefined]])
+    expect(records).toEqual([[{ type: "adopted", url: "https://mcp.linear.app/mcp" }, undefined]])
   })
 
-  test("Linear's full server is a conflict in read-only access, so read-only access stays read-only", async () => {
-    const full = { type: "remote" as const, url: "https://mcp.linear.app/mcp" }
-    const { servers, records } = await register({ linear: full })
-    expect(servers.get("linear")).toEqual(full)
-    expect(records).toEqual([[{ type: "conflict", url: "https://mcp.linear.app/mcp", expected: "https://mcp.linear.app/mcp/readonly" }, undefined]])
+  test("Linear's read-only server is a conflict: the plugin uses one server for every access value", async () => {
+    const readonly = { type: "remote" as const, url: "https://mcp.linear.app/mcp/readonly" }
+    const { servers, records } = await register({ linear: readonly })
+    expect(servers.get("linear")).toEqual(readonly)
+    expect(records).toEqual([[{ type: "conflict", url: "https://mcp.linear.app/mcp/readonly", expected: "https://mcp.linear.app/mcp" }, undefined]])
   })
 
   test("reports a server that points elsewhere as a conflict and adds nothing", async () => {
     const foreign = { type: "remote" as const, url: "https://linear.example.com/mcp?token=secret" }
     const { servers, records } = await register({ linear: foreign })
     expect([...servers]).toEqual([["linear", foreign]])
-    expect(records).toEqual([[{ type: "conflict", url: "https://linear.example.com/mcp", expected: "https://mcp.linear.app/mcp/readonly" }, undefined]])
+    expect(records).toEqual([[{ type: "conflict", url: "https://linear.example.com/mcp", expected: "https://mcp.linear.app/mcp" }, undefined]])
     const local = await register({ linear: { type: "local", command: ["linear-mcp"] } })
-    expect(local.records).toEqual([[{ type: "conflict", url: "a local command", expected: "https://mcp.linear.app/mcp/readonly" }, undefined]])
+    expect(local.records).toEqual([[{ type: "conflict", url: "a local command", expected: "https://mcp.linear.app/mcp" }, undefined]])
   })
 
   test("never throws from the transform", async () => {
     const { transform, run } = transforms<McpEditor>()
     const records: [ServerSource | undefined, string | undefined][] = []
-    await registerServer({ transform }, serverConfig(seam, "read-only"), (source, problem) => records.push([source, problem]))
+    await registerServer({ transform }, serverConfig(seam), (source, problem) => records.push([source, problem]))
     const { editor } = mcpEditor()
     expect(() => run({ ...editor, get: () => { throw new Error("broken editor") } })).not.toThrow()
     expect(records).toEqual([[undefined, "SERVER_NOT_REGISTERED: The linear MCP server could not be registered (broken editor). Next step: Restart OpenCode."]])
@@ -133,7 +128,7 @@ describe("setup", () => {
     const cleanup = await createLinearPlugin(seam).setup(ctx)
     const { editor, servers } = mcpEditor()
     mcp.run(editor)
-    expect(servers.get("linear")).toEqual(serverConfig(seam, access))
+    expect(servers.get("linear")).toEqual(serverConfig(seam))
     const agents = builtInAgents()
     agent.run(agentEditor(agents))
     expect(agents.every((item) => item.permissions[1]?.action === "linear_*")).toBe(true)
@@ -154,7 +149,7 @@ describe("setup", () => {
     // The always-visible rules: read the skill, cite the url, and how read access becomes write access.
     expect(NAMESPACE_DESCRIPTION[access]).toContain("Read the linear skill before the first call")
     expect(NAMESPACE_DESCRIPTION[access]).toContain("by its identifier and the url Linear returns")
-    if (access === "read-only") expect(NAMESPACE_DESCRIPTION["read-only"]).toContain('the user sets the plugin option "access": "all" and signs in again')
+    if (access === "read-only") expect(NAMESPACE_DESCRIPTION["read-only"]).toContain('the user sets the plugin option "access": "all", or "ask-changes" to ask first; the sign-in stays the same')
     // linear_issues, a direct tool in the linear namespace, so Jelly can draw its result; linear_events_list, a Code
     // Mode tool for Memory's collector.
     expect(tools.map((info) => [info.name, info.options])).toEqual([
@@ -170,23 +165,23 @@ describe("setup", () => {
     expect(hooks).toEqual([])
   })
 
-  test("linear_issues refuses a linear server that is not Linear's for this access, without calling it", async () => {
+  test("linear_issues refuses a linear server that is not Linear's, without calling it", async () => {
     const { ctx, mcp, tool } = context({ access: "read-only" })
     const calls: unknown[] = []
     ;(ctx.tool as { list: unknown }).list = async () => [{ id: "linear_list_issues", execute: async (args: unknown) => (calls.push(args), { output: { issues: [] } }) }]
     const cleanup = await createLinearPlugin(seam).setup(ctx)
-    mcp.run(mcpEditor({ linear: { type: "remote", url: ENDPOINTS.all } }).editor)
+    mcp.run(mcpEditor({ linear: { type: "remote", url: "https://mcp.linear.app/mcp/readonly" } }).editor)
     const tools: { name: string; execute: (input: unknown, context: unknown) => Promise<unknown> }[] = []
     tool.run({ namespace: () => undefined, add: (info: (typeof tools)[number]) => void tools.push(info) } as never)
-    await expect(tools[0]!.execute({}, {})).rejects.toThrow(/^SERVER_CONFLICT: .* Next step: Your OpenCode config defines mcp\.servers\.linear with https:\/\/mcp\.linear\.app\/mcp,/)
+    await expect(tools[0]!.execute({}, {})).rejects.toThrow(/^SERVER_CONFLICT: .* Next step: Your OpenCode config defines mcp\.servers\.linear with https:\/\/mcp\.linear\.app\/mcp\/readonly,/)
     expect(calls).toEqual([])
     await cleanup!()
   })
 
   test.each([
     ["registers its own server", {}, { value: { text: "ok" } }],
-    ["adopts the user's server at the access's URL", { linear: { type: "remote", url: ENDPOINTS.all } }, { value: { text: "ok" } }],
-    ["finds a user server at another URL", { linear: { type: "remote", url: ENDPOINTS["read-only"] } }, { code: "SERVER_CONFLICT" }],
+    ["adopts the user's server at Linear's URL", { linear: { type: "remote", url: ENDPOINT } }, { value: { text: "ok" } }],
+    ["finds a user server at another URL", { linear: { type: "remote", url: "https://mcp.linear.app/mcp/readonly" } }, { code: "SERVER_CONFLICT" }],
   ] as const)("the tools RPC runs a read when the plugin %s, or refuses with its code", async (_, initial, expected) => {
     const { ctx, mcp, handlers } = context({})
     const cleanup = await createLinearPlugin(seam).setup(ctx)

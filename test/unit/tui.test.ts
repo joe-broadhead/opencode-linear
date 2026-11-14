@@ -8,7 +8,7 @@ import tui, { setupView, viewMessage, type ViewContext } from "../../src/tui.js"
 const SIGN_IN = "Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth linear opens it automatically)."
 
 const status = (overrides: Partial<Parameters<typeof buildStatus>[0]> = {}): Status =>
-  buildStatus({ server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp/readonly" }, access: "all", host: checkHost("2.2.3", false), ...overrides })
+  buildStatus({ server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "all", host: checkHost("2.2.3", false), ...overrides })
 
 /** Everything the view touches, recorded. */
 function fake(options: { answer?: () => Promise<unknown> } = {}) {

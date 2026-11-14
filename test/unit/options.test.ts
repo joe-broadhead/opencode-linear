@@ -12,6 +12,15 @@ describe("parseOptions", () => {
     expect(parseOptions({ access: "read-only", allowUntestedHost: true })).toEqual({ access: "read-only", allowUntestedHost: true })
   })
 
+  test("maps the deprecated values onto the family's, and keeps the sign-in", () => {
+    expect(parseOptions({ access: "read" })).toMatchObject({ access: "read-only", deprecation: 'The access value "read" is deprecated: it means "read-only". Set "read-only".' })
+    expect(parseOptions({ access: "write" })).toMatchObject({ access: "all" })
+  })
+
+  test.each(["constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"])("refuses %j, an inherited name and not an access value", (access) => {
+    expect(() => parseOptions({ access })).toThrow(`The option "access" must be "all" (the default), "ask-changes" or "read-only", found "${access}"`)
+  })
+
   test.each([
     [{ account: "work" }, 'Unknown option "account". Accepted options: "access", "allowUntestedHost"'],
     [{ allowTools: ["create_issue"] }, 'Unknown option "allowTools"'],

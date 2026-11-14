@@ -38,11 +38,9 @@ project.
 
 What the model can do in Linear is limited by three layers, in this order:
 
-1. **Linear's server.** With `access: "read-only"`, the plugin registers Linear's read-only server,
-   `https://mcp.linear.app/mcp/readonly`, with the `read` scope. It lists only tools that read, and Linear refuses
-   changes through it. Otherwise the plugin registers `https://mcp.linear.app/mcp` with `read write`, which is the
-   default. The two servers have different addresses, so each needs its own sign-in. If you define
-   `mcp.servers.linear` yourself, the plugin adopts it only at the URL for your `access`.
+1. **Linear's server.** The plugin registers `https://mcp.linear.app/mcp` with `read write` for every `access` value,
+   so changing `access` keeps the sign-in, and the sign-in can always write: `"read-only"` is enforced by the rules in
+   layer 2, not by Linear. If you define `mcp.servers.linear` yourself, the plugin adopts it only at that URL.
 2. **Default permission rules: everything is allowed.** Every tool the plugin registers runs without a prompt, and so
    does a tool Linear adds later, so an agent can read and change everything the signed-in account can: issues,
    comments, projects, documents, initiatives and labels. Nothing asks first. To restrict it, set the plugin option

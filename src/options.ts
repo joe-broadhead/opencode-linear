@@ -8,7 +8,7 @@ export type Access = (typeof ACCESS_VALUES)[number]
 const OLD_VALUES: Readonly<Record<string, Access>> = { read: "read-only", write: "all" }
 
 interface Options {
-  /** What the generated default rules allow, which of Linear's servers is used, and what the sign-in asks for. */
+  /** What the generated default rules allow. The server and the sign-in are the same for every value. */
   readonly access: Access
   /** Run on an OpenCode version outside the tested line, with a warning in status. */
   readonly allowUntestedHost: boolean
@@ -36,17 +36,18 @@ export function parseOptions(raw: unknown): Options {
     }
   }
   const { access = "all", allowUntestedHost = false } = input
-  if (typeof access !== "string" || (typeof access === "string" && !(ACCESS_VALUES as readonly string[]).includes(access) && OLD_VALUES[access] === undefined)) {
+  if (typeof access !== "string" || (typeof access === "string" && !(ACCESS_VALUES as readonly string[]).includes(access) && !Object.hasOwn(OLD_VALUES, access))) {
     throw invalid(`The option "access" must be ${ACCEPTED.access}, found ${describe(access)}`)
   }
   if (typeof allowUntestedHost !== "boolean") {
     throw invalid(`The option "allowUntestedHost" must be ${ACCEPTED.allowUntestedHost}, found ${describe(allowUntestedHost)}`)
   }
-  const old = OLD_VALUES[access]
+  // Own keys only: `constructor`, `toString` and `__proto__` are not access values.
+  const old = Object.hasOwn(OLD_VALUES, access) ? OLD_VALUES[access] : undefined
   return {
     access: (old ?? access) as Access,
     allowUntestedHost,
-    ...(old === undefined ? {} : { deprecation: `The access value "${access}" is deprecated: it means "${old}". Set "${old}" and sign in again.` }),
+    ...(old === undefined ? {} : { deprecation: `The access value "${access}" is deprecated: it means "${old}". Set "${old}".` }),
   }
 }
 

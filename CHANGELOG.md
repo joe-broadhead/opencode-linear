@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **One Linear server for every `access` value.** The plugin registers `https://mcp.linear.app/mcp` with `read write`
+  at `"all"`, `"ask-changes"` and `"read-only"` alike, and the generated rules do the gating, so changing `access`, in
+  `opencode.json` or in Jelly's settings, never needs a new sign-in. At `"read-only"` the rules deny every change;
+  Linear's own read-only server is no longer used, and a `mcp.servers.linear` of your own at its address is a conflict.
+  If you used `"read-only"` before, sign in once more after updating.
+- The deprecated access values `"read"` and `"write"` no longer say to sign in again, and an inherited name such as
+  `"constructor"`, `"toString"` or `"__proto__"` is refused as an access value instead of passing the alias lookup.
+
+### Added
+
+- `whoami`, which Linear serves and marks `readOnlyHint: false`, is a known tool and is declared for Jelly as not
+  read-only: it follows `access` like a change, and a read-only helper in Jelly is never given it. `get_user` with
+  `me` reads the same account at every access value.
+- Jelly's sign-in declares `relay: {}`, so a Jelly sign-in from a browser tab may come back through Jelly's relay.
+  It is not yet checked with Linear: it rests on Linear's server metadata (dynamic registration and client metadata
+  documents), Linear documents no redirect rules, and no relay sign-in has been made.
+- `test/fixtures/live-tools.json`, Linear's tool list captured live on 14 November 2026, and a test that fails when the
+  declaration and that list disagree. The known reads are tied to the tools Linear marks read-only in that capture.
+
 ## [0.0.1] - 2026-11-13
 
 ### Added
