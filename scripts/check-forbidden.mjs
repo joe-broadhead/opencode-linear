@@ -4,9 +4,14 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { extname, join, relative, sep } from "node:path"
 import { fileURLToPath } from "node:url"
+import { maskCaptureWording } from "./check-drift.mjs"
 
 const root = fileURLToPath(new URL("..", import.meta.url))
 const self = fileURLToPath(import.meta.url)
+/** Provider words recorded in the capture that a rule would catch, exempt there only (tool-registry.json, captureWording). */
+const maskCapture = maskCaptureWording(root)
+/** The exemption list itself: the registry's captureWording phrases, and nothing else in that file. */
+const exemptionList = (path, text) => (path === "test/fixtures/tool-registry.json" ? text.replace(/^(\s*"phrase": ).*$/, "$1(a captureWording phrase)") : text)
 const ROOTS = ["src", "test", "scripts", "dist"]
 const MEMBER = String.raw`\s*(?:\?\.|\.)\s*`
 const PERMISSION_HOOK = new RegExp(String.raw`\bpermission${MEMBER}hook\b`)
@@ -32,8 +37,8 @@ const RULES = [
     id: "internal-wording",
     pattern: /\bowner(?:'s)? (?:decision|ruling)\b|\bthe lead\b|\blane\s+[A-Z]\d*\b|\bhey-jelly\s*#\d+|\bG[1-4] lane\b|\breconcile lane\b/i,
     why: "internal process wording (a decision's author, a lane, or a ticket of our own) does not belong in shipped docs or code",
-    // Linear's own tool descriptions, recorded verbatim, say "the lead team": Linear's words, not ours.
-    except: ["test/fixtures/live-tools.json"],
+    // Linear's own tool descriptions, recorded verbatim, say "the lead team": Linear's words, not ours. That phrase alone is
+    // exempt, in the capture alone (test/fixtures/tool-registry.json, captureWording); the rest of the capture is checked.
   },
   { id: "absolute-path", pattern: /\/Users\/[^/\s"'`]+\/|\/home\/[^/\s"'`]+\/|\/(?:private\/)?var\/folders\/|(?<![\w.:/-])\/tmp\/|[A-Za-z]:\\\\?Users\\/, why: "machine-local home and temp paths do not belong in the repository; make temp folders with mkdtemp under realpathSync(\"/tmp\"), or use a relative path" },
 ]
@@ -56,7 +61,7 @@ for (const top of ROOTS) {
     for (const rule of RULES) {
       if (rule.except?.includes(path)) continue
       lines.forEach((text, index) => {
-        if (rule.pattern.test(text)) findings.push({ path, line: index + 1, id: rule.id, why: rule.why, text })
+        if (rule.pattern.test(maskCapture(path, rule.id, exemptionList(path, text)))) findings.push({ path, line: index + 1, id: rule.id, why: rule.why, text })
       })
     }
   }
