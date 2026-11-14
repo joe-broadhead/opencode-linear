@@ -6,8 +6,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
-- The icon is Linear's logomark, unaltered, on a tile in Linear's own colours, used under Linear's brand guidelines. The
-  README carries Linear's trademark line.
+- The icon is Linear's logomark, unaltered, on a tile in Linear's own colours, used under Linear's brand guidelines.
+  `opencode.vendor.mark` is `true`, and the README carries Linear's trademark line.
 
 ## [0.0.1] - 2026-11-13
 

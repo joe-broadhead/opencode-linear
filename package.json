@@ -62,7 +62,8 @@
     "vendor": {
       "id": "linear",
       "name": "Linear",
-      "domain": "linear.app"
+      "domain": "linear.app",
+      "mark": true
     }
   },
   "scripts": {

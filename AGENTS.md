@@ -55,7 +55,8 @@ the checks and the release steps.
   `#222326`, Linear's own colours. Never replace it with the stylised app icon (it needs filters, which Jelly refuses),
   never recolour or combine it with other graphics, and keep the README's trademark line. They are checked by
   `scripts/check-icons.mjs`, which is a byte-identical copy of the kit's. `opencode.icons` declares the three
-  files, `opencode.vendor` declares Linear as the vendor, and the three `exports` and three `files` entries ship them.
+  files, `opencode.vendor` declares Linear as the vendor with `mark: true` (the icon is the vendor's own mark), and the
+  three `exports` and three `files` entries ship them.
 - **The workflows are linted** by `actionlint` (`scripts/actionlint.mjs`, and a CI job), because a `${{ }}` that exists
   in some contexts only makes GitHub reject the whole file and run nothing.
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.

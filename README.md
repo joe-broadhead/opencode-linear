@@ -5,7 +5,7 @@ projects, cycles, documents and comments, and change them only if you allow it.
 
 Unofficial; not affiliated with Linear.
 
-Linear is a trademark of Linear Orbit, Inc. The icon is Linear's logomark, unaltered, on a tile in Linear's own colours, used under [Linear's brand guidelines](https://linear.app/brand) only to identify the service this plugin connects to.
+Linear is a trademark of Linear Orbit, Inc.; this unofficial plugin is not endorsed by them.
 
 ## Requirements
 
