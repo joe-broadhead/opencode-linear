@@ -30,9 +30,9 @@ describe("docs", () => {
     expect(writes.filter((count) => count !== WRITE_TOOLS.length)).toEqual([])
   })
 
-  test.each(FILES)("%s names only Linear tools the plugin knows, and its own linear_issues and linear_events_list", (file) => {
+  test.each(FILES)("%s names only Linear tools the plugin knows, its own linear_issues and linear_events_list, and linear_probe", (file) => {
     const named = [...text(file).matchAll(/\blinear_([a-z][a-z_]*)(?![\w*])/g)].map((match) => match[1]!)
-    expect(named.filter((tool) => ![...READ_TOOLS, ...WRITE_TOOLS, "issues", "events_list"].includes(tool))).toEqual([])
+    expect(named.filter((tool) => ![...READ_TOOLS, ...WRITE_TOOLS, "issues", "events_list", "probe"].includes(tool))).toEqual([])
   })
 
   // Once the plugin is removed and OpenCode reloads, `mcp logout linear` finds no server: the README signs out first,
@@ -63,7 +63,7 @@ describe("docs", () => {
 
   test("the scripting guide says the methods are every known tool, and names the reads and writes as one table", () => {
     const guide = text("docs/scripting.md")
-    expect(guide).toContain("(`METHODS` in `src/host/tools-rpc.ts`)")
+    expect(guide).toContain("(`METHODS` in `src/tools-rpc.ts`)")
     expect(guide).toContain(`${READ_TOOLS.length} reads and the ${WRITE_TOOLS.length}`)
     expect(guide).toContain("`issues`")
     expect(guide).toContain("x-opencode-directory")

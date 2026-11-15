@@ -186,15 +186,18 @@ describe(`the default access on OpenCode ${HOST_VERSION}`, () => {
     await linearTools(host)
     const events = (await host.probe().tool.list()).find((tool) => tool.id === "linear_events_list")!
     const run = (sessionID: string, id: string) =>
-      events.execute({ since: "2026-11-01" }, { sessionID, agent: "build", messageID: "msg_host_test", id, signal: new AbortController().signal, progress: async () => {} } as never)
+      events.execute({ account: "c0ffee00-0000-4000-8000-000000000000/sam.rivera@example.com", since: "2026-11-01" }, { sessionID, agent: "build", messageID: "msg_host_test", id, signal: new AbortController().signal, progress: async () => {} } as never)
     const from = host.fake.inputs.length
-    // The default rules allow it; the fake serves no get_workspace, so its first read names that.
-    await expect(run(await session(host), "call_events_1")).rejects.toThrow(/^TOOL_UNAVAILABLE: OpenCode does not list Linear's get_workspace/)
+    // The default rules allow it. It never asks who is signed in, and no probe has named this sign-in, so it refuses
+    // to label a page with an account it has not seen signed in, before any Linear read.
+    await expect(run(await session(host), "call_events_1")).rejects.toThrow(/^UNAVAILABLE: .* Next step: Call probe for the linear source/)
+    expect(host.fake.inputs.slice(from)).toEqual([])
     // A session that denies linear_events_list: the assert refuses it before any read.
     const permissions = [{ action: "linear_events_list", resource: "*", effect: "deny" as const }]
     const locked = (await host.client.sessions.create({ agent: "build", location: host.location, permissions })).id
+    const before = host.fake.inputs.length
     await expect(run(locked, "call_events_2")).rejects.toThrow("linear_events_list")
-    expect(host.fake.inputs.length).toBe(from)
+    expect(host.fake.inputs.length).toBe(before)
   })
 
   test("P4: a saved 'Always allow' removes the prompt", async () => {

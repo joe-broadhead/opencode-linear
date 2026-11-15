@@ -62,4 +62,4 @@ Jelly folds the declared sign-ins into this plugin's one card, which shows each 
 Jelly's curated catalogue pins an exact version, so publish each release under a new version: a review in Jelly
 can then tell the two apart.
 
-The declaration test runs the shared kit, `test/support/jelly-kit.ts`, which checks the declaration and this page against Jelly's plugin authors' standard. `scripts/check-copies.mjs` holds the kit, and the shared part of the tools RPC (`src/host/tools-rpc.ts`), equal to the copy every plugin carries.
+The declaration test runs the shared kit, `test/support/jelly-kit.ts`, which checks the declaration and this page against Jelly's plugin authors' standard. `scripts/check-copies.mjs` holds the kit equal to the copy every plugin carries. The tools RPC and the events_list contract are not copies: they are the source contract's, pinned in `package-lock.json`.

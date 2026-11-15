@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { METHODS, TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
+import { METHODS, TOOLS_RPC_ID } from "../../src/tools-rpc.js"
 import { ISSUES_TOOL } from "../../src/issues.js"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 

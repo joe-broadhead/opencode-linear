@@ -40,11 +40,14 @@ the checks and the release steps.
   (`codemode: false`) on purpose: Jelly draws its `table` card only from a direct call's result. That makes it present
   in every session, also when Code Mode holds Linear's other tools, so add no other direct tool without the same
   reason. Its answer keeps Jelly's `table` shape: at most 8 columns, 100 rows and 200 characters a cell.
-- **`linear_events_list` is Memory's source of Linear events** (`src/events.ts`), a Code Mode tool and the tools RPC's
-  one owned method, `events_list`. It keeps the shared `events_list` contract in `src/host/events-list.ts`, a copy
-  every source plugin carries unchanged (`scripts/check-copies.mjs` pins its hash): change it in every source plugin at
-  once. It asserts its own action, reads only through the host's executors, never writes, never asks with the default
-  rules, and its tests run the contract's conformance check on synthetic fixtures.
+- **`linear_events_list` is Linear's source `linear.activity`** (`src/events.ts`), a Code Mode tool and the tools RPC
+  method `events_list`, with the tools RPC method `probe` beside it, under the source contract
+  (`@we-the-rebel-alliance/source-contract`, pinned to a tag in `package-lock.json` and bundled into `dist/index.js`;
+  `package.json`'s `sources` declares the source). A listing names its account, `<workspace id>/<email>`, and never asks
+  Linear who is signed in: only `probe` reads `get_workspace` and `get_user` "me", the declared identity operations,
+  and records them per sign-in; a listing compares its account with that record (none yet is `UNAVAILABLE`). It asserts its own
+  action, reads only through the host's executors, never writes, never asks with the default rules; `npm test` runs the
+  contract's events checks on synthetic fixtures, and the `conformance` stage the contract's kit over the source.
 - **The `jelly` section** of `package.json` declares every known tool, the skills, the `linear_issues` table card,
   the Home feed, the sign-in, a one-line `summary` and the `icon`, with only fields that Jelly's declaration schema
   accepts: it refuses unknown keys, so a Jelly without `summary` and `icon` refuses the declaration.
@@ -60,9 +63,10 @@ the checks and the release steps.
 - **The workflows are linted** by `actionlint` (`scripts/actionlint.mjs`, and a CI job), because a `${{ }}` that exists
   in some contexts only makes GitHub reject the whole file and run nothing.
 - **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.
-- **The tools RPC.** `src/host/tools-rpc.ts` is a copy of a module shared by several plugins. Change only its block
-  between the `PLUGIN-SPECIFIC` markers here; change the rest in the shared copy first. Its methods are every known
-  tool (`READ_TOOLS` and `WRITE_TOOLS`, each with its class) and the owned read `issues`, never an unknown tool. A rule
+- **The tools RPC.** The transport is the source contract's `tools-rpc`, shared by the family; Linear's part is
+  `src/tools-rpc.ts` (the plugin value, the method table and the next steps), and a change to the transport goes to the
+  package first. Its methods are every known tool (`READ_TOOLS` and `WRITE_TOOLS`, each with its class) and the owned
+  reads `issues`, `events_list` and `probe`, never an unknown tool. A rule
   must allow a method before a script runs it: an `ask` is refused, and a saved "Always allow" is not a grant. Keep the
   RPC id `linear.workspace.tools` and its method names stable: scripts call them by name.
 - **Tests.** Unit tests use narrow `Pick<Plugin.Context, ...>` fakes. Host tests use the public `@opencode/sdk` with
@@ -99,8 +103,8 @@ the checks and the release steps.
   `permission.ask`;
 - the deprecated `ctx.generate.text` and `experimental.policies`;
 - importing `@opencode/ai`;
-- a permission hook, except the one `permission.hook("evaluate")` in `src/host/tools-rpc.ts` (and the bundle that
-  inlines it), exactly once each: it turns an `ask` on one of the tools RPC's own script calls in flight into a deny,
+- a permission hook, except the one `permission.hook("evaluate")` of the source contract's tools RPC, in the bundle
+  that inlines it, exactly once: it turns an `ask` on one of the tools RPC's own script calls in flight into a deny,
   because no one can answer it, and touches nothing else;
 - references to private host source or host checkouts;
 - machine-local home and temp paths;

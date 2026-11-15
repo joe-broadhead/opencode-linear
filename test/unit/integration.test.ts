@@ -17,6 +17,7 @@ function fake(initial: { server?: string; integrationID?: string } = {}) {
   const transforms: ((editor: Editor) => void)[] = []
   const reported: unknown[] = []
   let push: (() => void) | undefined
+  let next = "integration.updated"
   const name = () => {
     let current = state.hostName
     const editor = {
@@ -64,14 +65,18 @@ function fake(initial: { server?: string; integrationID?: string } = {}) {
               push = resolve
               signal.addEventListener("abort", () => resolve(), { once: true })
             })
-            if (!signal.aborted) yield { type: "integration.updated", data: {} }
+            if (!signal.aborted) yield { type: next, data: {} }
           }
         },
       }),
     },
   } as unknown as IntegrationContext
   const settle = () => new Promise((resolve) => setTimeout(resolve, 30))
-  return { ctx, state, transforms, reported, name, emit: () => push?.(), settle }
+  const emit = (type = "integration.updated") => {
+    next = type
+    push?.()
+  }
+  return { ctx, state, transforms, reported, name, emit, settle }
 }
 
 const SIGN_IN_AGAIN = "Linear needs a new sign-in. Choose this account to sign in again."
@@ -127,6 +132,23 @@ describe("watchIntegration", () => {
     view.emit()
     await view.settle()
     expect(view.reported).toHaveLength(2)
+    await stop()
+  })
+
+  test("on a credential update or switch, forgets what probe read, and on nothing else", async () => {
+    const { ctx, emit, settle } = fake()
+    let forgotten = 0
+    const stop = watchIntegration(ctx, () => true, () => void forgotten++)
+    await settle()
+    emit("integration.updated")
+    await settle()
+    expect(forgotten).toBe(0)
+    emit("credential.updated")
+    await settle()
+    expect(forgotten).toBe(1)
+    emit("credential.switched")
+    await settle()
+    expect(forgotten).toBe(2)
     await stop()
   })
 })

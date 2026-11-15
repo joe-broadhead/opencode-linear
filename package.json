@@ -1,6 +1,6 @@
 {
   "name": "@joe-broadhead/opencode-linear",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "Unofficial OpenCode plugin for Linear: find, read and cite issues, projects and documents through Linear's official MCP server",
   "keywords": [
@@ -67,6 +67,48 @@
       "mark": true
     }
   },
+  "sources": {
+    "contractVersion": 1,
+    "rpc": "linear.workspace.tools",
+    "probe": {
+      "action": "linear_probe"
+    },
+    "items": [
+      {
+        "id": "linear.activity",
+        "kind": "events",
+        "reads": "issue",
+        "tool": "events_list",
+        "input": {
+          "source": "linear"
+        },
+        "accounts": {
+          "named": false
+        },
+        "permission": {
+          "events": "linear_events_list",
+          "operations": [
+            "get_workspace",
+            "get_user",
+            "list_issues",
+            "get_notifications"
+          ],
+          "identity": [
+            "get_workspace",
+            "get_user"
+          ]
+        },
+        "private": true,
+        "cost": {
+          "class": "free"
+        },
+        "maxBytes": 900000,
+        "urlHosts": [
+          "linear.app"
+        ]
+      }
+    ]
+  },
   "scripts": {
     "check": "node scripts/check.mjs",
     "typecheck": "node scripts/check.mjs typecheck",
@@ -86,6 +128,7 @@
     "@opentui/solid": "0.8.0",
     "@types/bun": "1.4.4",
     "@types/node": "24.19.2",
+    "@we-the-rebel-alliance/source-contract": "github:we-the-rebel-alliance/source-contract#v0.1.0",
     "esbuild": "0.28.2",
     "solid-js": "1.9.17",
     "typescript": "5.9.3"

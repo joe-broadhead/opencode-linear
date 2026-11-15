@@ -17,11 +17,10 @@ the known tools through a tools RPC. It has no runtime dependencies.
 | `src/linear-tools.ts` | `READ_TOOLS`, `WRITE_TOOLS` and `classify()`. No runtime imports, so the drift script can load it |
 | `src/permissions.ts` | The default rules, their placement, and detection of agents without them |
 | `src/issues.ts` | `linear_issues`: the issues assigned to you as a table, read through the host's own `linear_list_issues` |
-| `src/events.ts` | `linear_events_list` and the tools RPC method `events_list`: assigned issue changes and notifications as Memory's events, read through the host's own executors |
-| `src/host/events-list.ts` | The `events_list` source contract: the event type and limits, input, cursors, `makeEvent`, `fitPage`, the checks and the conformance test. A copy every source plugin carries unchanged |
+| `src/events.ts` | The source `linear.activity`: `linear_events_list` and the tools RPC methods `events_list` and `probe`: assigned issue changes and notifications as Memory's events, read through the host's own executors, on the source contract's `events` and `cursor` |
 | `src/status.ts` | The status model and text, `/linear-status`, and the status RPC method |
 | `src/skills.ts` | Loading and registering the skills |
-| `src/host/tools-rpc.ts` | The tools RPC for scripts, `linear.workspace.tools`; a copy of a module shared by several plugins, with Linear's part in one marked block |
+| `src/tools-rpc.ts` | Linear's part of the tools RPC for scripts, `linear.workspace.tools`: the plugin value, the method table and the next steps, for the source contract's `tools-rpc` transport, bundled |
 | `src/tui.ts` | The terminal UI part: the plugin `linear.workspace.tui` and the `/linear` dialog |
 | `src/constants.ts` | IDs, the server name and URLs, the Code Mode namespace description, the supported host range, the tested releases (`TESTED_HOSTS`, the one list the checks and status use) and the error shape. Type-only imports, so `scripts/check.mjs` can load it |
 | `src/version.ts` | The plugin's version from `package.json`; the build replaces it with the version string alone |

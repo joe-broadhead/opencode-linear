@@ -1,7 +1,7 @@
 import type { Plugin, Rpc } from "@opencode/plugin"
 import { PLUGIN_ID, SERVER_NAME, TESTED_HOSTS } from "./constants.js"
 import { isSupportedHost, type HostCheck } from "./host-version.js"
-import { EVENTS_LIST } from "./host/events-list.js"
+import { EVENTS_LIST } from "@we-the-rebel-alliance/source-contract/events"
 import { ISSUES_TOOL } from "./issues.js"
 import { classify } from "./linear-tools.js"
 import { ACCESS_VALUES, type Access } from "./options.js"

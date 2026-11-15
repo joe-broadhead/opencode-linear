@@ -16,7 +16,7 @@ import { arch, platform } from "node:os"
 import { basename, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { ENDPOINT, SUPPORTED_HOST, TESTED_HOSTS } from "../../src/constants.js"
-import { TOOLS_RPC_ID } from "../../src/host/tools-rpc.js"
+import { TOOLS_RPC_ID } from "../../src/tools-rpc.js"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 import { defaultRules, type Rule } from "../../src/permissions.js"
 import { NEW_TOOL, startFakeMcp, UPSTREAM_FAILURE, type FakeMcp } from "../host/fake-mcp.js"
@@ -302,12 +302,12 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     await fake?.close()
   }, 60_000)
 
-  test.each(["read-only", "all"] as const)("in %s access, describes every known tool with its class, and the owned issues method", async (access) => {
+  test.each(["read-only", "all"] as const)("in %s access, describes every known tool with its class, and the owned issues, events_list and probe methods", async (access) => {
     const { value } = await script(access, "describe", {})
     expect(value.id).toBe(TOOLS_RPC_ID)
-    expect(value.methods.map((method: { name: string }) => method.name)).toEqual([...READ_TOOLS, ...WRITE_TOOLS, "issues", "events_list"])
+    expect(value.methods.map((method: { name: string }) => method.name)).toEqual([...READ_TOOLS, ...WRITE_TOOLS, "issues", "events_list", "probe"])
     const listed = new Set([...READ_TOOLS, ...WRITE_TOOLS])
-    for (const method of value.methods.slice(0, -2)) {
+    for (const method of value.methods.slice(0, -3)) {
       const name = method.name as string
       expect({ name, kind: method.kind, action: method.action, available: method.available }).toEqual({
         name,
@@ -318,10 +318,11 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
       expect(method.class).toBe((READ_TOOLS as readonly string[]).includes(name) ? "read" : "write")
       if (listed.has(name)) expect(method.input).toEqual({ type: "object", properties: { query: { type: "string" } } })
     }
-    // The plugin's own reads are methods in both access modes: linear_issues, then linear_events_list.
-    expect(value.methods.at(-2)).toMatchObject({ name: "issues", kind: "plugin", class: "read", action: "linear_issues", available: true })
-    expect(Object.keys(value.methods.at(-2).input.properties)).toEqual(["limit"])
-    expect(value.methods.at(-1)).toMatchObject({ name: "events_list", kind: "plugin", class: "read", action: "linear_events_list", available: true })
+    // The plugin's own reads are methods in both access modes: linear_issues, linear_events_list, then probe.
+    expect(value.methods.at(-3)).toMatchObject({ name: "issues", kind: "plugin", class: "read", action: "linear_issues", available: true })
+    expect(Object.keys(value.methods.at(-3).input.properties)).toEqual(["limit"])
+    expect(value.methods.at(-2)).toMatchObject({ name: "events_list", kind: "plugin", class: "read", action: "linear_events_list", available: true })
+    expect(value.methods.at(-1)).toMatchObject({ name: "probe", kind: "plugin", class: "read", action: "linear_probe", available: true })
   })
 
   test.each(["read-only", "all"] as const)("in %s access, a deny refuses and a write follows the block", async (access) => {
@@ -399,12 +400,19 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     expect(await call("read-only", "reopen", "get_issue", { query: "q" })).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
   })
 
-  test("events_list runs the packed plugin's own spec, reads through OpenCode, and reports an answer it cannot read with its own code", async () => {
+  test("events_list runs the packed plugin's own spec, and before a probe has named the sign-in reads nothing", async () => {
+    const from = fake.calls.length
+    const result = await call("read-only", "build", "events_list", { account: "c0ffee00-0000-4000-8000-000000000000/sam.rivera@example.com" })
+    expect(result).toMatchObject({ type: "failed", code: "UNAVAILABLE" })
+    expect(toolCalls(from)).toEqual([])
+  })
+
+  test("probe runs the packed plugin's own spec, reads through OpenCode, and reports an answer it cannot read with its own code", async () => {
     const from = fake.calls.length
     // The fake answers get_workspace with its call, not a workspace.
-    const result = await call("read-only", "build", "events_list", {})
+    const result = await call("read-only", "build", "probe", {})
     expect(result).toMatchObject({ type: "failed", code: "UPSTREAM_UNREADABLE" })
-    expect(String(result.message)).toContain("UPSTREAM_UNREADABLE: Linear's get_workspace answered in a shape events_list does not read.")
+    expect(String(result.message)).toContain("UPSTREAM_UNREADABLE: Linear's get_workspace answered in a shape probe does not read.")
     expect(toolCalls(from)).toEqual(["get_workspace"])
   })
 
