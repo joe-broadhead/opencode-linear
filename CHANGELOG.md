@@ -28,13 +28,14 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
-- **For Memory: the account is `<workspace URL key>/<email>`, and every listing names it.** `events_list` no longer
+- **For Memory: the account is `<workspace id>/<email>`, and every listing names it.** `events_list` no longer
   reads `get_workspace` or `get_user`: it takes `account` as `probe` answers it (lowercase, such as
-  `acme/sam@example.com`), and compares it, before any Linear read, with what `probe` read for the current sign-in.
+  `c0ffee00-…/sam@example.com`; the id, because an admin can change a workspace's URL key), and compares it, before any Linear read, with what `probe` read for the current sign-in.
   **Call `probe` first** after a new sign-in or a restart of OpenCode: until then a listing is `UNAVAILABLE` (new
   code), and another account than the probed one is `ACCOUNT_MISMATCH`. A listing without `account`, or with one that
-  is not `<workspace>/<email>`, is `INPUT_INVALID`. The owner stays `linear:<user id>` labelled with the user's name,
-  as in 0.0.2; the account was the workspace's URL key alone, so every event's `account` and `hash` change.
+  is not `<workspace id>/<email>`, is `INPUT_INVALID`. The owner stays `linear:<user id>`, now labelled with the user's
+  name and the workspace's URL key (`Sam Rivera (acme)`); the account was the workspace's URL key alone, so every
+  event's `account` and `hash` change. A renamed URL key keeps the account and its cursors.
 - **For Memory: the cursor is the contract's bound cursor.** It is tied to the plugin, the source and the account; a
   cursor issued for another account, another workspace's included, is `ACCOUNT_MISMATCH` (it was `ACCOUNT_UNKNOWN`
   for another workspace), before any Linear read. **A cursor issued by 0.0.2 or earlier is `CURSOR_INVALID`:** start again with `since` (the plugin keeps
@@ -54,8 +55,9 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Known limits
 
-- What `probe` read is kept in memory, per sign-in: after a new sign-in or a restart of OpenCode, a listing is
-  `UNAVAILABLE` until the next `probe`, and a sign-in switch within one credential is caught at that probe. The kit's
+- What `probe` read is kept in memory, per sign-in, and forgotten on every `credential.updated` and
+  `credential.switched` (a new sign-in may keep its credential id): after a new sign-in or a restart of OpenCode, a
+  listing is `UNAVAILABLE` until the next `probe`. The kit's
   page-size check reads a fixed 64 KB rather than the declared 900,000
   bytes (source-contract#30, item 2). The recorded Linear answers are invented, modelled on the live tool list's
   descriptions, not live-verified. The README's Known limits cite Linear's rate limits.
