@@ -28,8 +28,8 @@ const LINEAR = JSON.parse(readFileSync(join(root, "test/fixtures/sources.json"),
 
 const NOW = Date.parse("2026-11-08T12:00:00Z")
 const SINCE = "2026-11-01T00:00:00Z"
-/** The account probe names: the workspace's URL key and the signed-in email. */
-const ACCOUNT = `${LINEAR["workspace"].urlKey}/${LINEAR["me"].email}`
+/** The account probe names: the workspace's id and the signed-in email. */
+const ACCOUNT = `${LINEAR["workspace"].id}/${LINEAR["me"].email}`
 /** Each Linear read answers one page in one call, so no single event can fail on its own. */
 const ATOMIC = "Linear answers each list_issues and get_notifications read as one page in one call, so no single event can fail on its own"
 
@@ -90,9 +90,9 @@ async function cases(): Promise<PageCase[]> {
     { name: "what came after the first two", input: { source: LINEAR_SOURCE, account: ACCOUNT, cursor: first }, expect: "page" },
     { name: "nothing new since the last listing", input: { source: LINEAR_SOURCE, account: ACCOUNT, cursor: done }, expect: "empty" },
     { name: "a listing that names no account", input: { source: LINEAR_SOURCE, since: SINCE }, expect: { refuses: "INPUT_INVALID" } },
-    { name: "a cursor passed for another account", input: { source: LINEAR_SOURCE, account: "example-co/ama.mensah@example.com", cursor: first }, expect: { refuses: "ACCOUNT_MISMATCH" } },
-    { name: "another account than the signed-in one", input: { source: LINEAR_SOURCE, account: "example-co/someone.else@example.com", since: SINCE }, expect: { refuses: "ACCOUNT_MISMATCH" } },
-    { name: "the same email in another workspace", input: { source: LINEAR_SOURCE, account: `other-co/${LINEAR["me"].email}`, since: SINCE }, expect: { refuses: "ACCOUNT_MISMATCH" } },
+    { name: "a cursor passed for another account", input: { source: LINEAR_SOURCE, account: `${LINEAR["workspace"].id}/ama.mensah@example.com`, cursor: first }, expect: { refuses: "ACCOUNT_MISMATCH" } },
+    { name: "another account than the signed-in one", input: { source: LINEAR_SOURCE, account: `${LINEAR["workspace"].id}/someone.else@example.com`, since: SINCE }, expect: { refuses: "ACCOUNT_MISMATCH" } },
+    { name: "the same email in another workspace", input: { source: LINEAR_SOURCE, account: `0ff1ce00-0000-4000-8000-000000000000/${LINEAR["me"].email}`, since: SINCE }, expect: { refuses: "ACCOUNT_MISMATCH" } },
     {
       name: "a cursor bound to another plugin",
       input: { source: LINEAR_SOURCE, account: ACCOUNT, cursor: encodeBoundCursor({ plugin: "jira", source: LINEAR_SOURCE, account: ACCOUNT }, { a: ACCOUNT, i: [0, ""], n: [0, ""] }) },

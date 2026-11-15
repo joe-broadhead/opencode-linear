@@ -47,7 +47,7 @@ for a direct call, not for one made inside Code Mode.
 
 `linear_events_list` is for Memory's collector, not for answering questions: it lists what changed in Linear for you
 since a cursor, as normalised events, oldest first: each change to an issue assigned to you, and each notification in
-your Linear inbox, with the issue's identifier and link. Each listing names its account, `<workspace>/<email>`, which must be the one `probe` read for the current sign-in. It only
+your Linear inbox, with the issue's identifier and link. Each listing names its account, `<workspace id>/<email>`, which must be the one `probe` read for the current sign-in. It only
 reads, through Linear's `list_issues` and `get_notifications`, and never asks with the default rules. It is this
 plugin's source `linear.activity` under the shared source contract, which `package.json` declares, with the tools RPC
 method `probe`, which names who is signed in through `get_workspace` and `get_user` with `me`
@@ -321,7 +321,7 @@ Run `/linear-status` first. Its last line is the next step.
 | `SERVER_CONFLICT` from `linear_issues` | Your own `mcp.servers.linear` points at another URL than the plugin uses. Point it at the URL `/linear-status` names, or remove it, then restart OpenCode. |
 | `TOOL_UNAVAILABLE` from `linear_issues` | OpenCode does not list Linear's `list_issues` yet. Follow the next step in the message, or run `/linear-status`. |
 | `UPSTREAM_UNREADABLE` from `linear_issues` | Linear's `list_issues` answered with something other than a list of issues. Ask for `list_issues` with assignee `me` instead. |
-| `INPUT_INVALID` from `linear_events_list` or `probe` | The input is invalid, and the message names the problems. Pass `account` (`<workspace>/<email>`, as `probe` names it), `since`, `cursor`, `limit` or `source` as the tool's schema describes them. |
+| `INPUT_INVALID` from `linear_events_list` or `probe` | The input is invalid, and the message names the problems. Pass `account` (`<workspace id>/<email>`, as `probe` names it), `since`, `cursor`, `limit` or `source` as the tool's schema describes them. |
 | `SOURCE_UNKNOWN` from `linear_events_list` or `probe` | This plugin lists only the source `linear`. Leave `source` out, or pass `linear`. |
 | `CURSOR_INVALID` from `linear_events_list` | The cursor was not issued by `events_list` for this Linear account, or by 0.0.2 or earlier. Call `events_list` without a cursor, with `since`, to start again. |
 | `UNAVAILABLE` from `linear_events_list` | No `probe` has named the current Linear sign-in yet, after a new sign-in or a restart of OpenCode. Call `probe` for the `linear` source, then list again. |
@@ -358,10 +358,11 @@ store.
   allows an OAuth app 5,000 requests an hour per user
   ([Rate limiting](https://linear.app/developers/rate-limiting)), which the server's reads presumably count against (not
   verified). One `events_list` call makes up to 8 `list_issues` and 5 `get_notifications` reads.
-- **A listing waits for `probe`.** `linear.activity`'s account is `<workspace URL key>/<email>`, which `probe` reads
-  with `get_workspace` and `get_user` and the plugin keeps, in memory, for the sign-in. A listing compares its account
-  with that and never reads the identity itself, so after a new sign-in or a restart of OpenCode it answers
-  `UNAVAILABLE` until the next `probe`: a sign-in switch is caught there. The conformance kit runs on Linear answers
+- **A listing waits for `probe`.** `linear.activity`'s account is `<workspace id>/<email>` (the id, because an admin
+  can change a workspace's URL key, [workspaces](https://linear.app/docs/workspaces)), which `probe` reads with
+  `get_workspace` and `get_user` and the plugin keeps, in memory, for the sign-in. A listing compares its account with
+  that and never reads the identity itself. The plugin forgets it on every credential update or switch, so after a
+  new sign-in or a restart of OpenCode a listing answers `UNAVAILABLE` until the next `probe`. The conformance kit runs on Linear answers
   that are invented, modelled on the tools' descriptions in the live tool list, and not live-verified.
 - **A Linear cursor never expires.** It holds an update time in each feed, so the plugin never answers
   `CURSOR_EXPIRED`, and the conformance report stays incomplete on the kit's expired-cursor check.

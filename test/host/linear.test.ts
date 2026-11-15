@@ -186,7 +186,7 @@ describe(`the default access on OpenCode ${HOST_VERSION}`, () => {
     await linearTools(host)
     const events = (await host.probe().tool.list()).find((tool) => tool.id === "linear_events_list")!
     const run = (sessionID: string, id: string) =>
-      events.execute({ account: "acme/sam.rivera@example.com", since: "2026-11-01" }, { sessionID, agent: "build", messageID: "msg_host_test", id, signal: new AbortController().signal, progress: async () => {} } as never)
+      events.execute({ account: "c0ffee00-0000-4000-8000-000000000000/sam.rivera@example.com", since: "2026-11-01" }, { sessionID, agent: "build", messageID: "msg_host_test", id, signal: new AbortController().signal, progress: async () => {} } as never)
     const from = host.fake.inputs.length
     // The default rules allow it. It never asks who is signed in, and no probe has named this sign-in, so it refuses
     // to label a page with an account it has not seen signed in, before any Linear read.

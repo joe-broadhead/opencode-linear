@@ -58,7 +58,7 @@ export const PROBE_ACTION = `${SERVER_NAME}_${PROBE}`
 export const PAGE_BYTES = 900_000
 /** An email, as Linear names a user's: no whitespace, one @, a dot in the domain. */
 const EMAIL = /^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/
-/** A Linear workspace's URL key. */
+/** A Linear workspace's id: a UUID, lowercase (letters, digits, hyphens). */
 const WORKSPACE_KEY = /^[a-z0-9_-]{1,64}$/
 
 /** Issues per `list_issues` page, Linear's maximum, and the most pages one call reads. */
@@ -212,8 +212,9 @@ function eventsRequest(input: unknown): EventsListRequest {
 // ── Owner and account ───────────────────────────────────────────────────
 
 /**
- * An account as this source names it: the workspace's URL key and the signed-in user's email, `<key>/<email>`,
- * lowercase, so one person in two workspaces has two accounts; undefined when the value is not one.
+ * An account as this source names it: the workspace's id and the signed-in user's email, `<workspace id>/<email>`,
+ * lowercase, so one person in two workspaces has two accounts. The id, not the URL key, because an admin can change a
+ * workspace's URL key; the id never changes. Undefined when the value is not one.
  */
 export function accountOf(value: string): string | undefined {
   const account = value.trim().toLowerCase()
@@ -223,13 +224,16 @@ export function accountOf(value: string): string | undefined {
   return WORKSPACE_KEY.test(key) && EMAIL.test(email) && account.length <= EVENT_LIMITS.account ? account : undefined
 }
 
-/** The workspace's URL key, from `get_workspace`'s `urlKey` or URL (`https://linear.app/<key>`). */
-export function workspaceKey(answer: unknown): string {
+/**
+ * The workspace from `get_workspace`: its id, which the account names, and for display its URL key (`urlKey`, or the
+ * key in its URL, `https://linear.app/<key>`), else its name.
+ */
+export function workspaceOf(answer: unknown): { id: string; display: string } {
   const data = unwrap(record(answer), ["workspace", "organization"])
+  const id = text(data["id"])?.toLowerCase()
+  if (id === undefined || !WORKSPACE_KEY.test(id)) throw unreadable("get_workspace", PROBE)
   const fromUrl = /^https:\/\/linear\.app\/([A-Za-z0-9_-]+)\/?$/.exec(text(data["url"]) ?? "")?.[1]
-  const key = (text(data["urlKey"]) ?? fromUrl)?.toLowerCase()
-  if (key === undefined || !WORKSPACE_KEY.test(key)) throw unreadable("get_workspace", PROBE)
-  return key
+  return { id, display: text(data["urlKey"]) ?? fromUrl ?? text(data["name"]) ?? id }
 }
 
 /** The signed-in user, from `get_user` "me": their email, and the owner `linear:<id>` labelled with their name. */
@@ -454,10 +458,10 @@ function stateOf(cursor: string, account: string): { issues: Position; notificat
 export async function linearEvents(read: Read, signedIn: SignedIn | undefined, input: unknown, now = Date.now()): Promise<EventsListResult> {
   const request = eventsRequest(input)
   if (request.account === undefined) {
-    throw linearError("INPUT_INVALID", "A listing names the account it reads: events_list has no account.", 'Pass "account", the "<workspace>/<email>" account that probe names.')
+    throw linearError("INPUT_INVALID", "A listing names the account it reads: events_list has no account.", 'Pass "account", the "<workspace id>/<email>" account that probe names.')
   }
   const account = accountOf(request.account)
-  if (account === undefined) throw linearError("INPUT_INVALID", 'The events_list account is not "<workspace>/<email>".', 'Pass "account", the "<workspace>/<email>" account that probe names.')
+  if (account === undefined) throw linearError("INPUT_INVALID", 'The events_list account is not "<workspace id>/<email>".', 'Pass "account", the "<workspace id>/<email>" account that probe names.')
   if (request.cursor !== undefined) cursorFor(request.cursor, account)
   if (signedIn === undefined) {
     throw linearError("UNAVAILABLE", "The plugin does not know yet who is signed in to Linear: no probe has named this sign-in's account since it was made or OpenCode started.", "Call probe for the linear source, then call events_list again.")
@@ -501,8 +505,8 @@ export async function linearEvents(read: Read, signedIn: SignedIn | undefined, i
 
 /**
  * `probe` (the source contract's): who is signed in to Linear, for the source, and nothing it reads. It reads the
- * source's two identity operations, `get_workspace` and `get_user` "me": the account is `<workspace URL key>/<email>`,
- * and the owner `linear:<user id>` labelled with the user's name, as on every page. `record` keeps them for this
+ * source's two identity operations, `get_workspace` and `get_user` "me": the account is `<workspace id>/<email>`, and
+ * the owner `linear:<user id>` labelled with the user's name and the workspace's URL key, as on every page. `record` keeps them for this
  * sign-in, so a listing can check the account it is asked for. A caller that names another account is refused with
  * ACCOUNT_MISMATCH.
  */
@@ -511,9 +515,10 @@ export async function linearProbe(read: Read, input: unknown, record: (signedIn:
   if (!parsed.ok) throw linearError("INPUT_INVALID", `The probe input is invalid: ${parsed.problems.join("; ")}.`, 'Pass only "source" and "account", or an empty object.')
   const source = parsed.value.source ?? LINEAR_SOURCE
   if (source !== LINEAR_SOURCE) throw linearError("SOURCE_UNKNOWN", `This plugin lists only the source "${LINEAR_SOURCE}".`, `Leave "source" out, or pass "${LINEAR_SOURCE}".`)
-  const key = workspaceKey(await read("get_workspace", {}))
+  const workspace = workspaceOf(await read("get_workspace", {}))
   const user = signedInUser(await read("get_user", { query: "me" }))
-  const signedIn: SignedIn = { account: `${key}/${user.email}`, owner: user.owner }
+  const owner = { id: user.owner.id, label: cut(`${user.owner.label} (${workspace.display})`, EVENT_LIMITS.ownerLabel) }
+  const signedIn: SignedIn = { account: `${workspace.id}/${user.email}`, owner }
   record(signedIn)
   if (parsed.value.account !== undefined && accountOf(parsed.value.account) !== signedIn.account) {
     throw linearError("ACCOUNT_MISMATCH", `Linear is signed in to another account than "${parsed.value.account}".`, `Sign in to Linear as that account (/connect, Linear), or read as "${signedIn.account}", the signed-in account.`)

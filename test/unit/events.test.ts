@@ -20,7 +20,7 @@ import {
   probeMethod,
   signIns,
   signedInUser,
-  workspaceKey,
+  workspaceOf,
   type SignedIn,
   type EventsToolOptions,
 } from "../../src/events.js"
@@ -31,11 +31,13 @@ const NOW = Date.parse("2026-11-08T12:00:00Z")
 const SINCE = "2026-11-01T00:00:00Z"
 const ME = "4f1c2e9a-0000-4000-8000-000000000001"
 const AMA = "4f1c2e9a-0000-4000-8000-000000000002"
-const ACCOUNT = "acme/sam.rivera@example.com"
-const OWNER = { id: `linear:${ME}`, label: "Sam Rivera" }
+/** The workspace's id, which the account names; its URL key, `acme`, is for display only. */
+const WORKSPACE = "c0ffee00-0000-4000-8000-000000000000"
+const ACCOUNT = `${WORKSPACE}/sam.rivera@example.com`
+const OWNER = { id: `linear:${ME}`, label: "Sam Rivera (acme)" }
 /** Ama, signed in to the same workspace, and Sam in another: the accounts the refusals use. */
-const AMA_ACCOUNT = "acme/ama.mensah@example.com"
-const ELSEWHERE = "other-co/sam.rivera@example.com"
+const AMA_ACCOUNT = `${WORKSPACE}/ama.mensah@example.com`
+const ELSEWHERE = "0ff1ce00-0000-4000-8000-000000000000/sam.rivera@example.com"
 const as = (account: string, owner = OWNER): SignedIn => ({ account, owner })
 
 const issue = (n: number, updatedAt: string, extra: Record<string, unknown> = {}) => ({
@@ -67,7 +69,7 @@ const notification = (n: number, createdAt: string, extra: Record<string, unknow
 
 /** A synthetic workspace: issues and notifications, some before since and one assigned to someone else. */
 const fixture = () => ({
-  workspace: { id: "c0ffee00-0000-4000-8000-000000000000", name: "Acme", url: "https://linear.app/acme" },
+  workspace: { id: WORKSPACE, name: "Acme", url: "https://linear.app/acme" },
   user: { id: ME, name: "Sam Rivera", displayName: "sam", email: "sam.rivera@example.com" },
   issues: [
     issue(1, "2026-10-30T10:00:00.000Z"),
@@ -251,12 +253,13 @@ describe("linear_events_list", () => {
   })
 
   test("names the account as the workspace key and the email, lowercase, and reads them from probe's answers", () => {
-    expect(accountOf(" ACME/Sam.Rivera@Example.com ")).toBe(ACCOUNT)
-    for (const bad of ["acme", "sam.rivera@example.com", "/sam.rivera@example.com", "acme/", "a b/sam@example.com"]) expect(accountOf(bad)).toBeUndefined()
-    expect(workspaceKey({ id: "w", name: "Acme", url: "https://linear.app/acme" })).toBe("acme")
-    expect(workspaceKey({ workspace: { id: "w", urlKey: "Acme-Labs" } })).toBe("acme-labs")
-    expect(() => workspaceKey({ id: "c0ffee" })).toThrow(/^UPSTREAM_UNREADABLE: Linear's get_workspace answered in a shape probe does not read\./)
-    expect(signedInUser({ user: { id: ME, name: "Sam Rivera", email: "Sam.Rivera@example.com" } })).toEqual({ email: "sam.rivera@example.com", owner: OWNER })
+    expect(accountOf(` ${WORKSPACE.toUpperCase()}/Sam.Rivera@Example.com `)).toBe(ACCOUNT)
+    for (const bad of [WORKSPACE, "sam.rivera@example.com", "/sam.rivera@example.com", `${WORKSPACE}/`, "a b/sam@example.com"]) expect(accountOf(bad)).toBeUndefined()
+    expect(workspaceOf({ id: WORKSPACE, name: "Acme", url: "https://linear.app/acme" })).toEqual({ id: WORKSPACE, display: "acme" })
+    expect(workspaceOf({ workspace: { id: "W1", urlKey: "acme-labs", name: "Acme Labs" } })).toEqual({ id: "w1", display: "acme-labs" })
+    expect(workspaceOf({ id: WORKSPACE, name: "Acme" })).toEqual({ id: WORKSPACE, display: "Acme" })
+    expect(() => workspaceOf({ name: "Acme", urlKey: "acme" })).toThrow(/^UPSTREAM_UNREADABLE: Linear's get_workspace answered in a shape probe does not read\./)
+    expect(signedInUser({ user: { id: ME, name: "Sam Rivera", email: "Sam.Rivera@example.com" } })).toEqual({ email: "sam.rivera@example.com", owner: { id: `linear:${ME}`, label: "Sam Rivera" } })
     expect(() => signedInUser({ id: ME, name: "No email" })).toThrow(/^UPSTREAM_UNREADABLE: Linear's get_user answered in a shape probe does not read\./)
   })
 
@@ -265,7 +268,7 @@ describe("linear_events_list", () => {
     await expect(list({ limit: 0 })).rejects.toThrow(/^INPUT_INVALID: The events_list input is invalid: "limit" must be an integer from 1 to 500\./)
     await expect(list({ source: "gmail" })).rejects.toThrow(/^SOURCE_UNKNOWN: /)
     await expect(eventsTool(options()).execute({ since: SINCE }, context)).rejects.toThrow(/^INPUT_INVALID: A listing names the account it reads/)
-    await expect(list({ account: "sam.rivera@example.com" })).rejects.toThrow(/^INPUT_INVALID: The events_list account is not "<workspace>\/<email>"\./)
+    await expect(list({ account: "sam.rivera@example.com" })).rejects.toThrow(/^INPUT_INVALID: The events_list account is not "<workspace id>\/<email>"\./)
     await expect(list({ cursor: encodeBoundCursor({ plugin: "gitlab", source: "linear", account: ACCOUNT }, { a: ACCOUNT, i: [0, ""], n: [0, ""] }) })).rejects.toThrow(/^CURSOR_INVALID: /)
     // A cursor from 0.0.2 or earlier (contract 1, unbound) is not read: start again.
     await expect(list({ cursor: encodeCursor("linear", { o: "x", i: [0, ""], n: [0, ""] }) })).rejects.toThrow(/^CURSOR_INVALID: .* Next step: Call events_list without a cursor, with since, to start again\./)
@@ -275,7 +278,7 @@ describe("linear_events_list", () => {
     // Signed in as Sam in acme: a listing for anyone else is refused, never labelled with their account.
     const host = linear()
     const tool = eventsTool(options(host))
-    for (const account of [AMA_ACCOUNT, "acme/someone.else@example.com", ELSEWHERE]) {
+    for (const account of [AMA_ACCOUNT, `${WORKSPACE}/someone.else@example.com`, ELSEWHERE]) {
       await expect(tool.execute({ account, since: SINCE }, context)).rejects.toThrow(/^ACCOUNT_MISMATCH: Linear is signed in to another account than /)
     }
     expect(host.calls).toEqual([])
@@ -292,11 +295,24 @@ describe("linear_events_list", () => {
     expect(host.calls).toEqual([])
   })
 
+  test("after a credential update or switch forgets what probe read, a listing is UNAVAILABLE until the next probe", async () => {
+    const host = linear()
+    const opts = options(host, [], null)
+    const call: ToolCall = { sessionID: "ses_1", agent: "build", messageID: "msg_script", id: "script:1", signal: new AbortController().signal, progress: async () => {} }
+    await probeMethod(opts).run({}, call)
+    expect((await eventsTool(opts).execute({ account: ACCOUNT, since: SINCE }, context)).output.account).toBe(ACCOUNT)
+    // What the plugin does on credential.updated or credential.switched (src/plugin.ts, watchIntegration).
+    opts.signIns.clear()
+    await expect(eventsTool(opts).execute({ account: ACCOUNT, since: SINCE }, context)).rejects.toThrow(/^UNAVAILABLE: /)
+    await probeMethod(opts).run({}, call)
+    expect((await eventsTool(opts).execute({ account: ACCOUNT, since: SINCE }, context)).output.account).toBe(ACCOUNT)
+  })
+
   test("refuses another account's cursor, another workspace's included, with ACCOUNT_MISMATCH before any read", async () => {
     for (const other of [AMA_ACCOUNT, ELSEWHERE]) {
       const theirs = (await run(linear(), [], other)({ since: SINCE })).cursor
       const host = linear()
-      await expect(run(host)({ cursor: theirs })).rejects.toThrow(/^ACCOUNT_MISMATCH: The cursor is for another Linear account than "acme\/sam.rivera@example.com"\./)
+      await expect(run(host)({ cursor: theirs })).rejects.toThrow(/^ACCOUNT_MISMATCH: The cursor is for another Linear account than "c0ffee00-0000-4000-8000-000000000000\/sam.rivera@example.com"\./)
       expect(host.calls).toEqual([])
     }
   })
@@ -416,8 +432,23 @@ describe("probe", () => {
     const read = async (tool: string) => (tool === "get_user" ? fixture().user : tool === "get_workspace" ? fixture().workspace : undefined)
     await expect(linearProbe(read, { account: AMA_ACCOUNT })).rejects.toThrow(/^ACCOUNT_MISMATCH: /)
     await expect(linearProbe(read, { account: ELSEWHERE })).rejects.toThrow(/^ACCOUNT_MISMATCH: /)
-    expect(await linearProbe(read, { account: "ACME/Sam.Rivera@example.com" })).toMatchObject({ account: ACCOUNT })
+    expect(await linearProbe(read, { account: `${WORKSPACE.toUpperCase()}/Sam.Rivera@example.com` })).toMatchObject({ account: ACCOUNT })
     await expect(linearProbe(read, { source: "gmail" })).rejects.toThrow(/^SOURCE_UNKNOWN: /)
     await expect(linearProbe(read, { scope: {} })).rejects.toThrow(/^INPUT_INVALID: /)
+  })
+
+  test("a workspace whose URL key an admin changes keeps its account, and its cursors; another workspace's cursor is still refused", async () => {
+    const data = fixture()
+    const opts = options(linear(data), [], null)
+    const call: ToolCall = { sessionID: "ses_1", agent: "build", messageID: "msg_script", id: "script:1", signal: new AbortController().signal, progress: async () => {} }
+    expect(await probeMethod(opts).run({}, call)).toMatchObject({ account: ACCOUNT, owner: { label: "Sam Rivera (acme)" } })
+    const first = (await eventsTool(opts).execute({ account: ACCOUNT, since: SINCE, limit: 2 }, context)).output
+    // The admin renames the workspace's URL key: the id, and so the account, stay.
+    data.workspace = { ...data.workspace, url: "https://linear.app/acme-renamed" }
+    expect(await probeMethod(opts).run({}, call)).toMatchObject({ account: ACCOUNT, owner: { label: "Sam Rivera (acme-renamed)" } })
+    const rest = (await eventsTool(opts).execute({ account: ACCOUNT, cursor: first.cursor, limit: 500 }, context)).output
+    expect(rest.events.map((event) => event.external_id)).toEqual(LISTED.slice(2))
+    const theirs = (await run(linear(), [], ELSEWHERE)({ since: SINCE })).cursor
+    await expect(eventsTool(opts).execute({ account: ACCOUNT, cursor: theirs }, context)).rejects.toThrow(/^ACCOUNT_MISMATCH: The cursor is for another Linear account/)
   })
 })

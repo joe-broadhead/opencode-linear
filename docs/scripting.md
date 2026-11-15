@@ -30,7 +30,7 @@ executor, so that read's rules apply too. Its input is `{ "limit"?: 1 to 100 }`,
 `{ "columns", "rows" }`: identifier, title, state, priority and link for each issue assigned to you.
 `events_list` is the plugin's own read for Memory's collector. It runs `linear_events_list`'s own spec as the session
 and its agent: it asserts `linear_events_list`, then reads `list_issues` and `get_notifications` through OpenCode's
-executors, so each read's rules apply. Every call names `account`, `<workspace>/<email>` as `probe` answers it, which
+executors, so each read's rules apply. Every call names `account`, `<workspace id>/<email>` as `probe` answers it, which
 must be the one `probe` read for the current sign-in (call `probe` first after a new sign-in or a restart: until then
 a listing is `UNAVAILABLE`), and a cursor is read only with the account it was issued for. `probe` asserts
 `linear_probe`, then reads `get_workspace` and `get_user` with `me` the same way. Their own refusals are the codes in the configuration guide's [errors](configuration.md#errors), such as

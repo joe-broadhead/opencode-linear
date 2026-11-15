@@ -402,7 +402,7 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
 
   test("events_list runs the packed plugin's own spec, and before a probe has named the sign-in reads nothing", async () => {
     const from = fake.calls.length
-    const result = await call("read-only", "build", "events_list", { account: "acme/sam.rivera@example.com" })
+    const result = await call("read-only", "build", "events_list", { account: "c0ffee00-0000-4000-8000-000000000000/sam.rivera@example.com" })
     expect(result).toMatchObject({ type: "failed", code: "UNAVAILABLE" })
     expect(toolCalls(from)).toEqual([])
   })

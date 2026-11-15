@@ -116,7 +116,8 @@ export function createLinearPlugin(seam: LinearSeam) {
         methods: [...METHODS, issuesMethod(issues), eventsMethod(events), probeMethod(events)],
         mcp: { server: SERVER_NAME, managed: owned },
       })
-      const stopWatch = watchIntegration(ctx, owned)
+      // A sign-in that changes forgets what probe read for every sign-in: the next listing waits for a probe.
+      const stopWatch = watchIntegration(ctx, owned, () => events.signIns.clear())
       return async () => {
         await stopWatch()
         await stopTools()

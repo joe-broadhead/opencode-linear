@@ -22,8 +22,10 @@ const RESUBSCRIBE_MS = 5_000
  * server name whenever the MCP config reloads, so the rename is registered once the integration exists, and again each
  * time the host's name comes back. Events trigger a check; the first seconds are also polled, because a subscription
  * has no start acknowledgement. `owned` is false while `linear` is another server, which keeps its own name.
+ * `signedInAgain` runs on every `credential.updated` and `credential.switched`: a new sign-in may keep its credential
+ * id and be another person or workspace.
  */
-export function watchIntegration(ctx: IntegrationContext, owned: () => boolean) {
+export function watchIntegration(ctx: IntegrationContext, owned: () => boolean, signedInAgain: () => void = () => {}) {
   const stopped = new AbortController()
   let registration: Registration | undefined
 
@@ -70,7 +72,12 @@ export function watchIntegration(ctx: IntegrationContext, owned: () => boolean) 
     while (!stopped.signal.aborted) {
       try {
         const events = ctx.event.subscribe({ types: ["integration.updated", "mcp.status.changed", "credential.updated", "credential.switched"], signal: stopped.signal })
-        for await (const event of events) if (event.type !== "mcp.status.changed" || event.data.server === SERVER_NAME) schedule()
+        for await (const event of events) {
+          // A new or switched credential may be another person or workspace under the same credential id: what probe
+          // read for the old one no longer holds, so a listing waits for the next probe.
+          if (event.type === "credential.updated" || event.type === "credential.switched") signedInAgain()
+          if (event.type !== "mcp.status.changed" || event.data.server === SERVER_NAME) schedule()
+        }
       } catch {
         // The stream failed; check, then subscribe again.
       }
