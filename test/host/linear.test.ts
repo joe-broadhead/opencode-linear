@@ -186,13 +186,12 @@ describe(`the default access on OpenCode ${HOST_VERSION}`, () => {
     await linearTools(host)
     const events = (await host.probe().tool.list()).find((tool) => tool.id === "linear_events_list")!
     const run = (sessionID: string, id: string) =>
-      events.execute({ account: "sam.rivera@example.com", since: "2026-11-01" }, { sessionID, agent: "build", messageID: "msg_host_test", id, signal: new AbortController().signal, progress: async () => {} } as never)
+      events.execute({ account: "acme/sam.rivera@example.com", since: "2026-11-01" }, { sessionID, agent: "build", messageID: "msg_host_test", id, signal: new AbortController().signal, progress: async () => {} } as never)
     const from = host.fake.inputs.length
-    // The default rules allow it. It never asks who is signed in: its first read is list_issues, whose fake answer says
-    // there is always another page, so it stops with TOO_MANY_CHANGES rather than skip.
-    await expect(run(await session(host), "call_events_1")).rejects.toThrow(/^TOO_MANY_CHANGES: More assigned issues changed/)
-    const reads = host.fake.inputs.slice(from).map((input) => input.tool)
-    expect(new Set(reads)).toEqual(new Set(["list_issues"]))
+    // The default rules allow it. It never asks who is signed in, and no probe has named this sign-in, so it refuses
+    // to label a page with an account it has not seen signed in, before any Linear read.
+    await expect(run(await session(host), "call_events_1")).rejects.toThrow(/^UNAVAILABLE: .* Next step: Call probe for the linear source/)
+    expect(host.fake.inputs.slice(from)).toEqual([])
     // A session that denies linear_events_list: the assert refuses it before any read.
     const permissions = [{ action: "linear_events_list", resource: "*", effect: "deny" as const }]
     const locked = (await host.client.sessions.create({ agent: "build", location: host.location, permissions })).id

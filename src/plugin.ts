@@ -2,7 +2,7 @@ import { Plugin, type Mcp } from "@opencode/plugin"
 import { errorText, NAMESPACE_DESCRIPTION, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { checkHost } from "./host-version.js"
 import { registerToolsRpc } from "@we-the-rebel-alliance/source-contract/tools-rpc"
-import { eventsMethod, probeMethod, registerEventsTool } from "./events.js"
+import { eventsMethod, probeMethod, registerEventsTool, signIns } from "./events.js"
 import { watchIntegration } from "./integration.js"
 import { issuesMethod, registerIssuesTool } from "./issues.js"
 import { parseOptions } from "./options.js"
@@ -98,7 +98,13 @@ export function createLinearPlugin(seam: LinearSeam) {
       await registerIssuesTool(issues)
       // Linear's source (package.json's `sources`): events_list, a Code Mode tool and a tools RPC method, and probe, a
       // tools RPC method.
-      const events = { tool: ctx.tool, permission: ctx.permission, owned, status: read }
+      // The sign-in is OpenCode's credential for the server: probe records who it is, and a listing checks against that.
+      const signIn = async () => {
+        const server = (await ctx.mcp.list()).data.find((entry) => entry.name === SERVER_NAME)
+        const connection = server?.integrationID ? await ctx.integration.connection.active(server.integrationID) : undefined
+        return connection?.type === "credential" ? connection.id : undefined
+      }
+      const events = { tool: ctx.tool, permission: ctx.permission, owned, status: read, signIn, signIns: signIns() }
       await registerEventsTool(events)
       await registerSkills(ctx.skill, skills)
       await registerStatusCommand(ctx, read)

@@ -47,10 +47,10 @@ for a direct call, not for one made inside Code Mode.
 
 `linear_events_list` is for Memory's collector, not for answering questions: it lists what changed in Linear for you
 since a cursor, as normalised events, oldest first: each change to an issue assigned to you, and each notification in
-your Linear inbox, with the issue's identifier and link. Each listing names its account, the signed-in email. It only
+your Linear inbox, with the issue's identifier and link. Each listing names its account, `<workspace>/<email>`, which must be the one `probe` read for the current sign-in. It only
 reads, through Linear's `list_issues` and `get_notifications`, and never asks with the default rules. It is this
 plugin's source `linear.activity` under the shared source contract, which `package.json` declares, with the tools RPC
-method `probe`, which names who is signed in through `get_user` with `me`
+method `probe`, which names who is signed in through `get_workspace` and `get_user` with `me`
 ([configuration](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/configuration.md#events-list)).
 
 The install takes the GitHub release tag. Its commit carries the built `dist/`, so the install runs no build.
@@ -321,9 +321,10 @@ Run `/linear-status` first. Its last line is the next step.
 | `SERVER_CONFLICT` from `linear_issues` | Your own `mcp.servers.linear` points at another URL than the plugin uses. Point it at the URL `/linear-status` names, or remove it, then restart OpenCode. |
 | `TOOL_UNAVAILABLE` from `linear_issues` | OpenCode does not list Linear's `list_issues` yet. Follow the next step in the message, or run `/linear-status`. |
 | `UPSTREAM_UNREADABLE` from `linear_issues` | Linear's `list_issues` answered with something other than a list of issues. Ask for `list_issues` with assignee `me` instead. |
-| `INPUT_INVALID` from `linear_events_list` or `probe` | The input is invalid, and the message names the problems. Pass `account` (the signed-in email), `since`, `cursor`, `limit` or `source` as the tool's schema describes them. |
+| `INPUT_INVALID` from `linear_events_list` or `probe` | The input is invalid, and the message names the problems. Pass `account` (`<workspace>/<email>`, as `probe` names it), `since`, `cursor`, `limit` or `source` as the tool's schema describes them. |
 | `SOURCE_UNKNOWN` from `linear_events_list` or `probe` | This plugin lists only the source `linear`. Leave `source` out, or pass `linear`. |
 | `CURSOR_INVALID` from `linear_events_list` | The cursor was not issued by `events_list` for this Linear account, or by 0.0.2 or earlier. Call `events_list` without a cursor, with `since`, to start again. |
+| `UNAVAILABLE` from `linear_events_list` | No `probe` has named the current Linear sign-in yet, after a new sign-in or a restart of OpenCode. Call `probe` for the `linear` source, then list again. |
 | `ACCOUNT_MISMATCH` from `linear_events_list` or `probe` | The cursor was issued for another account, or Linear is signed in to another account than `probe` was asked for. Pass the cursor with its own account, or sign in to Linear as that account. |
 | `TOO_MANY_CHANGES` from `linear_events_list` | More changes than one `events_list` call reads came after the cursor or `since`. Call `events_list` again with a later `since`, without a cursor. |
 | `UPSTREAM_ERROR` from `linear_events_list` | Linear's read failed. Run `/linear-status`, then call `events_list` again with the same cursor. |
@@ -357,11 +358,11 @@ store.
   allows an OAuth app 5,000 requests an hour per user
   ([Rate limiting](https://linear.app/developers/rate-limiting)), which the server's reads presumably count against (not
   verified). One `events_list` call makes up to 8 `list_issues` and 5 `get_notifications` reads.
-- **The source's account is the signed-in email, not the workspace.** `linear.activity` names its account by the email
-  `probe` reads from `get_user`, and a listing never asks Linear who is signed in. One sign-in reaches one workspace
-  ([Linear's MCP docs](https://linear.app/docs/mcp)), so after a sign-in to another workspace with the same email the
-  account stays the same, and only `probe` shows the change. The conformance kit runs on Linear answers that are
-  invented, modelled on the tools' descriptions in the live tool list, and not live-verified.
+- **A listing waits for `probe`.** `linear.activity`'s account is `<workspace URL key>/<email>`, which `probe` reads
+  with `get_workspace` and `get_user` and the plugin keeps, in memory, for the sign-in. A listing compares its account
+  with that and never reads the identity itself, so after a new sign-in or a restart of OpenCode it answers
+  `UNAVAILABLE` until the next `probe`: a sign-in switch is caught there. The conformance kit runs on Linear answers
+  that are invented, modelled on the tools' descriptions in the live tool list, and not live-verified.
 - **A Linear cursor never expires.** It holds an update time in each feed, so the plugin never answers
   `CURSOR_EXPIRED`, and the conformance report stays incomplete on the kit's expired-cursor check.
 - **Jelly's relay sign-in is not yet checked with Linear.** The Jelly declaration lets a sign-in come back through

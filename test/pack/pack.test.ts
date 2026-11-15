@@ -400,21 +400,20 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     expect(await call("read-only", "reopen", "get_issue", { query: "q" })).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
   })
 
-  test("events_list runs the packed plugin's own spec, reads through OpenCode, and never asks who is signed in", async () => {
+  test("events_list runs the packed plugin's own spec, and before a probe has named the sign-in reads nothing", async () => {
     const from = fake.calls.length
-    // The fake says there is always another page of assigned issues, so it stops rather than skip.
-    const result = await call("read-only", "build", "events_list", { account: "sam.rivera@example.com" })
-    expect(result).toMatchObject({ type: "failed", code: "TOO_MANY_CHANGES" })
-    expect(new Set(toolCalls(from))).toEqual(new Set(["list_issues"]))
+    const result = await call("read-only", "build", "events_list", { account: "acme/sam.rivera@example.com" })
+    expect(result).toMatchObject({ type: "failed", code: "UNAVAILABLE" })
+    expect(toolCalls(from)).toEqual([])
   })
 
-  test("probe runs the packed plugin's own spec, reads get_user through OpenCode, and reports an answer it cannot read with its own code", async () => {
+  test("probe runs the packed plugin's own spec, reads through OpenCode, and reports an answer it cannot read with its own code", async () => {
     const from = fake.calls.length
-    // The fake answers get_user with its call, not a user.
+    // The fake answers get_workspace with its call, not a workspace.
     const result = await call("read-only", "build", "probe", {})
     expect(result).toMatchObject({ type: "failed", code: "UPSTREAM_UNREADABLE" })
-    expect(String(result.message)).toContain("UPSTREAM_UNREADABLE: Linear's get_user answered in a shape probe does not read.")
-    expect(toolCalls(from)).toEqual(["get_user"])
+    expect(String(result.message)).toContain("UPSTREAM_UNREADABLE: Linear's get_workspace answered in a shape probe does not read.")
+    expect(toolCalls(from)).toEqual(["get_workspace"])
   })
 
   test("gives Linear's own error as UPSTREAM_ERROR: its first line, with the signed URL redacted", async () => {

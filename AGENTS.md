@@ -43,8 +43,9 @@ the checks and the release steps.
 - **`linear_events_list` is Linear's source `linear.activity`** (`src/events.ts`), a Code Mode tool and the tools RPC
   method `events_list`, with the tools RPC method `probe` beside it, under the source contract
   (`@we-the-rebel-alliance/source-contract`, pinned to a tag in `package-lock.json` and bundled into `dist/index.js`;
-  `package.json`'s `sources` declares the source). A listing names its account, the signed-in email, and never asks
-  Linear who is signed in: only `probe` reads `get_user` "me", the declared identity operation. It asserts its own
+  `package.json`'s `sources` declares the source). A listing names its account, `<workspace>/<email>`, and never asks
+  Linear who is signed in: only `probe` reads `get_workspace` and `get_user` "me", the declared identity operations,
+  and records them per sign-in; a listing compares its account with that record (none yet is `UNAVAILABLE`). It asserts its own
   action, reads only through the host's executors, never writes, never asks with the default rules; `npm test` runs the
   contract's events checks on synthetic fixtures, and the `conformance` stage the contract's kit over the source.
 - **The `jelly` section** of `package.json` declares every known tool, the skills, the `linear_issues` table card,

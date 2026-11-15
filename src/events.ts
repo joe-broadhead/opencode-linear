@@ -10,6 +10,7 @@ import {
   type EventsOwner,
   type ProbeResult,
   type SourceEvent,
+  cut,
   eventsListResult,
   fitPage,
   makeEvent,
@@ -56,7 +57,9 @@ export const PROBE_ACTION = `${SERVER_NAME}_${PROBE}`
 /** The most bytes of JSON one page holds: the source's declared `maxBytes`. */
 export const PAGE_BYTES = 900_000
 /** An email, as Linear names a user's: no whitespace, one @, a dot in the domain. */
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const EMAIL = /^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/
+/** A Linear workspace's URL key. */
+const WORKSPACE_KEY = /^[a-z0-9_-]{1,64}$/
 
 /** Issues per `list_issues` page, Linear's maximum, and the most pages one call reads. */
 const ISSUE_PAGE = 250
@@ -208,22 +211,50 @@ function eventsRequest(input: unknown): EventsListRequest {
 
 // ── Owner and account ───────────────────────────────────────────────────
 
-/** An account as Linear names it: the email, lowercase; undefined when it is not one. */
+/**
+ * An account as this source names it: the workspace's URL key and the signed-in user's email, `<key>/<email>`,
+ * lowercase, so one person in two workspaces has two accounts; undefined when the value is not one.
+ */
 export function accountOf(value: string): string | undefined {
   const account = value.trim().toLowerCase()
-  return EMAIL.test(account) && account.length <= EVENT_LIMITS.account ? account : undefined
+  const slash = account.indexOf("/")
+  if (slash <= 0) return undefined
+  const [key, email] = [account.slice(0, slash), account.slice(slash + 1)]
+  return WORKSPACE_KEY.test(key) && EMAIL.test(email) && account.length <= EVENT_LIMITS.account ? account : undefined
 }
 
-/** The owner of an account: `mailto:` and the email, labelled with the email, in every page and probe alike. */
-export const ownerOf = (account: string): EventsOwner => ({ id: `mailto:${account}`, label: account })
+/** The workspace's URL key, from `get_workspace`'s `urlKey` or URL (`https://linear.app/<key>`). */
+export function workspaceKey(answer: unknown): string {
+  const data = unwrap(record(answer), ["workspace", "organization"])
+  const fromUrl = /^https:\/\/linear\.app\/([A-Za-z0-9_-]+)\/?$/.exec(text(data["url"]) ?? "")?.[1]
+  const key = (text(data["urlKey"]) ?? fromUrl)?.toLowerCase()
+  if (key === undefined || !WORKSPACE_KEY.test(key)) throw unreadable("get_workspace", PROBE)
+  return key
+}
 
-/** The signed-in user's email, from `get_user` "me", lowercase. */
-export function signedInEmail(answer: unknown): string {
+/** The signed-in user, from `get_user` "me": their email, and the owner `linear:<id>` labelled with their name. */
+export function signedInUser(answer: unknown): { email: string; owner: EventsOwner } {
   const data = unwrap(record(answer), ["user", "viewer"])
-  const email = typeof data["email"] === "string" ? accountOf(data["email"]) : undefined
-  if (email === undefined) throw unreadable("get_user", PROBE)
-  return email
+  const id = text(data["id"])
+  const email = text(data["email"])?.toLowerCase()
+  if (id === undefined || /\s/.test(id) || email === undefined || !EMAIL.test(email)) throw unreadable("get_user", PROBE)
+  const label = (text(data["name"]) ?? text(data["displayName"]) ?? id).replace(/\s+/g, " ")
+  return { email, owner: { id: cut(`linear:${id}`, EVENT_LIMITS.ownerId), label: cut(label, EVENT_LIMITS.ownerLabel) } }
 }
+
+/** Who a sign-in is, as `probe` last read it: the account and the owner every page names. */
+export interface SignedIn {
+  readonly account: string
+  readonly owner: EventsOwner
+}
+
+/**
+ * What `probe` has read, per sign-in (OpenCode's credential for the `linear` server): a listing compares the account it
+ * is asked for with this, so it never labels a page with an account it has not seen signed in. One per plugin instance,
+ * in memory: after a restart, or a new sign-in, a listing waits for the next probe.
+ */
+export type SignIns = Map<string, SignedIn>
+export const signIns = (): SignIns => new Map()
 
 // ── Issues and notifications ────────────────────────────────────────────
 
@@ -393,11 +424,16 @@ function cursorAccount(cursor: string): string | undefined {
  * The positions a cursor holds for `account`. Another account's cursor is ACCOUNT_MISMATCH; anything that is not this
  * source's bound cursor for the account, a cursor of an earlier version included, is CURSOR_INVALID: start again.
  */
-function stateOf(cursor: string, account: string): { issues: Position; notifications: Position } {
+/** A cursor issued for another account than `account` is ACCOUNT_MISMATCH: checked before anything else is read. */
+function cursorFor(cursor: string, account: string): void {
   const named = cursorAccount(cursor)
   if (named !== undefined && named !== account) {
     throw linearError("ACCOUNT_MISMATCH", `The cursor is for another Linear account than "${account}".`, `Pass the cursor with the account it was issued for, or call events_list for "${account}" without a cursor, with since, to start again.`)
   }
+}
+
+function stateOf(cursor: string, account: string): { issues: Position; notifications: Position } {
+  cursorFor(cursor, account)
   const decoded = decodeBoundCursor(bindingOf(account), cursor)
   const state = decoded.ok ? decoded.state : {}
   const issues = position(state["i"])
@@ -412,16 +448,24 @@ function stateOf(cursor: string, account: string): { issues: Position; notificat
  * Lists what changed in Linear after the request's cursor, or since its `since` (24 hours ago by default): changes to
  * issues assigned to the person, and their notifications, oldest first, at most `limit`. The cursor holds the last
  * listed position of each feed, so a later call never skips anything, and an older cursor lists the same events again.
- * The account is the one the request names, checked against nothing Linear says: `probe` confirms who is signed in.
+ * The account the request names must be the one `probe` last read for this sign-in (`signedIn`); without a probe it is
+ * UNAVAILABLE, and another account ACCOUNT_MISMATCH, before any Linear read. A listing never reads the identity itself.
  */
-export async function linearEvents(read: Read, input: unknown, now = Date.now()): Promise<EventsListResult> {
+export async function linearEvents(read: Read, signedIn: SignedIn | undefined, input: unknown, now = Date.now()): Promise<EventsListResult> {
   const request = eventsRequest(input)
   if (request.account === undefined) {
-    throw linearError("INPUT_INVALID", "A listing names the account it reads: events_list has no account.", 'Pass "account", the signed-in Linear email that probe names.')
+    throw linearError("INPUT_INVALID", "A listing names the account it reads: events_list has no account.", 'Pass "account", the "<workspace>/<email>" account that probe names.')
   }
   const account = accountOf(request.account)
-  if (account === undefined) throw linearError("INPUT_INVALID", "The events_list account is not an email.", 'Pass "account", the signed-in Linear email that probe names.')
-  const owner = ownerOf(account)
+  if (account === undefined) throw linearError("INPUT_INVALID", 'The events_list account is not "<workspace>/<email>".', 'Pass "account", the "<workspace>/<email>" account that probe names.')
+  if (request.cursor !== undefined) cursorFor(request.cursor, account)
+  if (signedIn === undefined) {
+    throw linearError("UNAVAILABLE", "The plugin does not know yet who is signed in to Linear: no probe has named this sign-in's account since it was made or OpenCode started.", "Call probe for the linear source, then call events_list again.")
+  }
+  if (signedIn.account !== account) {
+    throw linearError("ACCOUNT_MISMATCH", `Linear is signed in to another account than "${account}".`, `Sign in to Linear as that account (/connect, Linear), or read "${signedIn.account}", the account probe names.`)
+  }
+  const owner = signedIn.owner
   const start: Position = { t: startTime(request, now), k: "" }
   const from = request.cursor === undefined ? { issues: start, notifications: start } : stateOf(request.cursor, account)
   const issues = (await issueChanges(read, account, from.issues)).map((change) => ({ ...change, feed: 0 }))
@@ -456,20 +500,25 @@ export async function linearEvents(read: Read, input: unknown, now = Date.now())
 // ── The probe ───────────────────────────────────────────────────────────
 
 /**
- * `probe` (the source contract's): who is signed in to Linear, for the source, and nothing it reads. One `get_user`
- * "me" read, the source's identity operation: the account is the signed-in email, and the owner `mailto:` and that
- * email, as on every page. A caller that names another account is refused with ACCOUNT_MISMATCH.
+ * `probe` (the source contract's): who is signed in to Linear, for the source, and nothing it reads. It reads the
+ * source's two identity operations, `get_workspace` and `get_user` "me": the account is `<workspace URL key>/<email>`,
+ * and the owner `linear:<user id>` labelled with the user's name, as on every page. `record` keeps them for this
+ * sign-in, so a listing can check the account it is asked for. A caller that names another account is refused with
+ * ACCOUNT_MISMATCH.
  */
-export async function linearProbe(read: Read, input: unknown): Promise<ProbeResult> {
+export async function linearProbe(read: Read, input: unknown, record: (signedIn: SignedIn) => void = () => {}): Promise<ProbeResult> {
   const parsed = parseProbeInput(input)
   if (!parsed.ok) throw linearError("INPUT_INVALID", `The probe input is invalid: ${parsed.problems.join("; ")}.`, 'Pass only "source" and "account", or an empty object.')
   const source = parsed.value.source ?? LINEAR_SOURCE
   if (source !== LINEAR_SOURCE) throw linearError("SOURCE_UNKNOWN", `This plugin lists only the source "${LINEAR_SOURCE}".`, `Leave "source" out, or pass "${LINEAR_SOURCE}".`)
-  const account = signedInEmail(await read("get_user", { query: "me" }))
-  if (parsed.value.account !== undefined && accountOf(parsed.value.account) !== account) {
-    throw linearError("ACCOUNT_MISMATCH", `Linear is signed in to another account than "${parsed.value.account}".`, `Sign in to Linear as that account (/connect, Linear), or read as "${account}", the signed-in email.`)
+  const key = workspaceKey(await read("get_workspace", {}))
+  const user = signedInUser(await read("get_user", { query: "me" }))
+  const signedIn: SignedIn = { account: `${key}/${user.email}`, owner: user.owner }
+  record(signedIn)
+  if (parsed.value.account !== undefined && accountOf(parsed.value.account) !== signedIn.account) {
+    throw linearError("ACCOUNT_MISMATCH", `Linear is signed in to another account than "${parsed.value.account}".`, `Sign in to Linear as that account (/connect, Linear), or read as "${signedIn.account}", the signed-in account.`)
   }
-  return probeResult({ source, account, owner: ownerOf(account) })
+  return probeResult({ source, account: signedIn.account, owner: signedIn.owner })
 }
 
 // ── The tool and the tools RPC method ───────────────────────────────────
@@ -539,6 +588,10 @@ export interface EventsToolOptions {
   readonly owned: () => boolean
   /** The status model, read only when a read cannot run, for its next step. */
   readonly status: () => Promise<Status>
+  /** OpenCode's credential for the `linear` server, which keys `signIns`; undefined when there is none. */
+  readonly signIn: () => Promise<string | undefined>
+  /** What probe has read, per sign-in. */
+  readonly signIns: SignIns
   /** The clock; tests fix it. */
   readonly now?: () => number
 }
@@ -564,7 +617,8 @@ export function eventsTool(options: EventsToolOptions) {
     execute: async (input: unknown, context: Context) => {
       // Rethrown untouched: the host turns a refusal into the end of the step, and the tools RPC into PERMISSION_DENIED.
       await assertAction(options, EVENTS_ACTION, context)
-      const output = await linearEvents(reader(options, context), input, options.now?.() ?? Date.now())
+      const signedIn = options.signIns.get((await options.signIn().catch(() => undefined)) ?? "")
+      const output = await linearEvents(reader(options, context), signedIn, input, options.now?.() ?? Date.now())
       return { output, content: summary(output) }
     },
   }
@@ -599,7 +653,8 @@ export function probeMethod(options: EventsToolOptions): OwnedMethod {
     run: async (input, call) => {
       const context = call as unknown as Context
       await assertAction(options, PROBE_ACTION, context)
-      return linearProbe(reader(options, context, PROBE), input)
+      const signIn = (await options.signIn().catch(() => undefined)) ?? ""
+      return linearProbe(reader(options, context, PROBE), input, (signedIn) => void options.signIns.set(signIn, signedIn))
     },
     available: availability(options),
   }

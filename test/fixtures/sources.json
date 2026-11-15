@@ -1,5 +1,11 @@
 {
-  "$comment": "Recorded Linear MCP answers for the conformance stage, invented and modelled on the tool descriptions in live-tools.json (get_user, list_issues, get_notifications), not live-verified: every name, email, issue, id and link is made up. One issue's description carries a password in a URL, a secret the source must refuse.",
+  "$comment": "Recorded Linear MCP answers for the conformance stage, invented and modelled on the tool descriptions in live-tools.json (get_workspace, get_user, list_issues, get_notifications), not live-verified: every name, email, issue, id and link is made up. One issue's description carries a password in a URL, a secret the source must refuse.",
+  "workspace": {
+    "id": "c0ffee00-0000-4000-8000-000000000000",
+    "name": "Example Co",
+    "urlKey": "example-co",
+    "url": "https://linear.app/example-co"
+  },
   "me": {
     "id": "4f1c2e9a-0000-4000-8000-000000000001",
     "name": "Sam Rivera",

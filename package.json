@@ -88,11 +88,13 @@
         "permission": {
           "events": "linear_events_list",
           "operations": [
+            "get_workspace",
             "get_user",
             "list_issues",
             "get_notifications"
           ],
           "identity": [
+            "get_workspace",
             "get_user"
           ]
         },

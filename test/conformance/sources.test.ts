@@ -12,7 +12,7 @@ import { encodeBoundCursor } from "@we-the-rebel-alliance/source-contract/cursor
 import { readInstalledDescriptor } from "@we-the-rebel-alliance/source-contract/descriptor"
 import { SOURCES_SCHEMA, type Sources } from "@we-the-rebel-alliance/source-contract/schema"
 import type { ToolCall } from "@we-the-rebel-alliance/source-contract/tools-rpc"
-import { LINEAR_SOURCE, NAMESPACE, PACKAGE, eventsMethod, probeMethod, type EventsToolOptions } from "../../src/events.js"
+import { LINEAR_SOURCE, NAMESPACE, PACKAGE, eventsMethod, probeMethod, signIns, type EventsToolOptions } from "../../src/events.js"
 import type { Status } from "../../src/status.js"
 import { TOOLS_RPC_ID } from "../../src/tools-rpc.js"
 
@@ -28,7 +28,8 @@ const LINEAR = JSON.parse(readFileSync(join(root, "test/fixtures/sources.json"),
 
 const NOW = Date.parse("2026-11-08T12:00:00Z")
 const SINCE = "2026-11-01T00:00:00Z"
-const ACCOUNT: string = LINEAR["me"].email
+/** The account probe names: the workspace's URL key and the signed-in email. */
+const ACCOUNT = `${LINEAR["workspace"].urlKey}/${LINEAR["me"].email}`
 /** Each Linear read answers one page in one call, so no single event can fail on its own. */
 const ATOMIC = "Linear answers each list_issues and get_notifications read as one page in one call, so no single event can fail on its own"
 
@@ -42,6 +43,7 @@ const answer = (value: unknown) => ({ output: value, content: [{ type: "text", t
 function executors(permission: SessionContext["permission"]) {
   const execute = (tool: string, input: Record<string, unknown>) => {
     if (tool === "linear_get_user") return answer(input["query"] === "me" ? LINEAR["me"] : {})
+    if (tool === "linear_get_workspace") return answer(LINEAR["workspace"])
     if (tool === "linear_list_issues") {
       const after = Date.parse(String(input["updatedAt"]))
       const issues = (LINEAR["issues"] as { updatedAt: string }[]).filter((item) => Date.parse(item.updatedAt) > after).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
@@ -51,7 +53,7 @@ function executors(permission: SessionContext["permission"]) {
   }
   return {
     list: async () =>
-      ["linear_get_user", "linear_list_issues", "linear_get_notifications"].map((id) => ({
+      ["linear_get_workspace", "linear_get_user", "linear_list_issues", "linear_get_notifications"].map((id) => ({
         id,
         execute: async (input: Record<string, unknown>) => {
           await permission.assert({ action: id, resources: ["*"] })
@@ -63,17 +65,23 @@ function executors(permission: SessionContext["permission"]) {
 
 const connected = { state: "connected", nextStep: "Nothing to do." } as unknown as Status
 const call = (): ToolCall => ({ sessionID: "ses_conformance", agent: "build", messageID: "msg_script", id: `script:${Math.random()}`, signal: new AbortController().signal, progress: async () => {} })
+/** What probe records, for the one sign-in: a listing checks its account against it, as the plugin does. */
+const known = signIns()
 const options = (context: SessionContext): EventsToolOptions => ({
   tool: executors(context.permission) as never,
   permission: context.permission as never,
   owned: () => true,
   status: async () => connected,
+  signIn: async () => "cred_conformance",
+  signIns: known,
   now: () => NOW,
 })
 const open: SessionContext = { account: ACCOUNT, permission: { assert: async () => {} } }
 const list = (input: Record<string, unknown>, context: SessionContext = open) => eventsMethod(options(context)).run(input, call()) as Promise<Record<string, any>>
 
 async function cases(): Promise<PageCase[]> {
+  // A consumer probes at bind: the plugin then knows who the sign-in is, and a listing for that account runs.
+  await probeMethod(options(open)).run({ source: LINEAR_SOURCE }, call())
   const first = (await list({ source: LINEAR_SOURCE, account: ACCOUNT, since: SINCE, limit: 2 }))["cursor"] as string
   const done = (await list({ source: LINEAR_SOURCE, account: ACCOUNT, cursor: first, limit: 500 }))["cursor"] as string
   return [
@@ -82,7 +90,9 @@ async function cases(): Promise<PageCase[]> {
     { name: "what came after the first two", input: { source: LINEAR_SOURCE, account: ACCOUNT, cursor: first }, expect: "page" },
     { name: "nothing new since the last listing", input: { source: LINEAR_SOURCE, account: ACCOUNT, cursor: done }, expect: "empty" },
     { name: "a listing that names no account", input: { source: LINEAR_SOURCE, since: SINCE }, expect: { refuses: "INPUT_INVALID" } },
-    { name: "a cursor passed for another account", input: { source: LINEAR_SOURCE, account: "ama.mensah@example.com", cursor: first }, expect: { refuses: "ACCOUNT_MISMATCH" } },
+    { name: "a cursor passed for another account", input: { source: LINEAR_SOURCE, account: "example-co/ama.mensah@example.com", cursor: first }, expect: { refuses: "ACCOUNT_MISMATCH" } },
+    { name: "another account than the signed-in one", input: { source: LINEAR_SOURCE, account: "example-co/someone.else@example.com", since: SINCE }, expect: { refuses: "ACCOUNT_MISMATCH" } },
+    { name: "the same email in another workspace", input: { source: LINEAR_SOURCE, account: `other-co/${LINEAR["me"].email}`, since: SINCE }, expect: { refuses: "ACCOUNT_MISMATCH" } },
     {
       name: "a cursor bound to another plugin",
       input: { source: LINEAR_SOURCE, account: ACCOUNT, cursor: encodeBoundCursor({ plugin: "jira", source: LINEAR_SOURCE, account: ACCOUNT }, { a: ACCOUNT, i: [0, ""], n: [0, ""] }) },
