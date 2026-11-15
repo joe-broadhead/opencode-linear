@@ -28,7 +28,7 @@ describe("buildStatus", () => {
       unknownCount: 0,
       unknownTools: [],
       unguardedAgents: [],
-      host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true },
+      host: { version: "2.2.3", range: ">=2.2.3 <2.4.0", tested: true },
       problems: [],
       nextStep: "Nothing to do.",
     })
@@ -40,7 +40,7 @@ describe("buildStatus", () => {
         "- Access: every tool runs without asking, reads, changes and new tools included",
         "- Tools: 1 available, 0 unknown",
         "- Agents without default rules: none",
-        "- OpenCode: 2.2.3 (tested; supported range >=2.2.3 <2.3.0)",
+        "- OpenCode: 2.2.3 (tested; supported range >=2.2.3 <2.4.0)",
         "- Next step: Nothing to do.",
       ].join("\n"),
     )
@@ -153,12 +153,12 @@ describe("buildStatus", () => {
   })
 
   test("an untested host and setup problems show on the OpenCode row; a problem's own next step comes first", () => {
-    const outside = checkHost("2.3.0", true)
+    const outside = checkHost("2.4.0", true)
     const problem = 'SKILLS_INVALID: The "linear" skill was not loaded: skills/linear/SKILL.md is missing. Next step: Reinstall the plugin.'
     const status = buildStatus({ ...base, host: outside, problems: [problem] })
     expect(status.nextStep).toBe("Reinstall the plugin.")
     expect(formatStatus(status)).toContain(
-      `- OpenCode: 2.3.0 (untested; supported range >=2.2.3 <2.3.0). It is outside the supported range; the plugin runs because allowUntestedHost is true. If Linear misbehaves, use OpenCode 2.2.3, 2.2.4, 2.2.5 or 2.2.6. ${problem}`,
+      `- OpenCode: 2.4.0 (untested; supported range >=2.2.3 <2.4.0). It is outside the supported range; the plugin runs because allowUntestedHost is true. If Linear misbehaves, use OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 or 2.3.0. ${problem}`,
     )
     // The OpenCode row carries the warning; the next step stays the working state's.
     expect(buildStatus({ ...base, host: outside }).nextStep).toBe(NOTHING_TO_DO)
@@ -166,8 +166,8 @@ describe("buildStatus", () => {
     const inside = buildStatus({ ...base, host: checkHost("2.2.99", false) })
     expect(inside).toMatchObject({ state: "connected", host: { version: "2.2.99", tested: false }, nextStep: NOTHING_TO_DO })
     expect(buildStatus({ ...base, host: checkHost("2.2.99", false), server: { status: "needs_auth" } }).nextStep).toBe(SIGN_IN)
-    expect(formatStatus(inside)).toContain("- OpenCode: 2.2.99 (untested; supported range >=2.2.3 <2.3.0)\n")
-    expect(formatStatus(buildStatus({ ...base, host: checkHost("2.2.5", false) }))).toContain("- OpenCode: 2.2.5 (tested; supported range >=2.2.3 <2.3.0)\n")
+    expect(formatStatus(inside)).toContain("- OpenCode: 2.2.99 (untested; supported range >=2.2.3 <2.4.0)\n")
+    expect(formatStatus(buildStatus({ ...base, host: checkHost("2.2.5", false) }))).toContain("- OpenCode: 2.2.5 (tested; supported range >=2.2.3 <2.4.0)\n")
     expect(buildStatus(base).nextStep).toBe(NOTHING_TO_DO)
   })
 
@@ -278,7 +278,7 @@ describe("status RPC", () => {
     const status = buildStatus(base)
     expect({ version: status.version, host: status.host, state: status.state, unguardedAgents: status.unguardedAgents, nextStep: status.nextStep }).toEqual({
       version: VERSION,
-      host: { version: "2.2.3", range: ">=2.2.3 <2.3.0", tested: true },
+      host: { version: "2.2.3", range: ">=2.2.3 <2.4.0", tested: true },
       state: "connected",
       unguardedAgents: [],
       nextStep: NOTHING_TO_DO,
@@ -291,7 +291,7 @@ describe("status RPC", () => {
     const { properties, required } = StatusRpc.methods.status.output
     const statuses: Status[] = [
       buildStatus({ ...base, account: "Acme", tools: ["shiny_new_tool"], agents: [{ id: "reviewer", permissions: [allow("*")] }], problems: ["p"] }),
-      buildStatus({ ...base, server: { status: "failed", error: "fetch failed" }, source: { type: "conflict", url: "https://x.example/mcp", expected: URL_ }, host: checkHost("2.3.0", true) }),
+      buildStatus({ ...base, server: { status: "failed", error: "fetch failed" }, source: { type: "conflict", url: "https://x.example/mcp", expected: URL_ }, host: checkHost("2.4.0", true) }),
     ]
     for (const status of statuses) {
       expect(Object.keys(status).filter((key) => !(key in properties))).toEqual([])
