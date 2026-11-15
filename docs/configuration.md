@@ -159,6 +159,7 @@ default.** The plugin adds the rules for the `access` option to every agent that
   {"action":"linear_search_documentation","resource":"*","effect":"allow"},
   {"action":"linear_issues","resource":"*","effect":"allow"},
   {"action":"linear_events_list","resource":"*","effect":"allow"},
+  {"action":"linear_probe","resource":"*","effect":"allow"},
   {"action":"linear_create_attachment","resource":"*","effect":"allow"},
   {"action":"linear_create_attachment_from_upload","resource":"*","effect":"allow"},
   {"action":"linear_create_initiative_label","resource":"*","effect":"allow"},
@@ -247,6 +248,7 @@ default.** The plugin adds the rules for the `access` option to every agent that
   {"action":"linear_search_documentation","resource":"*","effect":"allow"},
   {"action":"linear_issues","resource":"*","effect":"allow"},
   {"action":"linear_events_list","resource":"*","effect":"allow"},
+  {"action":"linear_probe","resource":"*","effect":"allow"},
   {"action":"linear_create_attachment","resource":"*","effect":"ask"},
   {"action":"linear_create_attachment_from_upload","resource":"*","effect":"ask"},
   {"action":"linear_create_initiative_label","resource":"*","effect":"ask"},
@@ -336,6 +338,7 @@ hidden from the model:
   {"action":"linear_search_documentation","resource":"*","effect":"allow"},
   {"action":"linear_issues","resource":"*","effect":"allow"},
   {"action":"linear_events_list","resource":"*","effect":"allow"},
+  {"action":"linear_probe","resource":"*","effect":"allow"},
   {"action":"linear_create_attachment","resource":"*","effect":"deny"},
   {"action":"linear_create_attachment_from_upload","resource":"*","effect":"deny"},
   {"action":"linear_create_initiative_label","resource":"*","effect":"deny"},
@@ -449,12 +452,13 @@ Copy the full block from your own `/linear-status` output; the lines in quotes a
 ## Events list
 
 `linear_events_list` (Code Mode `tools.linear.events_list`, and the tools RPC method `events_list`) is this plugin's
-side of the `events_list` source contract that Memory's collector reads. It is not for answering questions: the model
-uses `list_issues` or `linear_issues` for that.
+source under the shared source contract, `@we-the-rebel-alliance/source-contract` v0.1.0 (see [Sources](#sources)),
+which Memory's collector reads. It is not for answering questions: the model uses `list_issues` or `linear_issues` for
+that.
 
 ```text
-events_list({ since?, cursor?, limit?, account?, source? })
-  → { source: "linear", account, owner: { id, label }, events, cursor, more, trust: "untrusted" }
+events_list({ account, since?, cursor?, limit?, source? })
+  → { source: "linear", account, owner: { id, label }, events, cursor, more, refused?, plugin, asOf, trust: "untrusted" }
 ```
 
 - **What it lists**, oldest first: each change to an issue assigned to you (`list_issues` with assignee `me`, ordered
@@ -466,21 +470,53 @@ events_list({ since?, cursor?, limit?, account?, source? })
   description (at most 4,096 characters), the issue's link, and the labels `assigned`, its state type and its labels.
 - **A notification event**: kind `issue` (`event` when it names no issue), `external_id` `notification:<id>`, the
   actor as `linear:<user id>`, the issue's identifier, title and link, and the labels `notification` and its type.
-- **Account and owner**: `account` is the workspace's URL key (`get_workspace`), and `owner` the signed-in user
-  (`get_user` with `me`) as `linear:<user id>` and their name. Memory compares the owner with the person it collects
-  for. `account` and `source` are optional inputs: another workspace is `ACCOUNT_UNKNOWN`, another source
-  `SOURCE_UNKNOWN`.
-- **Cursor**: opaque, at most 1,024 characters. It holds the update time and key of the last issue change listed, the
-  same for the last notification, and a digest of the workspace and user, so another workspace's or sign-in's cursor
-  is `CURSOR_INVALID`. A cursor wins over `since`; without either, the listing starts 24 hours ago. An older cursor
-  lists the same events again.
+- **Account and owner**: every listing names its `account`, the signed-in Linear user's email, lowercase, as `probe`
+  answers it; the page's `owner` is `mailto:` and that email, labelled with the email, the same as `probe`'s. A listing
+  never asks Linear who is signed in, so it checks the account against nothing Linear says: `probe` confirms it. Memory
+  compares the owner with the person it collects for. A listing without `account`, or with one that is not an email,
+  is `INPUT_INVALID`; another source is `SOURCE_UNKNOWN`.
+- **Cursor**: opaque, at most 1,024 characters: the source contract's bound cursor, tied to this plugin, the source and
+  the account. It holds the update time and key of the last issue change listed, and the same for the last
+  notification. A cursor issued for another account is `ACCOUNT_MISMATCH`, before any Linear read; a changed one, or
+  one issued by 0.0.2 or earlier, is `CURSOR_INVALID`: start again with `since`. A cursor wins over `since`; without
+  either, the listing starts 24 hours ago. An older cursor lists the same events again.
+- **Secrets**: an event whose title or text holds a secret, such as a password in a URL, is never listed: it is in the
+  page's `refused[]` with `reason: "secret"`, and the cursor moves past it. Every page also names `plugin` and
+  `asOf`.
 - **Limits**: `limit` is 1 to 500 (100 by default); a result stops early, with `more: true`, rather than pass 900 KB.
   One call reads at most 8 pages of 250 issues and 5 pages of 100 notifications; more is `TOO_MANY_CHANGES`, never a
   skip.
 - **Permissions**: it asserts `linear_events_list`, then each Linear read it makes goes through OpenCode's own
-  executor, so `linear_get_workspace`, `linear_get_user`, `linear_list_issues` and `linear_get_notifications` follow
-  their own rules. With the default rules none of them asks. Every result carries `trust: "untrusted"`: issue and
-  notification text is other people's, never instructions.
+  executor, so `linear_list_issues` and `linear_get_notifications` follow their own rules. With the default rules
+  neither asks. Every result carries `trust: "untrusted"`: issue and notification text is other people's, never
+  instructions.
+
+**`probe`** (the tools RPC method, action `linear_probe`, allowed by the default rules at every `access`) answers who
+is signed in, `{ source: "linear", account, owner, trust }`, and nothing it reads. It asserts `linear_probe`, then reads
+`get_user` with `me` once, through OpenCode's executor (`linear_get_user`), for the signed-in email. Another `account`
+is `ACCOUNT_MISMATCH`.
+
+## Sources
+
+`package.json` declares the plugin's one source in its top-level `sources` key, under source-contract version 1, so a
+consumer (Memory, jelly, Artifacts) reads it from the installed package:
+
+| Key | Value |
+| --- | --- |
+| `id` | `linear.activity` |
+| `kind`, `reads` | `events`, `issue` (a notification that names no issue is kind `event`) |
+| `tool`, `input` | `events_list`, `{ "source": "linear" }` |
+| `accounts.named` | `false`: one sign-in |
+| `permission.events` | `linear_events_list` |
+| `permission.operations` | `get_user` (the identity operation, which only `probe` reads), `list_issues` and `get_notifications`: exactly the reads it makes |
+| `private` | `true`: your assigned issues and your inbox |
+| `cost` | `free`: Linear's MCP server is not billed per call; it is rate-limited (see the README's Known limits) |
+| `maxBytes` | 900,000 |
+| `urlHosts` | `linear.app` |
+| `sources.rpc`, `sources.probe.action` | `linear.workspace.tools`, `linear_probe` |
+
+`npm run check` runs the contract's conformance kit over the source, on recorded answers with no Linear call, and
+writes `reports/conformance-report.json` for a release to attach.
 
 ## Errors
 
@@ -499,10 +535,10 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 | `TOOL_UNAVAILABLE` | `linear_issues` or `linear_events_list`: OpenCode does not list the Linear read it needs, because the `linear` server is connecting, disabled, failed or missing, or has not listed its tools yet. The message names the read and the state. | Status's next step for that state; when connected, wait a few seconds and run `/linear-status`. |
 | `UPSTREAM_UNREADABLE` | `linear_issues`: Linear's `list_issues` answered with something other than a list of issues. `linear_events_list`: one of its reads answered in a shape it does not read. | `linear_issues`: call `list_issues` with assignee `me` instead, which returns Linear's answer as it is. `linear_events_list`: call the read the message names directly, and run `/linear-status`. |
 | `UPSTREAM_ERROR` | `linear_events_list`: Linear answered one of its reads with an error. The message holds the first line, at most 300 characters, with tokens and URL query strings removed. | Run `/linear-status`, then call again with the same cursor. |
-| `INPUT_INVALID` | `linear_events_list`: the input is not the contract's, such as a `limit` outside 1 to 500 or a `since` that is not an ISO date or date-time. | Pass `since`, `cursor`, `limit`, `account` or `source` as the schema describes them. |
-| `SOURCE_UNKNOWN` | `linear_events_list`: `source` is not `linear`. | Leave `source` out, or pass `linear`. |
-| `ACCOUNT_UNKNOWN` | `linear_events_list`: `account` is not the signed-in workspace's URL key. | Leave `account` out, or pass the key the message names. |
-| `CURSOR_INVALID` | `linear_events_list`: the cursor is malformed, another source's, or another workspace's or sign-in's. | Call without a cursor, with `since`, to start again. |
+| `INPUT_INVALID` | `linear_events_list` or `probe`: the input is not the contract's, such as a `limit` outside 1 to 500, a `since` that is not an ISO date or date-time, or a listing with no `account` or one that is not an email. | Pass `account`, `since`, `cursor`, `limit` or `source` as the schema describes them. |
+| `SOURCE_UNKNOWN` | `linear_events_list` or `probe`: `source` is not `linear`. | Leave `source` out, or pass `linear`. |
+| `ACCOUNT_MISMATCH` | `linear_events_list`: the cursor was issued for another account. `probe`: `account` is not the signed-in email. | Pass the cursor with the account it was issued for, or sign in to Linear as that account; `probe` names the signed-in email. |
+| `CURSOR_INVALID` | `linear_events_list`: the cursor is malformed, another source's or plugin's, changed, or issued by 0.0.2 or earlier. | Call without a cursor, with `since`, to start again. |
 | `TOO_MANY_CHANGES` | `linear_events_list`: more assigned issues or notifications changed after the cursor or `since` than one call reads. | Call again with a later `since`, without a cursor. |
 
 For example:

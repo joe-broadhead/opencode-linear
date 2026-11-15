@@ -16,10 +16,10 @@ project.
 ## Data handling
 
 - The plugin adds two read tools: `linear_issues`, which calls Linear's `list_issues` through OpenCode, and
-  `linear_events_list`, which calls `get_workspace`, `get_user`, `list_issues` and `get_notifications` through
-  OpenCode for Memory's collector, and returns the issue changes and notifications as events whose text is marked
-  untrusted. Its cursor holds times, issue identifiers, notification ids and a digest of the workspace and user, never
-  a token. The plugin runs no network requests of its own and stores nothing. It registers Linear's MCP server with OpenCode, and OpenCode
+  `linear_events_list`, which calls `list_issues` and `get_notifications` through OpenCode for Memory's collector, and
+  returns the issue changes and notifications as events whose text is marked untrusted; an event that holds a secret is
+  never returned. Its cursor holds times, issue identifiers, notification ids and the account's email, never a token.
+  The tools RPC method `probe` calls `get_user` with `me` and returns only the signed-in email. The plugin runs no network requests of its own and stores nothing. It registers Linear's MCP server with OpenCode, and OpenCode
   connects, signs in and stores the credentials. The tools RPC for scripts (see [Scripts](#scripts)) runs Linear's
   tools through OpenCode's own connection, too.
 - The plugin never reads tokens. Status shows only the account label OpenCode reports, if any, and server URLs

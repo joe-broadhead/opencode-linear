@@ -12,11 +12,13 @@ opencode api post /api/rpc/linear.workspace.tools/<method> -H "x-opencode-direct
 | --- | --- | --- |
 | one per known Linear tool, named after it: `list_issues`, `get_issue`, `get_project`, `save_issue`, `save_comment` and the others | `read` or `write` | `linear_<method>`, such as `linear_list_issues` |
 | `issues` | read | `linear_issues`, the plugin's own: your assigned issues as a table, one row each |
+| `events_list` | read | `linear_events_list`, the plugin's own: what changed for you since a cursor, as Memory's events |
+| `probe` | read | `linear_probe`, the source contract's: who is signed in, `{ source, account, owner, trust }`, and nothing it reads |
 | `describe` | none | none: lists every method with its class, its permission action, whether OpenCode lists its tool now, and its input as JSON Schema; given a session, it also gives each method's `permission` |
 
-The methods are exactly the tools this plugin knows (`METHODS` in `src/host/tools-rpc.ts`): the 41 reads and the 37
+The methods are exactly the tools this plugin knows (`METHODS` in `src/tools-rpc.ts`): the 41 reads and the 37
 other tools of `READ_TOOLS` and `WRITE_TOOLS` in `src/linear-tools.ts` (Linear's changes, and `whoami`, which Linear
-marks not read-only), plus the plugin's own `issues`, appended at
+marks not read-only), plus the plugin's own `issues`, `events_list` and `probe`, appended at
 registration. A tool Linear adds later is not a method.
 
 Each method runs Linear's own tool with the same input, through OpenCode's own connection and sign-in. The plugin
@@ -27,10 +29,11 @@ under the rules: at `read-only` the default rules deny it before it runs (`PERMI
 executor, so that read's rules apply too. Its input is `{ "limit"?: 1 to 100 }`, 25 by default. It returns
 `{ "columns", "rows" }`: identifier, title, state, priority and link for each issue assigned to you.
 `events_list` is the plugin's own read for Memory's collector. It runs `linear_events_list`'s own spec as the session
-and its agent: it asserts `linear_events_list`, then reads `get_workspace`, `get_user`, `list_issues` and
-`get_notifications` through OpenCode's executors, so each read's rules apply. Its own refusals are the codes in the
-configuration guide's [errors](configuration.md#errors), such as `CURSOR_INVALID`; a refused read is
-`PERMISSION_DENIED` naming that read.
+and its agent: it asserts `linear_events_list`, then reads `list_issues` and `get_notifications` through OpenCode's
+executors, so each read's rules apply. Every call names `account`, the signed-in email that `probe` answers, and a
+cursor is read only with the account it was issued for. `probe` asserts `linear_probe`, then reads `get_user` with `me`
+the same way. Their own refusals are the codes in the configuration guide's [errors](configuration.md#errors), such as
+`CURSOR_INVALID` and `ACCOUNT_MISMATCH`; a refused read is `PERMISSION_DENIED` naming that read.
 
 
 ## A script runs as a session
