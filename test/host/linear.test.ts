@@ -186,15 +186,19 @@ describe(`the default access on OpenCode ${HOST_VERSION}`, () => {
     await linearTools(host)
     const events = (await host.probe().tool.list()).find((tool) => tool.id === "linear_events_list")!
     const run = (sessionID: string, id: string) =>
-      events.execute({ since: "2026-11-01" }, { sessionID, agent: "build", messageID: "msg_host_test", id, signal: new AbortController().signal, progress: async () => {} } as never)
+      events.execute({ account: "sam.rivera@example.com", since: "2026-11-01" }, { sessionID, agent: "build", messageID: "msg_host_test", id, signal: new AbortController().signal, progress: async () => {} } as never)
     const from = host.fake.inputs.length
-    // The default rules allow it; the fake serves no get_workspace, so its first read names that.
-    await expect(run(await session(host), "call_events_1")).rejects.toThrow(/^TOOL_UNAVAILABLE: OpenCode does not list Linear's get_workspace/)
+    // The default rules allow it. It never asks who is signed in: its first read is list_issues, whose fake answer says
+    // there is always another page, so it stops with TOO_MANY_CHANGES rather than skip.
+    await expect(run(await session(host), "call_events_1")).rejects.toThrow(/^TOO_MANY_CHANGES: More assigned issues changed/)
+    const reads = host.fake.inputs.slice(from).map((input) => input.tool)
+    expect(new Set(reads)).toEqual(new Set(["list_issues"]))
     // A session that denies linear_events_list: the assert refuses it before any read.
     const permissions = [{ action: "linear_events_list", resource: "*", effect: "deny" as const }]
     const locked = (await host.client.sessions.create({ agent: "build", location: host.location, permissions })).id
+    const before = host.fake.inputs.length
     await expect(run(locked, "call_events_2")).rejects.toThrow("linear_events_list")
-    expect(host.fake.inputs.length).toBe(from)
+    expect(host.fake.inputs.length).toBe(before)
   })
 
   test("P4: a saved 'Always allow' removes the prompt", async () => {

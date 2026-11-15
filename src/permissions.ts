@@ -1,6 +1,6 @@
 import type { Plugin } from "@opencode/plugin"
 import { errorText, SERVER_NAME } from "./constants.js"
-import { EVENTS_LIST } from "./host/events-list.js"
+import { EVENTS_LIST, PROBE } from "@we-the-rebel-alliance/source-contract/events"
 import { ISSUES_TOOL } from "./issues.js"
 import type { Access } from "./options.js"
 import { READ_TOOLS, WRITE_TOOLS } from "./linear-tools.js"
@@ -18,14 +18,15 @@ const rule = (tool: string, effect: Rule["effect"]): Rule => ({ action: actionOf
 /**
  * Broad first, narrow last, because the last matching rule wins. At `access: "all"` every tool the plugin registers is
  * allowed, and so is one Linear adds later through the `linear_*` pattern; `ask-changes` asks for anything that is not
- * a read, and `read-only` denies it. The reads and the plugin's own `linear_issues` are always allowed, which is why
- * the first rule alone decides an unknown tool.
+ * a read, and `read-only` denies it. The reads, the plugin's own `linear_issues` and `linear_events_list`, and the
+ * source contract's `probe` (`linear_probe`, a tools RPC method) are always allowed, which is why the first rule alone
+ * decides an unknown tool.
  */
 export function defaultRules(access: Access = "all"): Rule[] {
   const other: Rule["effect"] = access === "all" ? "allow" : access === "ask-changes" ? "ask" : "deny"
   return [
     rule("*", other),
-    ...[...READ_TOOLS, ISSUES_TOOL, EVENTS_LIST].map((tool) => rule(tool, "allow")),
+    ...[...READ_TOOLS, ISSUES_TOOL, EVENTS_LIST, PROBE].map((tool) => rule(tool, "allow")),
     ...WRITE_TOOLS.map((tool) => rule(tool, other)),
   ]
 }

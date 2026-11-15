@@ -29,7 +29,7 @@ export const TESTED_HOSTS: readonly string[] = ["2.2.3", "2.2.4", "2.2.5", "2.2.
  * table name each one, and a test fails when they differ either way.
  */
 type PluginCode =
-  | "ACCOUNT_UNKNOWN"
+  | "ACCOUNT_MISMATCH"
   | "AUTH_REQUIRED"
   | "CURSOR_INVALID"
   | "HOST_UNTESTED"
@@ -47,7 +47,7 @@ type PluginCode =
   | "UPSTREAM_UNREADABLE"
 
 export const PLUGIN_CODES: readonly PluginCode[] = [
-  "ACCOUNT_UNKNOWN",
+  "ACCOUNT_MISMATCH",
   "AUTH_REQUIRED",
   "CURSOR_INVALID",
   "HOST_UNTESTED",

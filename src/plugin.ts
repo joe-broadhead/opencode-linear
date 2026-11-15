@@ -1,14 +1,15 @@
 import { Plugin, type Mcp } from "@opencode/plugin"
 import { errorText, NAMESPACE_DESCRIPTION, PLUGIN_ID, SERVER_NAME } from "./constants.js"
 import { checkHost } from "./host-version.js"
-import { METHODS, registerToolsRpc } from "./host/tools-rpc.js"
-import { eventsMethod, registerEventsTool } from "./events.js"
+import { registerToolsRpc } from "@we-the-rebel-alliance/source-contract/tools-rpc"
+import { eventsMethod, probeMethod, registerEventsTool } from "./events.js"
 import { watchIntegration } from "./integration.js"
 import { issuesMethod, registerIssuesTool } from "./issues.js"
 import { parseOptions } from "./options.js"
 import { defaultRules, registerDefaultRules } from "./permissions.js"
 import { loadSkills, registerSkills } from "./skills.js"
 import { readStatus, registerStatusCommand, registerStatusRpc, type ServerSource } from "./status.js"
+import { METHODS, PLUGIN } from "./tools-rpc.js"
 
 /** Internal seam: tests point the server at a loopback fake without OAuth, and at their own skills. */
 interface LinearSeam {
@@ -95,15 +96,20 @@ export function createLinearPlugin(seam: LinearSeam) {
       const owned = () => source?.type === "plugin" || source?.type === "adopted"
       const issues = { tool: ctx.tool, owned, status: read }
       await registerIssuesTool(issues)
-      // Memory's source of Linear events, as a Code Mode tool and a tools RPC method.
+      // Linear's source (package.json's `sources`): events_list, a Code Mode tool and a tools RPC method, and probe, a
+      // tools RPC method.
       const events = { tool: ctx.tool, permission: ctx.permission, owned, status: read }
       await registerEventsTool(events)
       await registerSkills(ctx.skill, skills)
       await registerStatusCommand(ctx, read)
       await registerStatusRpc(ctx.rpc, read)
-      // Scripts call every known tool and the plugin's own linear_issues and linear_events_list with no model, as a
-      // session and its agent: a write needs a prior allow rule for its action.
-      const stopTools = await registerToolsRpc(ctx, { methods: [...METHODS, issuesMethod(issues), eventsMethod(events)], mcp: { server: SERVER_NAME, managed: owned } })
+      // Scripts call every known tool, the plugin's own linear_issues and linear_events_list, and probe with no model, as
+      // a session and its agent: a write needs a prior allow rule for its action.
+      const stopTools = await registerToolsRpc(ctx as never, {
+        plugin: PLUGIN,
+        methods: [...METHODS, issuesMethod(issues), eventsMethod(events), probeMethod(events)],
+        mcp: { server: SERVER_NAME, managed: owned },
+      })
       const stopWatch = watchIntegration(ctx, owned)
       return async () => {
         await stopWatch()

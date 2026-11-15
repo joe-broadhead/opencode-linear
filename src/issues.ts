@@ -1,6 +1,6 @@
 import type { Plugin } from "@opencode/plugin"
 import { linearError, SERVER_NAME } from "./constants.js"
-import type { PluginMethod } from "./host/tools-rpc.js"
+import type { PluginMethod } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 import type { Status } from "./status.js"
 
 /**
