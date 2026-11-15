@@ -8,14 +8,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - Linear's source under the shared source contract, `@we-the-rebel-alliance/source-contract` v0.1.0: `package.json`'s
   new top-level `sources` key declares `linear.activity`, an `events` source read with `events_list` (input
-  `source: "linear"`), reading `issue`, one account, the operations `get_user` (the identity operation, which only
-  `probe` reads), `list_issues` and `get_notifications`, `private`, `cost.class: "free"`, `maxBytes` 900,000,
+  `source: "linear"`), reading `issue`, one account, the operations `get_workspace` and `get_user` (the identity
+  operations, which only `probe` reads), `list_issues` and `get_notifications`, `private`, `cost.class: "free"`, `maxBytes` 900,000,
   `urlHosts` `linear.app`, the tools RPC `linear.workspace.tools` and the probe action `linear_probe`. **For Memory,
   jelly and Artifacts:** read the declaration from the installed package with the contract's `descriptor`; every read
   runs under the grant it derives.
 - **For Memory, jelly and every consumer:** the tools RPC method `probe` (action `linear_probe`, allowed by the default
   rules at every `access`) answers who is signed in, `{ source: "linear", account, owner, trust }`, with no content,
-  from one `get_user` "me" read, and refuses another account with `ACCOUNT_MISMATCH`.
+  from one `get_workspace` and one `get_user` "me" read, keeps the account and owner for the sign-in (OpenCode's
+  credential for the `linear` server), and refuses another account with `ACCOUNT_MISMATCH`.
 - Every `events_list` page carries `plugin` (`@joe-broadhead/opencode-linear`) and `asOf`, and lists an event whose
   title or text holds a secret, such as a password in a URL, in `refused[]` with `reason: "secret"`, never its text;
   the cursor moves past it.
@@ -27,27 +28,35 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
-- **For Memory: the account is the signed-in email, and every listing names it.** `events_list` no longer reads
-  `get_workspace` or `get_user`: it takes `account`, the signed-in Linear email that `probe` answers (lowercase), and
-  its page's owner is `mailto:` and that email, labelled with the email, the same as `probe`'s. A listing without
-  `account`, or with one that is not an email, is `INPUT_INVALID`. The account was the workspace's URL key and the
-  owner `linear:<user id>`; every event's `account` and `hash` change accordingly. Actors stay `linear:<user id>`.
+- **For Memory: the account is `<workspace URL key>/<email>`, and every listing names it.** `events_list` no longer
+  reads `get_workspace` or `get_user`: it takes `account` as `probe` answers it (lowercase, such as
+  `acme/sam@example.com`), and compares it, before any Linear read, with what `probe` read for the current sign-in.
+  **Call `probe` first** after a new sign-in or a restart of OpenCode: until then a listing is `UNAVAILABLE` (new
+  code), and another account than the probed one is `ACCOUNT_MISMATCH`. A listing without `account`, or with one that
+  is not `<workspace>/<email>`, is `INPUT_INVALID`. The owner stays `linear:<user id>` labelled with the user's name,
+  as in 0.0.2; the account was the workspace's URL key alone, so every event's `account` and `hash` change.
 - **For Memory: the cursor is the contract's bound cursor.** It is tied to the plugin, the source and the account; a
-  cursor issued for another account is `ACCOUNT_MISMATCH` (it was `ACCOUNT_UNKNOWN` for another workspace), before any
-  Linear read. **A cursor issued by 0.0.2 or earlier is `CURSOR_INVALID`:** start again with `since` (the plugin keeps
+  cursor issued for another account, another workspace's included, is `ACCOUNT_MISMATCH` (it was `ACCOUNT_UNKNOWN`
+  for another workspace), before any Linear read. **A cursor issued by 0.0.2 or earlier is `CURSOR_INVALID`:** start again with `since` (the plugin keeps
   no legacy reader).
 - The tools RPC transport, the events contract and the cursor codec are the source contract's modules (`tools-rpc`,
   `events`, `cursor`), pinned as `github:we-the-rebel-alliance/source-contract#v0.1.0` (commit `8ace21d`) and bundled
   into `dist/index.js`; there is still no runtime dependency. `src/host/tools-rpc.ts` and `src/host/events-list.ts`
   are deleted, with their `check-copies` pins; Linear's part of the RPC is `src/tools-rpc.ts`. The RPC id
   `linear.workspace.tools`, its other methods and their answers are unchanged.
-- The default rules gain `linear_probe` allowed, at every `access`. **For jelly:** nothing to declare: `probe` is a
-  tools RPC method, not a tool; `linear_events_list` and `linear_get_user` stay declared reads.
+- The default rules gain `linear_probe` allowed, at every `access`.
+- **For jelly: jelly does not see this source yet, and must change, not the plugin.** Jelly's broker keeps only an
+  events source whose action is dotted, and `linear.activity`'s is `linear_events_list` (the contract allows
+  `<namespace>_` actions, as Slack's and X's sources use), so the broker drops it. Jelly sees it once it reads
+  declarations through the contract's `descriptor` and derives grants with its `permission.sessionRules`; it must
+  then call `probe` before it lists. Nothing else changes for jelly: `probe` is a tools RPC method, not a tool, and
+  `linear_events_list`, `linear_get_workspace` and `linear_get_user` stay declared reads.
 
 ### Known limits
 
-- `events_list` checks the account it is given against nothing Linear says: after a sign-in to another workspace or
-  user, only `probe` shows the change. The kit's page-size check reads a fixed 64 KB rather than the declared 900,000
+- What `probe` read is kept in memory, per sign-in: after a new sign-in or a restart of OpenCode, a listing is
+  `UNAVAILABLE` until the next `probe`, and a sign-in switch within one credential is caught at that probe. The kit's
+  page-size check reads a fixed 64 KB rather than the declared 900,000
   bytes (source-contract#30, item 2). The recorded Linear answers are invented, modelled on the live tool list's
   descriptions, not live-verified. The README's Known limits cite Linear's rate limits.
 
