@@ -67,6 +67,46 @@
       "mark": true
     }
   },
+  "sources": {
+    "contractVersion": 1,
+    "rpc": "linear.workspace.tools",
+    "probe": {
+      "action": "linear_probe"
+    },
+    "items": [
+      {
+        "id": "linear.activity",
+        "kind": "events",
+        "reads": "issue",
+        "tool": "events_list",
+        "input": {
+          "source": "linear"
+        },
+        "accounts": {
+          "named": false
+        },
+        "permission": {
+          "events": "linear_events_list",
+          "operations": [
+            "get_user",
+            "list_issues",
+            "get_notifications"
+          ],
+          "identity": [
+            "get_user"
+          ]
+        },
+        "private": true,
+        "cost": {
+          "class": "free"
+        },
+        "maxBytes": 900000,
+        "urlHosts": [
+          "linear.app"
+        ]
+      }
+    ]
+  },
   "scripts": {
     "check": "node scripts/check.mjs",
     "typecheck": "node scripts/check.mjs typecheck",

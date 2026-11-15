@@ -1,0 +1,75 @@
+{
+  "$comment": "Recorded Linear MCP answers for the conformance stage, invented and modelled on the tool descriptions in live-tools.json (get_user, list_issues, get_notifications), not live-verified: every name, email, issue, id and link is made up. One issue's description carries a password in a URL, a secret the source must refuse.",
+  "me": {
+    "id": "4f1c2e9a-0000-4000-8000-000000000001",
+    "name": "Sam Rivera",
+    "displayName": "sam",
+    "email": "sam.rivera@example.com"
+  },
+  "issues": [
+    {
+      "id": "ENG-21",
+      "uuid": "0b5e0000-0000-4000-8000-000000000021",
+      "title": "Retry the import on a timeout",
+      "description": "The nightly import gives up after one timeout.",
+      "url": "https://linear.app/example-co/issue/ENG-21/retry-the-import-on-a-timeout",
+      "updatedAt": "2026-11-02T09:00:00.000Z",
+      "status": "In Progress",
+      "statusType": "started",
+      "priority": { "value": 2, "name": "High" },
+      "labels": ["Bug"],
+      "assignee": "Sam Rivera",
+      "assigneeId": "4f1c2e9a-0000-4000-8000-000000000001",
+      "createdBy": "Ama Mensah",
+      "createdById": "4f1c2e9a-0000-4000-8000-000000000002"
+    },
+    {
+      "id": "ENG-22",
+      "uuid": "0b5e0000-0000-4000-8000-000000000022",
+      "title": "Point the webhook at the new host",
+      "description": "Use https://deploy:Wq7rZp4xLm9@hooks.example.net/release for now.",
+      "url": "https://linear.app/example-co/issue/ENG-22/point-the-webhook-at-the-new-host",
+      "updatedAt": "2026-11-03T15:30:00.000Z",
+      "status": "Todo",
+      "statusType": "unstarted",
+      "priority": { "value": 3, "name": "Medium" },
+      "labels": [],
+      "assignee": "Sam Rivera",
+      "assigneeId": "4f1c2e9a-0000-4000-8000-000000000001",
+      "createdBy": "Kofi Boateng",
+      "createdById": "4f1c2e9a-0000-4000-8000-000000000003"
+    },
+    {
+      "id": "ENG-23",
+      "uuid": "0b5e0000-0000-4000-8000-000000000023",
+      "title": "Release checklist for 1.0",
+      "description": "Steps before the release.",
+      "url": "https://linear.app/example-co/issue/ENG-23/release-checklist-for-1-0",
+      "updatedAt": "2026-11-05T11:00:00.000Z",
+      "status": "In Review",
+      "statusType": "started",
+      "priority": { "value": 2, "name": "High" },
+      "labels": [{ "name": "Release" }],
+      "assignee": "Sam Rivera",
+      "assigneeId": "4f1c2e9a-0000-4000-8000-000000000001",
+      "createdBy": "Sam Rivera",
+      "createdById": "4f1c2e9a-0000-4000-8000-000000000001"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "9a7d0000-0000-4000-8000-000000000032",
+      "type": "issueComment",
+      "createdAt": "2026-11-06T10:00:00.000Z",
+      "actor": { "id": "4f1c2e9a-0000-4000-8000-000000000002", "name": "Ama Mensah" },
+      "issue": { "id": "0b5e0000-0000-4000-8000-000000000023", "identifier": "ENG-23", "title": "Release checklist for 1.0", "url": "https://linear.app/example-co/issue/ENG-23" }
+    },
+    {
+      "id": "9a7d0000-0000-4000-8000-000000000031",
+      "type": "issueAssignedToYou",
+      "createdAt": "2026-11-02T09:05:00.000Z",
+      "actor": { "id": "4f1c2e9a-0000-4000-8000-000000000003", "name": "Kofi Boateng" },
+      "issue": { "id": "0b5e0000-0000-4000-8000-000000000021", "identifier": "ENG-21", "title": "Retry the import on a timeout", "url": "https://linear.app/example-co/issue/ENG-21" }
+    }
+  ]
+}
