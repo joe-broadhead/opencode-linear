@@ -195,8 +195,8 @@ describe("linear_events_list", () => {
     expect(reads.map((call) => call.input["cursor"])).toEqual([undefined, "3"])
     host.calls.length = 0
     await run(host)({ cursor: first.cursor, limit: 2 })
-    // Two minutes back from the cursor's issue (the lookback for late arrivals), and a second more.
-    expect(host.calls.find((call) => call.tool === "list_issues")!.input["updatedAt"]).toBe("2026-11-02T08:57:59.000Z")
+    // A backlog far behind now needs no lookback: a second before the cursor's issue.
+    expect(host.calls.find((call) => call.tool === "list_issues")!.input["updatedAt"]).toBe("2026-11-02T08:59:59.000Z")
   })
 
   test("reads notifications newest first only until it reaches the cursor's", async () => {

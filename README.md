@@ -320,11 +320,11 @@ Run `/linear-status` first. Its last line is the next step.
 | `AUTH_REQUIRED` from `linear_issues` | Linear needs a sign-in. Run `/connect` and choose Linear, then press `o` or Enter to open the link. |
 | `SERVER_CONFLICT` from `linear_issues` | Your own `mcp.servers.linear` points at another URL than the plugin uses. Point it at the URL `/linear-status` names, or remove it, then restart OpenCode. |
 | `TOOL_UNAVAILABLE` from `linear_issues` | OpenCode does not list Linear's `list_issues` yet. Follow the next step in the message, or run `/linear-status`. |
-| `UPSTREAM_UNREADABLE` from `linear_issues` | Linear's `list_issues` answered with something other than a list of issues. Ask for `list_issues` with assignee `me` instead. |
+| `UPSTREAM_UNREADABLE` from `linear_issues` or `linear_events_list` | `linear_issues`: Linear's `list_issues` answered with something other than a list of issues; ask for `list_issues` with assignee `me` instead. `linear_events_list`: a read answered in a shape it does not read, or an entry without an id or a time, which the listing can neither list nor skip; that feed is held where it was while the other is listed, and the call answers this only when nothing else is left. Call `events_list` again later with the same cursor; if it persists, call the tool it names directly, and run `/linear-status`. |
 | `INPUT_INVALID` from `linear_events_list` or `probe` | The input is invalid, and the message names the problems. Pass `account` (`<workspace id>/<email>`, as `probe` names it), `since`, `cursor`, `limit` or `source` as the tool's schema describes them. |
 | `SOURCE_UNKNOWN` from `linear_events_list` or `probe` | This plugin lists only the source `linear`. Leave `source` out, or pass `linear`. |
 | `CURSOR_INVALID` from `linear_events_list` | The cursor was not issued by `events_list` for this Linear account, or by 0.0.2 or earlier. Call `events_list` without a cursor, with `since`, to start again. |
-| `UNAVAILABLE` from `linear_events_list` | No `probe` has named the current Linear sign-in yet, after a new sign-in or a restart of OpenCode: call `probe` for the `linear` source, then list again. Or Linear answered an entry without an id or a time, which the listing never skips: call `events_list` again later with the same cursor, which has not moved. |
+| `UNAVAILABLE` from `linear_events_list` | No `probe` has named the current Linear sign-in yet, after a new sign-in or a restart of OpenCode. Call `probe` for the `linear` source, then list again. |
 | `ACCOUNT_MISMATCH` from `linear_events_list` or `probe` | The cursor was issued for another account, or Linear is signed in to another account than `probe` was asked for. Pass the cursor with its own account, or sign in to Linear as that account. |
 | `UPSTREAM_ERROR` from `linear_events_list` | Linear's read failed. Run `/linear-status`, then call `events_list` again with the same cursor. |
 
@@ -378,11 +378,13 @@ store.
 - **What Linear no longer shows is not listed.** A change to an issue deleted, or no longer assigned to you, before a
   listing reads it, and an inbox notification deleted or archived before then, are never listed, and nothing says so:
   Linear's tools do not show what was removed.
-- **A change that becomes visible more than two minutes after its time is missed.** Linear stamps each change when
-  its write runs, and a list read sees it once the write commits, normally well under a second. Each listing reads
-  the last two minutes before the cursor again, and lists what it had not listed there, once (the cursor carries the
-  hashes of what it listed in those two minutes). Only a change that shows up more than two minutes late, or behind the
-  17th newest change listed in a feed's last two minutes (the cursor holds 16 such hashes a feed), is not listed.
+- **A change that becomes visible more than two minutes after its time is missed.** Linear does not document how soon
+  a write is visible to a list read; the plugin assumes well under a second, and re-reads two minutes. Each listing
+  reads each feed again from two minutes before the later of the cursor and now, and lists what it had not listed
+  there, once (the cursor carries hashes of what it listed in those two minutes, up to 24 a feed). A backlog read far
+  behind now re-reads nothing: under the assumption every write before it is already visible. Only a change that shows
+  up more than two minutes late is missed without a sign. When a live burst lists more than the cursor's hashes hold,
+  the lookback is shortened and that page answers `gap` (`expired`, since now), so a write behind it is covered.
 - **Jelly's relay sign-in is not yet checked with Linear.** The Jelly declaration lets a sign-in come back through
   Jelly's relay, based only on Linear's server metadata; Linear does not document its redirect rules, and no relay
   sign-in has been made yet.

@@ -490,12 +490,17 @@ events_list({ account, since?, cursor?, limit?, source? })
   Linear read; a changed one, or
   one issued by 0.0.2 or earlier, is `CURSOR_INVALID`: start again with `since`. A cursor wins over `since`; without
   either, the listing starts 24 hours ago. An older cursor lists the same events again.
-- **Late arrivals**: every call reads each feed again from two minutes before the cursor (`LOOKBACK_MS`), and lists
-  what it had not listed there: a change Linear stamped before the cursor but showed only after the listing passed it,
-  such as one whose write committed a moment late (normally well under a second). The cursor carries 48-bit hashes of
-  what it listed in those two minutes, at most 16 a feed, so nothing is listed twice; more than 16 pull that feed's
-  lookback in to the newest 16. An item Linear's pages show twice in one call is listed once. An entry Linear answers
-  without an id or a time is `UNAVAILABLE`, with the cursor held: never skipped.
+- **Late arrivals**: Linear does not document how soon a write is visible to a list read; the plugin assumes well under
+  a second, and re-reads two minutes (`LOOKBACK_MS`). Every call reads each feed again from two minutes before the
+  later of the cursor and now, and lists what it had not listed there: a change Linear stamped before the cursor but
+  showed only after the listing passed it. A backlog read far behind now re-reads nothing, since under the assumption
+  every write before it is already visible. The cursor carries 36-bit hashes of what it listed in the lookback, up to
+  24 a feed and within the contract's 1,024 characters, so nothing is listed twice. When a live burst lists more than
+  that, the lookback is shortened, and the page answers `gap` (`expired`, since the later of now and the newest change
+  read; the cursor keeps that line as `gl`), so a write behind it is covered; later shortenings while that burst drains
+  answer no other, and only one past the line answers a new gap. An item Linear's pages show twice in one call is
+  listed once. An entry Linear answers without an id or a time holds that feed where it was while the other feed is
+  listed, and a call with nothing else to list answers `UPSTREAM_UNREADABLE`: never skipped.
 - **Secrets**: an event whose title or text holds a secret, such as a password in a URL, is never listed: it is in the
   page's `refused[]` with `reason: "secret"`, and the cursor moves past it. Every page also names `plugin` and
   `asOf`.
@@ -567,11 +572,11 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 | `AUTH_REQUIRED` | `linear_issues` or `linear_events_list`: the Linear read it needs is unavailable because the `linear` server needs a sign-in. | Run `/connect` and choose Linear, then press `o` or Enter to open the link. |
 | `SERVER_CONFLICT` | `linear_issues` or `linear_events_list`: your own `mcp.servers.linear` points at another URL than your `access` uses, so the tool does not call it. | Point it at the URL status names, or remove it, then restart OpenCode. |
 | `TOOL_UNAVAILABLE` | `linear_issues` or `linear_events_list`: OpenCode does not list the Linear read it needs, because the `linear` server is connecting, disabled, failed or missing, or has not listed its tools yet. The message names the read and the state. | Status's next step for that state; when connected, wait a few seconds and run `/linear-status`. |
-| `UPSTREAM_UNREADABLE` | `linear_issues`: Linear's `list_issues` answered with something other than a list of issues. `linear_events_list`: one of its reads answered in a shape it does not read. | `linear_issues`: call `list_issues` with assignee `me` instead, which returns Linear's answer as it is. `linear_events_list`: call the read the message names directly, and run `/linear-status`. |
+| `UPSTREAM_UNREADABLE` | `linear_issues`: Linear's `list_issues` answered with something other than a list of issues. `linear_events_list`: one of its reads answered in a shape it does not read, or an entry without an id or a time (that feed is held while the other is listed; the call answers this when nothing else is left). | `linear_issues`: call `list_issues` with assignee `me` instead, which returns Linear's answer as it is. `linear_events_list`: call the read the message names directly, and run `/linear-status`. |
 | `UPSTREAM_ERROR` | `linear_events_list`: Linear answered one of its reads with an error. The message holds the first line, at most 300 characters, with tokens and URL query strings removed. | Run `/linear-status`, then call again with the same cursor. |
 | `INPUT_INVALID` | `linear_events_list` or `probe`: the input is not the contract's, such as a `limit` outside 1 to 500, a `since` that is not an ISO date or date-time, or a listing with no `account` or one that is not `<workspace id>/<email>`. | Pass `account`, `since`, `cursor`, `limit` or `source` as the schema describes them. |
 | `SOURCE_UNKNOWN` | `linear_events_list` or `probe`: `source` is not `linear`. | Leave `source` out, or pass `linear`. |
-| `UNAVAILABLE` | `linear_events_list`: no `probe` has named the current sign-in yet (a new sign-in, or OpenCode restarted); or Linear answered an entry without an id or a time. | Call `probe` for the `linear` source, then call `events_list` again; for an entry, call again later with the same cursor. |
+| `UNAVAILABLE` | `linear_events_list`: no `probe` has named the current sign-in yet (a new sign-in, or OpenCode restarted). | Call `probe` for the `linear` source, then call `events_list` again. |
 | `ACCOUNT_MISMATCH` | `linear_events_list`: `account` is not the one `probe` read for the current sign-in, or the cursor was issued for another account. `probe`: `account` is not the signed-in one. | Pass the cursor with the account it was issued for, or sign in to Linear as that account; `probe` names the signed-in account. |
 | `CURSOR_INVALID` | `linear_events_list`: the cursor is malformed, another source's or plugin's, changed, or issued by 0.0.2 or earlier. | Call without a cursor, with `since`, to start again. |
 

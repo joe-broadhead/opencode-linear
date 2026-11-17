@@ -46,14 +46,17 @@ All notable changes to this project are documented here. The format follows [Kee
   all in one millisecond is cut whole and never read again. `TOO_MANY_CHANGES` is gone. **For Memory and every consumer:** resync on the gap, as the contract
   says; nothing else changes.
 - **A late arrival is listed.** A change Linear stamped before the cursor but showed only after a listing read past
-  it, such as a write that committed a moment late, was never listed. Every call now reads each feed again from two
-  minutes before the cursor, and lists what it had not listed there, once: the cursor carries 48-bit hashes of what it
-  listed in those two minutes, at most 16 a feed (more pull that feed's lookback in to the newest 16), and stays within
-  the contract's 1,024 characters. Linear's write delay is normally well under a second; only a change more than two
+  it, such as a write that committed a moment late, was never listed. Linear does not document how soon a write is
+  visible; the plugin assumes well under a second, and every call now reads each feed again from two minutes before the
+  later of the cursor and now, and lists what it had not listed there, once. The cursor carries 36-bit hashes of what
+  it listed in the lookback, up to 24 a feed, within the contract's 1,024 characters. A backlog read far behind now
+  re-reads nothing. When a live burst lists more than the hashes hold, the lookback is shortened and that page answers
+  `gap` (`expired`, since the later of now and the newest change read, kept in the cursor as `gl`), so nothing behind
+  it is lost without a sign; later shortenings while that burst drains answer no other. Only a change more than two
   minutes late is still missed ([README, Known limits](README.md#known-limits)).
-- **An entry Linear answers without an id or a time is no longer skipped silently:** the listing answers
-  `UNAVAILABLE`, with the cursor held, so it is read again later. An item Linear's pages show twice in one call (pages
-  moving under an arrival) is listed once.
+- **An entry Linear answers without an id or a time is no longer skipped silently:** that feed is held where it was
+  while the other is listed, and a call with nothing else to list answers `UPSTREAM_UNREADABLE`. An item Linear's pages
+  show twice in one call (pages moving under an arrival) is listed once.
 - The docs give the true worst case per call: 26 `list_issues` and 17 `get_notifications` reads, 43 requests against
   the person's Linear rate limit; a quiet call makes one of each.
 - A notification, or an issue change, in the same millisecond as the cursor's own could be skipped when Linear ordered

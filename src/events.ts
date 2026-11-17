@@ -78,16 +78,19 @@ const NOTIFICATION_PAGE = 100
 const NOTIFICATION_PAGES = 5
 /**
  * How far back each call reads again for late arrivals: a change Linear stamps before the cursor's position but shows
- * only after the listing read past it. Linear stamps a change when its write runs, and a list read sees it once the
- * write commits, normally well under a second; two minutes leaves a wide margin and costs only re-reading the last two
- * minutes of each feed. What was listed in it is de-duplicated by the hashes the cursor carries.
+ * only after the listing read past it. Linear does not document how soon a write is visible to a list read; the plugin
+ * assumes well under a second, and re-reads two minutes. Under that assumption only a change stamped within the last
+ * two minutes of wall time can still be unseen, so the lookback reaches back two minutes from the later of the feed's
+ * position and now: a backlog read far behind now needs none. What was listed in it is de-duplicated by the hashes the
+ * cursor carries.
  */
 export const LOOKBACK_MS = 120_000
 /**
- * The most listed items per feed whose hashes the cursor carries for the lookback, so the cursor stays within the
- * contract's 1,024 characters; more listed in the last two minutes pull that feed's lookback in to the newest 16.
+ * The most listed items per feed whose hashes the cursor carries for the lookback, each 36 bits in 6 base64url
+ * characters; fewer when the contract's 1,024 characters do not hold them all. More listed in a live lookback pull that
+ * feed's lookback in, and the page answers a gap whose since is now, which covers every later shortening up to it.
  */
-const SEEN_MAX = 16
+const SEEN_MAX = 24
 /** What an issue event needs, and nothing more: Linear otherwise sends every field. */
 const ISSUE_FIELDS = [
   "id",
@@ -410,14 +413,28 @@ interface Walk {
   readonly fence?: Position
 }
 
+/**
+ * An entry Linear answers without an id or a time: it can be neither listed nor skipped, so the feed it is in holds its
+ * position while the other is listed, and a page with nothing else to list answers this error.
+ */
+const unlistable = (tool: string) =>
+  Object.assign(
+    linearError(
+      "UPSTREAM_UNREADABLE",
+      `Linear's ${tool} answered an entry without an id or a time, which events_list can neither list nor skip.`,
+      `Call events_list again later with the same cursor, which holds this feed where it was; if it persists, call ${tool} directly to see Linear's answer, and run /linear-status.`,
+    ),
+    { feed: true },
+  )
+
 /** Where a feed's lookback starts, and the hashes of what was listed after it up to the feed's position. */
 interface Lookback {
   readonly line: Position
   readonly seen: ReadonlySet<string>
 }
 
-/** A listed item's hash in the cursor: 48 bits of the sha256 of its external_id, 8 base64url characters. */
-const seenHash = (externalId: string) => createHash("sha256").update(externalId).digest("base64url").slice(0, 8)
+/** A listed item's hash in the cursor: 36 bits of the sha256 of its external_id, 6 base64url characters. */
+const seenHash = (externalId: string) => createHash("sha256").update(externalId).digest("base64url").slice(0, 6)
 
 /**
  * Reads a feed newest first until an item is behind the lookback line or Linear has no more, and cuts rather than fail
@@ -464,9 +481,7 @@ async function walk(
     let unseen = 0
     for (const item of items) {
       const found = change(item)
-      if (found === undefined) {
-        throw linearError("UNAVAILABLE", `Linear's ${tool} answered an entry without an id or a time, which events_list can neither list nor skip.`, "Call events_list again later with the same cursor: the cursor has not moved.")
-      }
+      if (found === undefined) throw unlistable(tool)
       if (behind(found.at, line)) {
         reached = true
         continue
@@ -574,10 +589,15 @@ interface Feeds {
   readonly notificationsFence?: Position
   readonly issuesLookback: Lookback
   readonly notificationsLookback: Lookback
+  /**
+   * `gl`: the since of the last gap a shortened lookback answered. A late arrival behind a later shortening, up to this
+   * line, is covered by that gap; a shortening past it answers a new one.
+   */
+  readonly gapLine?: number
 }
 
-const HASHES = /^(?:[A-Za-z0-9_-]{8})*$/
-const hashesOf = (value: string) => new Set(value.match(/.{8}/g) ?? [])
+const HASHES = /^(?:[A-Za-z0-9_-]{6})*$/
+const hashesOf = (value: string) => new Set(value.match(/.{6}/g) ?? [])
 
 function stateOf(cursor: string, account: string): Feeds {
   cursorFor(cursor, account)
@@ -597,24 +617,37 @@ function stateOf(cursor: string, account: string): Feeds {
   }
   const issuesLookback = lookback("li", "si", issues)
   const notificationsLookback = lookback("ln", "sn", notifications)
-  if (!decoded.ok || state["a"] !== account || issues === undefined || notifications === undefined || fenceBroken || issuesLookback === undefined || notificationsLookback === undefined) {
+  const gapLine = state["gl"]
+  if (!decoded.ok || state["a"] !== account || issues === undefined || notifications === undefined || fenceBroken || issuesLookback === undefined || notificationsLookback === undefined || (gapLine !== undefined && !Number.isSafeInteger(gapLine))) {
     throw linearError("CURSOR_INVALID", "The cursor was not issued by events_list for this Linear account.", START_AGAIN)
   }
-  return { issues, notifications, ...(issuesFence ? { issuesFence } : {}), ...(notificationsFence ? { notificationsFence } : {}), issuesLookback, notificationsLookback }
+  return { issues, notifications, ...(issuesFence ? { issuesFence } : {}), ...(notificationsFence ? { notificationsFence } : {}), issuesLookback, notificationsLookback, ...(gapLine === undefined ? {} : { gapLine: gapLine as number }) }
+}
+
+/** A feed's next lookback, and the line it was shortened to when it could not hold every hash. */
+interface NextLookback {
+  readonly line: Position
+  readonly seen: string
+  readonly shortened?: Position
 }
 
 /**
- * A feed's next lookback: from two minutes before its new position (never before the old line, nor behind a cut), with
- * the hashes of what was listed after the line: what the walk read there that was already accounted for, and what this
- * page consumed. More than `max` pull the line in to the newest `max`, but never past an item still to be listed, nor
- * past the position.
+ * A feed's next lookback: from two minutes before the later of its new position and now (never before the old line, nor
+ * behind a cut, nor past the position), with the hashes of what was listed after the line: what the walk read there
+ * that was already accounted for, and what this page consumed. More than `max` pull the line in to the newest `max`,
+ * never past an item still to be listed nor past the position: `shortened` names the new line. A feed held for an
+ * unlistable entry keeps its lookback.
  */
-function nextLookback(walk: Walk, consumed: ReadonlySet<string>, old: Lookback, at: Position, max: number): { line: Position; seen: string } {
+function nextLookback(walk: Walk | undefined, consumed: ReadonlySet<string>, old: Lookback, at: Position, now: number, max: number): NextLookback {
+  if (walk === undefined) return { line: old.line, seen: [...old.seen].join("") }
   const found = new Set(walk.found.map((item) => item.event.external_id))
   const id = (item: IssueChange) => item.event.external_id
-  let line: Position = walk.cut ?? { t: at.t - LOOKBACK_MS, k: END }
+  let line: Position = { t: Math.max(at.t, now) - LOOKBACK_MS, k: END }
+  if (walk.cut !== undefined && isAfter(walk.cut, line)) line = walk.cut
   if (walk.cut === undefined && isAfter(old.line, line)) line = old.line
+  if (isAfter(line, at)) line = at
   const listed = walk.read.filter((item) => isAfter(item.at, line) && !isAfter(item.at, at) && (!found.has(id(item)) || consumed.has(id(item)))).sort((a, b) => byPosition(b.at, a.at))
+  let shortened: Position | undefined
   if (listed.length > max) {
     const pending = walk.found.filter((item) => !consumed.has(id(item)) && !isAfter(item.at, at))
     const floor = pending.length === 0 ? undefined : Math.min(...pending.map((item) => item.at.t)) - 1
@@ -622,8 +655,10 @@ function nextLookback(walk: Walk, consumed: ReadonlySet<string>, old: Lookback, 
     line = { t: floor === undefined ? raised : Math.min(raised, floor), k: END }
     // Never past the position: with ties at its millisecond, the line is the position itself.
     if (isAfter(line, at)) line = at
+    shortened = line
   }
-  return { line, seen: listed.filter((item) => isAfter(item.at, line)).map((item) => seenHash(item.event.external_id)).join("") }
+  const kept = listed.filter((item) => isAfter(item.at, line))
+  return { line, seen: kept.map((item) => seenHash(item.event.external_id)).join(""), ...(shortened === undefined ? {} : { shortened }) }
 }
 
 /**
@@ -653,15 +688,28 @@ export async function linearEvents(read: Read, signedIn: SignedIn | undefined, i
     request.cursor === undefined
       ? { issues: start, notifications: start, issuesLookback: { line: start, seen: new Set() }, notificationsLookback: { line: start, seen: new Set() } }
       : stateOf(request.cursor, account)
-  const issueWalk = await issueChanges(read, account, from.issues, from.issuesFence, from.issuesLookback)
-  const notificationWalk = await notificationChanges(read, account, from.notifications, from.notificationsFence, from.notificationsLookback)
+  // A feed that met an entry it can neither list nor skip is held where it was; the other is listed.
+  const held: Error[] = []
+  const hold = async (walking: Promise<Walk>): Promise<Walk | undefined> => {
+    try {
+      return await walking
+    } catch (error) {
+      if (!(error instanceof Error && (error as Error & { feed?: boolean }).feed === true)) throw error
+      held.push(error)
+      return undefined
+    }
+  }
+  const issuesRead = await hold(issueChanges(read, account, from.issues, from.issuesFence, from.issuesLookback))
+  const notificationsRead = await hold(notificationChanges(read, account, from.notifications, from.notificationsFence, from.notificationsLookback))
+  const none: Walk = { found: [], read: [] }
+  const issueWalk = issuesRead ?? none
+  const notificationWalk = notificationsRead ?? none
   const issues = issueWalk.found.map((change) => ({ ...change, feed: 0 }))
   const notifications = notificationWalk.found.map((change) => ({ ...change, feed: 1 }))
+  if (held.length === 2 || (held.length === 1 && issues.length + notifications.length === 0)) throw held[0]
   // A feed cut at its page limit resumes after the cut whatever this page lists, and the page answers the gap once:
   // expired for a cursor, whose history is now out of reach, window-truncated for since.
   const edges = [issueWalk.cut, notificationWalk.cut].flatMap((edge) => edge ?? [])
-  const gap: EventsGap | undefined =
-    edges.length === 0 ? undefined : { reason: request.cursor === undefined ? "window-truncated" : "expired", since: new Date(Math.max(...edges.map((edge) => edge.t)) + 1).toISOString() }
   // Oldest first across both feeds, late arrivals first; each feed keeps its own order, so what is listed is a prefix of
   // each, and a feed's position only moves forward.
   const merged = [...issues, ...notifications].sort((a, b) => a.at.t - b.at.t || a.feed - b.feed || byPosition(a.at, b.at))
@@ -684,15 +732,27 @@ export async function linearEvents(read: Read, signedIn: SignedIn | undefined, i
   // A fence stays while that feed has found items this page did not list and its position is short of the fence.
   const left = merged.slice(consumed)
   const keep = (fence: Position | undefined, at: Position, feed: number) => (fence !== undefined && isAfter(fence, at) && left.some((item) => item.feed === feed) ? [fence.t, fence.k] : undefined)
-  const fi = keep(issueWalk.fence, next.issues, 0)
-  const fn = keep(notificationWalk.fence, next.notifications, 1)
+  const fi = issuesRead === undefined ? (from.issuesFence ? [from.issuesFence.t, from.issuesFence.k] : undefined) : keep(issueWalk.fence, next.issues, 0)
+  const fn = notificationsRead === undefined ? (from.notificationsFence ? [from.notificationsFence.t, from.notificationsFence.k] : undefined) : keep(notificationWalk.fence, next.notifications, 1)
   const taken = new Set(merged.slice(0, consumed).map((item) => item.event.external_id))
-  // The lookback's hashes, as many as fit the contract's 1,024 characters (16 per feed always do).
-  let cursor = ""
-  for (let max = SEEN_MAX; ; max = Math.floor(max / 2)) {
-    const li = nextLookback(issueWalk, taken, from.issuesLookback, next.issues, max)
-    const ln = nextLookback(notificationWalk, taken, from.notificationsLookback, next.notifications, max)
-    cursor = encodeBoundCursor(bindingOf(account), {
+  const more = consumed < merged.length
+  const newestRead = Math.max(0, ...[...issueWalk.read, ...notificationWalk.read].map((item) => item.at.t))
+  // The page answers a gap once: for a cut (expired for a cursor, window-truncated for since), or for a lookback this
+  // page shortened past the line the last such gap named. A shortening's gap names the later of now and the newest
+  // change this call read (Linear's clock may run ahead of ours): every write stamped before it is visible by the
+  // plugin's assumption, or behind that gap, so the shortenings that follow while that burst drains answer no other.
+  const encode = (max: number) => {
+    const li = nextLookback(issuesRead, taken, from.issuesLookback, next.issues, now, max)
+    const ln = nextLookback(notificationsRead, taken, from.notificationsLookback, next.notifications, now, max)
+    const raised = [li.shortened, ln.shortened].flatMap((line) => (line !== undefined && (from.gapLine === undefined || line.t >= from.gapLine) ? [line] : []))
+    const lookbackGap = raised.length === 0 ? undefined : Math.max(now, newestRead + 1, ...raised.map((line) => line.t + 1))
+    const sinces = [...edges.map((edge) => edge.t + 1), ...(lookbackGap === undefined ? [] : [lookbackGap])]
+    const gap: EventsGap | undefined =
+      sinces.length === 0 ? undefined : { reason: request.cursor === undefined && edges.length > 0 ? "window-truncated" : "expired", since: new Date(Math.max(...sinces)).toISOString() }
+    // The last lookback gap's line is kept while a lookback line is still at or behind it.
+    const gl = lookbackGap ?? from.gapLine
+    const keepLine = gl !== undefined && (li.line.t < gl || ln.line.t < gl)
+    const cursor = encodeBoundCursor(bindingOf(account), {
       a: account,
       i: [next.issues.t, next.issues.k],
       n: [next.notifications.t, next.notifications.k],
@@ -702,14 +762,29 @@ export async function linearEvents(read: Read, signedIn: SignedIn | undefined, i
       si: li.seen,
       ln: [ln.line.t, ln.line.k],
       sn: ln.seen,
+      ...(keepLine ? { gl } : {}),
     })
-    if (cursor.length <= EVENT_LIMITS.cursor || max === 0) break
+    return { cursor, gap }
   }
+  // As many hashes as fit the contract's 1,024 characters: the codec refuses a longer cursor.
+  const within = (max: number) => {
+    try {
+      const page = encode(max)
+      return page.cursor.length <= EVENT_LIMITS.cursor ? page : undefined
+    } catch (error) {
+      if (max === 0) throw error
+      return undefined
+    }
+  }
+  let max = SEEN_MAX
+  let page = within(max)
+  while (page === undefined) page = within(--max)
+  const { cursor, gap } = page
   return eventsListResult(
     { source: LINEAR_SOURCE, account, owner },
     listed.map((item) => item.event),
     cursor,
-    consumed < merged.length,
+    more,
     { refused, ...(gap === undefined ? {} : { gap }), plugin: PACKAGE, asOf: new Date(now).toISOString() },
   )
 }

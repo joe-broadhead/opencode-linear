@@ -55,12 +55,12 @@ function linear(data: Data, pageSize: number, midCall?: (tool: string, page: num
 
 const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "read-only", host: checkHost("2.2.3", false) }
 const context = { sessionID: "ses_1", agent: "build", messageID: "msg_1", id: "call_1", signal: new AbortController().signal } as never
-function run(host: ReturnType<typeof linear>) {
+function run(host: ReturnType<typeof linear>, account = ACCOUNT) {
   const known = signIns()
-  known.set("cred_1", { account: ACCOUNT, owner: OWNER })
+  known.set("cred_1", { account, owner: OWNER })
   const options: EventsToolOptions = { tool: host.tool, permission: { assert: async () => {} }, owned: () => true, status: async () => buildStatus(facts), signIn: async () => "cred_1", signIns: known, now: () => NOW }
   const tool = eventsTool(options)
-  return async (input: EventsListInput): Promise<EventsListResult> => (await tool.execute({ account: ACCOUNT, ...input }, context)).output
+  return async (input: EventsListInput): Promise<EventsListResult> => (await tool.execute({ account, ...input }, context)).output
 }
 
 async function drain(list: (i: EventsListInput) => Promise<EventsListResult>, first: EventsListInput, between: (n: number) => void = () => {}, max = 2000) {
@@ -94,6 +94,7 @@ function unseenAt(data: Data, cursor: string | undefined) {
 }
 const latest = (g: { since: string }[]) => iso(Math.max(...g.map((x) => Date.parse(x.since))))
 const SLOW = 600_000
+const S = 1000
 
 describe("the recurring bugs, and late arrivals", () => {
   test("J1 jam: 5,000 tied in both feeds (one ms), real page sizes, limit 100: one gap, cut whole, later items listed, next read quiet", async () => {
@@ -147,7 +148,8 @@ describe("the recurring bugs, and late arrivals", () => {
     const pages = await drain(run(linear(data, 250)), { since: SINCE, limit: 50 }, (n) => {
       if (n % 5 === 0 && a < 400) {
         clock += n % 10 === 0 ? 2 * DAY : 7 * MIN
-        for (let k = 0; k < 40; k++, a++) { data.issues.push(issue(90000 + a, clock + k * 1000)); data.notifications.push(note(90000 + a, clock + k * 1000 + 1)) }
+        // 10 s apart: a two-minute lookback holds them all (a denser live burst answers its own gap, K1L+).
+        for (let k = 0; k < 40; k++, a++) { data.issues.push(issue(90000 + a, clock + k * 10_000)); data.notifications.push(note(90000 + a, clock + k * 10_000 + 1)) }
       }
     })
     const g = gaps(pages)
@@ -255,16 +257,20 @@ describe("the recurring bugs, and late arrivals", () => {
     }
   }, SLOW)
 
-  test("F2 late arrivals up to 110 s behind each feed's position, in both feeds (within the 16 hashes a feed's lookback carries): each listed once, no gap, the cursor within 1,024 characters", async () => {
+  test("F2 live late arrivals, stamped up to 110 s before each feed's position and within the last two minutes, in both feeds: each listed once, no gap, the cursor within 1,024 characters", async () => {
     let seed = 4242
     const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648)
     const pick = (n: number) => Math.floor(rnd() * n)
+    const LIVE = NOW - 110 * S
     for (let round = 0; round < 200; round++) {
       const pageSize = 1 + pick(4)
       const limit = [1, 2, 3, 5, 100][pick(5)]!
+      // Items 4 s apart in the last 100 s: every write still within the lookback of wall time.
+      const ni = 1 + pick(4 * pageSize)
+      const nn = 1 + pick(3 * pageSize)
       const data: Data = {
-        issues: Array.from({ length: 1 + pick(4 * pageSize) }, (_, n) => issue(1000 + n, T0 + n * 3 * MIN)),
-        notifications: Array.from({ length: 1 + pick(3 * pageSize) }, (_, n) => note(5000 + n, T0 + n * 3 * MIN + 1)),
+        issues: Array.from({ length: ni }, (_, n) => issue(1000 + n, NOW - 100 * S + n * 4 * S + pick(1000))),
+        notifications: Array.from({ length: nn }, (_, n) => note(5000 + n, NOW - 100 * S + n * 4 * S + pick(1000) + 1)),
       }
       const base = run(linear(data, pageSize))
       let current = ""
@@ -276,12 +282,13 @@ describe("the recurring bugs, and late arrivals", () => {
       let a = 0
       let ai = 0
       let an = 0
-      // Before each call, maybe a late arrival in each feed, stamped up to 110 s before that feed's position; at most 8 a
-      // feed, so a lookback never holds more than its 16 hashes (the hash-cap test covers more).
+      // Before each call, maybe a late arrival in each feed, stamped up to 110 s before that feed's position but not
+      // before the last 110 s of wall time; at most 6 a feed, so a lookback holds every hash.
+      const stamp = (position: number) => Math.max(LIVE, position - pick(110 * S))
       const pages = await drain(list, { since: SINCE, limit }, () => {
         const state = JSON.parse(Buffer.from(current, "base64url").toString()) as { i: [number, string]; n: [number, string] }
-        if (ai < 8 && pick(2) && state.i[0] > Date.parse(SINCE)) (ai++, data.issues.push(issue(70000 + a++, state.i[0] - pick(110_000))))
-        if (an < 8 && pick(2) && state.n[0] > Date.parse(SINCE)) (an++, data.notifications.push(note(70000 + a++, state.n[0] - pick(110_000))))
+        if (ai < 6 && pick(2) && state.i[0] > LIVE) (ai++, data.issues.push(issue(70000 + a++, stamp(state.i[0]))))
+        if (an < 6 && pick(2) && state.n[0] > LIVE) (an++, data.notifications.push(note(70000 + a++, stamp(state.n[0]))))
       })
       // A last read after the drain finds any arrival the drain's last page left behind.
       let last = pages.at(-1)!
@@ -298,20 +305,87 @@ describe("the recurring bugs, and late arrivals", () => {
     }
   }, SLOW)
 
-  test("the lookback carries at most 16 hashes a feed: past that it starts at the 17th newest listed, and the cursor stays within 1,024 characters", async () => {
-    // 40 issues and 40 notifications a second apart: all inside two minutes.
-    const data: Data = { issues: Array.from({ length: 40 }, (_, n) => issue(100 + n, T0 + n * 1000)), notifications: Array.from({ length: 40 }, (_, n) => note(100 + n, T0 + n * 1000 + 1)) }
-    const host = linear(data, 250)
-    const first = await run(host)({ since: SINCE, limit: 500 })
-    expect(first.events).toHaveLength(80)
-    expect(first.cursor.length).toBeLessThanOrEqual(1024)
-    const state = JSON.parse(Buffer.from(first.cursor, "base64url").toString()) as { si: string; sn: string; li: [number, string] }
-    expect([state.si.length, state.sn.length]).toEqual([16 * 8, 16 * 8])
-    // The line is the 17th newest issue's millisecond: a late arrival after it is listed, one before it is the known limit.
-    expect(state.li[0]).toBe(T0 + 23 * 1000)
-    data.issues.push(issue(900, T0 + 30_500), issue(901, T0 + 10_500))
-    const next = await run(host)({ cursor: first.cursor })
-    expect(next.events.map((event) => event.external_id)).toEqual([`ENG-900@${iso(T0 + 30_500)}`])
+  for (const feed of ["issues", "notifications"] as const) {
+    const add = (data: Data, n: number, t: number) => (feed === "issues" ? data.issues.push(issue(n, t)) : data.notifications.push(note(n, t)))
+    const key = (n: number, t: number) => (feed === "issues" ? issueKey(issue(n, t)) : noteKey(note(n, t)))
+    const empty = (): Data => ({ issues: [], notifications: [] })
+
+    test(`K1L ${feed}: live, 20 changes in the 20 s before now, then a write stamped 17.5 s ago commits: listed (the lookback holds them all)`, async () => {
+      const data = empty()
+      for (let k = 0; k < 20; k++) add(data, 100 + k, NOW - 20 * S + k * S)
+      const host = linear(data, 50)
+      const first = await run(host)({ since: iso(NOW - 3600 * S) })
+      expect(first.events).toHaveLength(20)
+      expect(first.gap).toBeUndefined()
+      add(data, 999, NOW - 17 * S - 500)
+      const next = await run(host)({ cursor: first.cursor })
+      expect(next.events.map((e) => e.external_id)).toEqual([key(999, NOW - 17 * S - 500)])
+      expect(next.gap).toBeUndefined()
+    }, SLOW)
+
+    test(`K1L+ ${feed}: live, 40 changes in the 40 s before now: the page that shortens the lookback answers a gap once; a later write is listed, an earlier one is behind the gap`, async () => {
+      const data = empty()
+      for (let k = 0; k < 40; k++) add(data, 100 + k, NOW - 40 * S + k * S)
+      const host = linear(data, 50)
+      const first = await run(host)({ since: iso(NOW - 3600 * S) })
+      expect(first.events).toHaveLength(40)
+      expect(first.gap?.reason).toBe("expired")
+      const since = Date.parse(first.gap!.since)
+      add(data, 998, since - 500)
+      add(data, 999, since + 500)
+      const next = await run(host)({ cursor: first.cursor })
+      const listed = next.events.map((e) => e.external_id)
+      expect(listed).toContain(key(999, since + 500))
+      // The write behind the gap's since is covered by that gap: listed or not, never listed twice.
+      expect(new Set(listed).size).toBe(listed.length)
+      // Still shortened, but the gap's line covers it: no second gap.
+      expect(next.gap).toBeUndefined()
+    }, SLOW)
+
+    test(`K2 ${feed}: live, a late arrival inside what the lookback still names is listed`, async () => {
+      const data = empty()
+      for (let k = 0; k < 20; k++) add(data, 100 + k, NOW - 20 * S + k * S)
+      const host = linear(data, 50)
+      const first = await run(host)({ since: iso(NOW - 3600 * S) })
+      add(data, 998, NOW - 5 * S + 500)
+      const next = await run(host)({ cursor: first.cursor })
+      expect(next.events.map((e) => e.external_id)).toEqual([key(998, NOW - 5 * S + 500)])
+    }, SLOW)
+
+    test(`K5L ${feed}: live bulk of 1,000 in the last second, drained, then a write stamped 200 ms before its end: one gap in the read covers it`, async () => {
+      const data = empty()
+      for (let k = 0; k < 1000; k++) add(data, 1000 + k, NOW - 1000 + k)
+      const host = linear(data, 250)
+      const pages = await drain(run(host), { since: iso(NOW - 3600 * S), limit: 500 })
+      const g = gaps(pages)
+      expect(g).toHaveLength(1)
+      // Everything from the gap's since on is listed, once (1,000 notifications are past one call's 500: a cut).
+      const drained = ids(pages)
+      expect(new Set(drained).size).toBe(drained.length)
+      expect(owed(data, g[0]!.since).filter((k) => !drained.includes(k))).toEqual([])
+      add(data, 99999, NOW - 200)
+      const next = await run(host)({ cursor: pages.at(-1)!.cursor })
+      // The write is behind the line the gap named, or listed: never lost without a gap.
+      const listed = next.events.map((e) => e.external_id)
+      expect(listed.includes(key(99999, NOW - 200)) || Date.parse(g[0]!.since) > NOW - 200).toBe(true)
+    }, SLOW)
+  }
+
+  test("C1 cursor size: a 128-character account, fences in both feeds, a live lookback in each: within 1,024 characters", async () => {
+    const local = "a".repeat(128 - WORKSPACE.length - 1 - "@example.com".length)
+    const account = `${WORKSPACE}/${local}@example.com`
+    expect(account.length).toBe(128)
+    // A burst cut in both feeds, ending in the last minute, so both lookbacks are live and full.
+    const data: Data = {
+      issues: Array.from({ length: 2600 }, (_, n) => issue(10000 + n, NOW - 60 * S + Math.floor(n * 20))),
+      notifications: Array.from({ length: 700 }, (_, n) => note(10000 + n, NOW - 60 * S + n * 80 + 1)),
+    }
+    const list = run(linear(data, 250), account)
+    const pages = await drain(list, { since: SINCE, limit: 100 })
+    for (const page of pages) expect(page.cursor.length).toBeLessThanOrEqual(1024)
+    expect(gaps(pages).length).toBeLessThanOrEqual(1)
+    const listed = ids(pages)
+    expect(new Set(listed).size).toBe(listed.length)
   }, SLOW)
 
   test("R9 an item arriving between two of Linear's pages in one walk shifts the pages; it is listed once", async () => {
