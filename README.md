@@ -384,7 +384,10 @@ store.
   there, once (the cursor carries hashes of what it listed in those two minutes, up to 24 a feed). A backlog read far
   behind now re-reads nothing: under the assumption every write before it is already visible. Only a change that shows
   up more than two minutes late is missed without a sign. When a live burst lists more than the cursor's hashes hold,
-  the lookback is shortened and that page answers `gap` (`expired`, since now), so a write behind it is covered.
+  the lookback is shortened. If what it still covers reaches back at least 10 seconds (`MIN_COVER_MS`, ten times the
+  assumed sub-second delay), nothing the assumption allows can be lost and there is no gap, so a steady stream below
+  about 2.4 changes a second never answers one. If it covers less, as in a bulk edit faster than that, the page answers
+  `gap` (`expired`, or `window-truncated` on a first read from `since`, since now), so a write behind it is covered.
 - **Jelly's relay sign-in is not yet checked with Linear.** The Jelly declaration lets a sign-in come back through
   Jelly's relay, based only on Linear's server metadata; Linear does not document its redirect rules, and no relay
   sign-in has been made yet.

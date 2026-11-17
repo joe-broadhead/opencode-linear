@@ -55,10 +55,10 @@ function linear(data: Data, pageSize: number, midCall?: (tool: string, page: num
 
 const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "read-only", host: checkHost("2.2.3", false) }
 const context = { sessionID: "ses_1", agent: "build", messageID: "msg_1", id: "call_1", signal: new AbortController().signal } as never
-function run(host: ReturnType<typeof linear>, account = ACCOUNT) {
+function run(host: ReturnType<typeof linear>, account = ACCOUNT, clock: () => number = () => NOW) {
   const known = signIns()
   known.set("cred_1", { account, owner: OWNER })
-  const options: EventsToolOptions = { tool: host.tool, permission: { assert: async () => {} }, owned: () => true, status: async () => buildStatus(facts), signIn: async () => "cred_1", signIns: known, now: () => NOW }
+  const options: EventsToolOptions = { tool: host.tool, permission: { assert: async () => {} }, owned: () => true, status: async () => buildStatus(facts), signIn: async () => "cred_1", signIns: known, now: clock }
   const tool = eventsTool(options)
   return async (input: EventsListInput): Promise<EventsListResult> => (await tool.execute({ account, ...input }, context)).output
 }
@@ -323,13 +323,14 @@ describe("the recurring bugs, and late arrivals", () => {
       expect(next.gap).toBeUndefined()
     }, SLOW)
 
-    test(`K1L+ ${feed}: live, 40 changes in the 40 s before now: the page that shortens the lookback answers a gap once; a later write is listed, an earlier one is behind the gap`, async () => {
+    test(`K1L+ ${feed}: live, 40 changes in the 4 s before now (24 hashes cover under 10 s): the page that shortens the lookback answers a gap once; a later write is listed, an earlier one is behind the gap`, async () => {
       const data = empty()
-      for (let k = 0; k < 40; k++) add(data, 100 + k, NOW - 40 * S + k * S)
+      for (let k = 0; k < 40; k++) add(data, 100 + k, NOW - 4 * S + k * 100)
       const host = linear(data, 50)
       const first = await run(host)({ since: iso(NOW - 3600 * S) })
       expect(first.events).toHaveLength(40)
-      expect(first.gap?.reason).toBe("expired")
+      // A first read from since: window-truncated, as for a cut.
+      expect(first.gap?.reason).toBe("window-truncated")
       const since = Date.parse(first.gap!.since)
       add(data, 998, since - 500)
       add(data, 999, since + 500)
@@ -340,6 +341,50 @@ describe("the recurring bugs, and late arrivals", () => {
       expect(new Set(listed).size).toBe(listed.length)
       // Still shortened, but the gap's line covers it: no second gap.
       expect(next.gap).toBeUndefined()
+    }, SLOW)
+
+    test(`K1C ${feed}: live, 40 changes in the 40 s before now: the 24 newest hashes still cover 24 s, more than MIN_COVER_MS, so no gap`, async () => {
+      const data = empty()
+      for (let k = 0; k < 40; k++) add(data, 100 + k, NOW - 40 * S + k * S)
+      const host = linear(data, 50)
+      const first = await run(host)({ since: iso(NOW - 3600 * S) })
+      expect(first.events).toHaveLength(40)
+      expect(first.gap).toBeUndefined()
+      // A late write inside what the hashes cover is listed.
+      add(data, 999, NOW - 5 * S - 500)
+      const next = await run(host)({ cursor: first.cursor })
+      expect(next.events.map((e) => e.external_id)).toEqual([key(999, NOW - 5 * S - 500)])
+      expect(next.gap).toBeUndefined()
+    }, SLOW)
+
+    test(`BUSY ${feed}: a live stream read every 10 s for 5 min: no gap up to 120 changes a minute; at 240 a minute, under 10 s covered, gaps`, async () => {
+      for (const per of [1, 2, 3, 4, 6, 10, 20, 40]) {
+        const data = empty()
+        let clock = NOW
+        const host = linear(data, 250)
+        const list = run(host, ACCOUNT, () => clock)
+        let cur = (await list({ since: iso(clock - 3600 * S) })).cursor
+        let gapsSeen = 0
+        let n = 0
+        const listed: string[] = []
+        for (let read = 0; read < 30; read++) {
+          for (let k = 0; k < per; k++) add(data, 50000 + n++, clock + Math.floor((k * 10 * S) / per))
+          clock += 10 * S
+          let page = await list({ cursor: cur, limit: 500 })
+          listed.push(...page.events.map((e) => e.external_id))
+          if (page.gap) gapsSeen++
+          while (page.more) {
+            page = await list({ cursor: page.cursor, limit: 500 })
+            listed.push(...page.events.map((e) => e.external_id))
+            if (page.gap) gapsSeen++
+          }
+          cur = page.cursor
+        }
+        expect(new Set(listed).size).toBe(n)
+        // 24 hashes at `per` changes per 10 s cover 240 / per seconds: 10 s or more up to 24 per 10 s (144 a minute).
+        if (per <= 20) expect({ perMinute: per * 6, gapsSeen }).toEqual({ perMinute: per * 6, gapsSeen: 0 })
+        else expect(gapsSeen).toBeGreaterThan(0)
+      }
     }, SLOW)
 
     test(`K2 ${feed}: live, a late arrival inside what the lookback still names is listed`, async () => {
@@ -383,9 +428,13 @@ describe("the recurring bugs, and late arrivals", () => {
     const list = run(linear(data, 250), account)
     const pages = await drain(list, { since: SINCE, limit: 100 })
     for (const page of pages) expect(page.cursor.length).toBeLessThanOrEqual(1024)
-    expect(gaps(pages).length).toBeLessThanOrEqual(1)
+    // The cut's gap, and, once the drain reaches the burst's live end (50 changes a second, so 24 hashes cover under
+    // MIN_COVER_MS), one lookback gap; nothing after the latest since is missed.
+    const g = gaps(pages)
+    expect(g.length).toBeLessThanOrEqual(2)
     const listed = ids(pages)
     expect(new Set(listed).size).toBe(listed.length)
+    expect(owed(data, latest(g)).filter((k) => !listed.includes(k))).toEqual([])
   }, SLOW)
 
   test("R9 an item arriving between two of Linear's pages in one walk shifts the pages; it is listed once", async () => {

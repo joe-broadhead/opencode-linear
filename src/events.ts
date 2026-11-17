@@ -86,6 +86,12 @@ const NOTIFICATION_PAGES = 5
  */
 export const LOOKBACK_MS = 120_000
 /**
+ * The least wall time a shortened lookback must still cover for no gap: ten times the stated sub-second assumption.
+ * A lookback whose kept hashes reach back at least 10 s before now covers every write that can still be unseen, so a
+ * steady stream below about 2.4 changes a second never answers a gap; a faster burst, which leaves less, does.
+ */
+export const MIN_COVER_MS = 10_000
+/**
  * The most listed items per feed whose hashes the cursor carries for the lookback, each 36 bits in 6 base64url
  * characters; fewer when the contract's 1,024 characters do not hold them all. More listed in a live lookback pull that
  * feed's lookback in, and the page answers a gap whose since is now, which covers every later shortening up to it.
@@ -738,17 +744,19 @@ export async function linearEvents(read: Read, signedIn: SignedIn | undefined, i
   const more = consumed < merged.length
   const newestRead = Math.max(0, ...[...issueWalk.read, ...notificationWalk.read].map((item) => item.at.t))
   // The page answers a gap once: for a cut (expired for a cursor, window-truncated for since), or for a lookback this
-  // page shortened past the line the last such gap named. A shortening's gap names the later of now and the newest
-  // change this call read (Linear's clock may run ahead of ours): every write stamped before it is visible by the
-  // plugin's assumption, or behind that gap, so the shortenings that follow while that burst drains answer no other.
+  // page shortened past the line the last such gap named, leaving less than MIN_COVER_MS covered. A shortening's gap
+  // names the later of now and the newest change this call read (Linear's clock may run ahead of ours): every write
+  // stamped before it is visible by the plugin's assumption, or behind that gap, so the shortenings that follow while
+  // that burst drains answer no other.
   const encode = (max: number) => {
     const li = nextLookback(issuesRead, taken, from.issuesLookback, next.issues, now, max)
     const ln = nextLookback(notificationsRead, taken, from.notificationsLookback, next.notifications, now, max)
-    const raised = [li.shortened, ln.shortened].flatMap((line) => (line !== undefined && (from.gapLine === undefined || line.t >= from.gapLine) ? [line] : []))
+    // Only a shortening that leaves less than MIN_COVER_MS of wall time covered can lose a write the assumption allows.
+    const raised = [li.shortened, ln.shortened].flatMap((line) => (line !== undefined && line.t > now - MIN_COVER_MS && (from.gapLine === undefined || line.t >= from.gapLine) ? [line] : []))
     const lookbackGap = raised.length === 0 ? undefined : Math.max(now, newestRead + 1, ...raised.map((line) => line.t + 1))
     const sinces = [...edges.map((edge) => edge.t + 1), ...(lookbackGap === undefined ? [] : [lookbackGap])]
     const gap: EventsGap | undefined =
-      sinces.length === 0 ? undefined : { reason: request.cursor === undefined && edges.length > 0 ? "window-truncated" : "expired", since: new Date(Math.max(...sinces)).toISOString() }
+      sinces.length === 0 ? undefined : { reason: request.cursor === undefined ? "window-truncated" : "expired", since: new Date(Math.max(...sinces)).toISOString() }
     // The last lookback gap's line is kept while a lookback line is still at or behind it.
     const gl = lookbackGap ?? from.gapLine
     const keepLine = gl !== undefined && (li.line.t < gl || ln.line.t < gl)

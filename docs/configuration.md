@@ -496,9 +496,12 @@ events_list({ account, since?, cursor?, limit?, source? })
   showed only after the listing passed it. A backlog read far behind now re-reads nothing, since under the assumption
   every write before it is already visible. The cursor carries 36-bit hashes of what it listed in the lookback, up to
   24 a feed and within the contract's 1,024 characters, so nothing is listed twice. When a live burst lists more than
-  that, the lookback is shortened, and the page answers `gap` (`expired`, since the later of now and the newest change
-  read; the cursor keeps that line as `gl`), so a write behind it is covered; later shortenings while that burst drains
-  answer no other, and only one past the line answers a new gap. An item Linear's pages show twice in one call is
+  that, the lookback is shortened. A shortened lookback that still covers at least the last 10 seconds of wall time
+  (`MIN_COVER_MS`, ten times the assumed sub-second delay) answers no gap: every write the assumption allows to be
+  unseen is still covered, so a steady stream below about 2.4 changes a second never gaps. One that covers less, as in
+  a faster bulk edit, answers `gap` (`expired` for a cursor, `window-truncated` for a first read from `since`, since the
+  later of now and the newest change read; the cursor keeps that line as `gl`), so a write behind it is covered; later
+  shortenings while that burst drains answer no other, and only one past the line answers a new gap. An item Linear's pages show twice in one call is
   listed once. An entry Linear answers without an id or a time holds that feed where it was while the other feed is
   listed, and a call with nothing else to list answers `UPSTREAM_UNREADABLE`: never skipped.
 - **Secrets**: an event whose title or text holds a secret, such as a password in a URL, is never listed: it is in the

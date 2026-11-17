@@ -50,9 +50,11 @@ All notable changes to this project are documented here. The format follows [Kee
   visible; the plugin assumes well under a second, and every call now reads each feed again from two minutes before the
   later of the cursor and now, and lists what it had not listed there, once. The cursor carries 36-bit hashes of what
   it listed in the lookback, up to 24 a feed, within the contract's 1,024 characters. A backlog read far behind now
-  re-reads nothing. When a live burst lists more than the hashes hold, the lookback is shortened and that page answers
-  `gap` (`expired`, since the later of now and the newest change read, kept in the cursor as `gl`), so nothing behind
-  it is lost without a sign; later shortenings while that burst drains answer no other. Only a change more than two
+  re-reads nothing. When a live burst lists more than the hashes hold, the lookback is shortened; if it still covers
+  the last 10 seconds (`MIN_COVER_MS`, ten times the assumed delay) there is no gap, so a steady stream below about 2.4
+  changes a second never answers one. If it covers less, that page answers `gap` (`expired`, or `window-truncated` on
+  a first read from `since`; since the later of now and the newest change read, kept in the cursor as `gl`), so
+  nothing behind it is lost without a sign; later shortenings while that burst drains answer no other. Only a change more than two
   minutes late is still missed ([README, Known limits](README.md#known-limits)).
 - **An entry Linear answers without an id or a time is no longer skipped silently:** that feed is held where it was
   while the other is listed, and a call with nothing else to list answers `UPSTREAM_UNREADABLE`. An item Linear's pages
