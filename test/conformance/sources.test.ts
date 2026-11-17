@@ -32,6 +32,12 @@ const SINCE = "2026-11-01T00:00:00Z"
 const ACCOUNT = `${LINEAR["workspace"].id}/${LINEAR["me"].email}`
 /** Each Linear read answers one page in one call, so no single event can fail on its own. */
 const ATOMIC = "Linear answers each list_issues and get_notifications read as one page in one call, so no single event can fail on its own"
+/**
+ * A cursor is the plugin's own: the last listed update time of each feed, never a token Linear issues. Linear filters
+ * assigned issues by updatedAt and lists the inbox newest first from any time, so no cursor loses history: the plugin
+ * never answers CURSOR_EXPIRED or a gap.
+ */
+const NO_EXPIRY = "A cursor is the last listed update time of each feed, not a Linear token, and Linear lists assigned issues by updatedAt and the inbox from any time, so a cursor never loses history and the plugin never answers CURSOR_EXPIRED or a gap"
 
 const answer = (value: unknown) => ({ output: value, content: [{ type: "text", text: JSON.stringify(value) }] })
 
@@ -128,20 +134,25 @@ describe("the source contract's conformance kit", () => {
       sources,
       describe: { id: TOOLS_RPC_ID },
       atomicPages: { reason: ATOMIC },
+      noExpiry: { reason: NO_EXPIRY },
     })
     reports.push(report)
     expect(report.problems).toEqual([])
-    // Linear's cursor holds an update time in each feed, and Linear keeps the issues and the inbox it lists, so a
-    // cursor never loses history: the plugin never answers CURSOR_EXPIRED, and the kit's gap check cannot run
-    // (source-contract#30, item 5). The report stays incomplete on that one check.
-    expect(report.checks.filter((check) => !check.ran && !check.notApplicable).map((check) => check.name)).toEqual(["gap-and-cursor-expired"])
+    // Every check that applies runs, so the report is complete. failed-holds-cursor and gap-and-cursor-expired are not
+    // applicable with the reasons above (source-contract#30, item 5); the others not run are about what this source
+    // never declares or sends: a gap, removals[], a price, details, suggest, a snapshot's output.
+    expect(report.checks.filter((check) => !check.ran && !check.notApplicable).map((check) => check.name)).toEqual([])
+    expect(report.checks.filter((check) => check.notApplicable).map((check) => check.name).sort()).toEqual(
+      ["billed-cost", "details", "failed-holds-cursor", "gap-and-cursor-expired", "gap-once-per-read", "output-schema", "removals-are-final", "suggest"],
+    )
+    expect(report.ok).toBe(true)
   })
 
   test("writes the report a release attaches", () => {
     expect(reports.map((report) => report.source)).toEqual(["linear.activity"])
     const installed = readInstalledDescriptor(root, { version: pkg.version })
     const report = {
-      contract: "@we-the-rebel-alliance/source-contract@0.1.0",
+      contract: "@we-the-rebel-alliance/source-contract@0.2.0",
       plugin: PACKAGE,
       version: pkg.version,
       descriptorHash: installed.ok ? installed.value.hash : null,

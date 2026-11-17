@@ -365,7 +365,8 @@ store.
   new sign-in or a restart of OpenCode a listing answers `UNAVAILABLE` until the next `probe`. The conformance kit runs on Linear answers
   that are invented, modelled on the tools' descriptions in the live tool list, and not live-verified.
 - **A Linear cursor never expires.** It holds an update time in each feed, so the plugin never answers
-  `CURSOR_EXPIRED`, and the conformance report stays incomplete on the kit's expired-cursor check.
+  `CURSOR_EXPIRED` or a `gap`. The conformance test says so to the kit (`noExpiry`, with that reason), so the kit's
+  expired-cursor check is reported not applicable and the report is complete.
 - **Jelly's relay sign-in is not yet checked with Linear.** The Jelly declaration lets a sign-in come back through
   Jelly's relay, based only on Linear's server metadata; Linear does not document its redirect rules, and no relay
   sign-in has been made yet.

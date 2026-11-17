@@ -452,7 +452,7 @@ Copy the full block from your own `/linear-status` output; the lines in quotes a
 ## Events list
 
 `linear_events_list` (Code Mode `tools.linear.events_list`, and the tools RPC method `events_list`) is this plugin's
-source under the shared source contract, `@we-the-rebel-alliance/source-contract` v0.1.0 (see [Sources](#sources)),
+source under the shared source contract, `@we-the-rebel-alliance/source-contract` v0.2.0 (see [Sources](#sources)),
 which Memory's collector reads. It is not for answering questions: the model uses `list_issues` or `linear_issues` for
 that.
 
@@ -526,8 +526,12 @@ consumer (Memory, jelly, Artifacts) reads it from the installed package:
 | `urlHosts` | `linear.app` |
 | `sources.rpc`, `sources.probe.action` | `linear.workspace.tools`, `linear_probe` |
 
-`npm run check` runs the contract's conformance kit over the source, on recorded answers with no Linear call, and
-writes `reports/conformance-report.json` for a release to attach.
+`npm run check` and `npm run conformance` run the contract's conformance kit over the source, on recorded answers
+with no Linear call, and write `reports/conformance-report.json`, which a release attaches; it must say `ok: true`.
+Every check that applies runs. Two cannot apply, and the test tells the kit why, so the report shows each reason:
+`atomicPages` (each Linear read answers one page in one call, so no single event can fail on its own, and `failed[]`
+never happens) and `noExpiry` (a cursor is the last listed update time of each feed, not a Linear token, so it never
+loses history and the plugin never answers `CURSOR_EXPIRED` or a `gap`).
 
 ## Errors
 
