@@ -380,14 +380,19 @@ store.
   Linear's tools do not show what was removed.
 - **A change that becomes visible more than two minutes after its time is missed.** Linear does not document how soon
   a write is visible to a list read; the plugin assumes well under a second, and re-reads two minutes. Each listing
-  reads each feed again from two minutes before the later of the cursor and now, and lists what it had not listed
-  there, once (the cursor carries hashes of what it listed in those two minutes, up to 24 a feed). A backlog read far
-  behind now re-reads nothing: under the assumption every write before it is already visible. Only a change that shows
-  up more than two minutes late is missed without a sign. When a live burst lists more than the cursor's hashes hold,
+  reads each feed again from two minutes before the later of the cursor and Linear's now, and lists what it had not
+  listed there, once (the cursor carries hashes of what it listed in those two minutes, up to 24 a feed). Linear's now
+  is taken from the newest change a listing reads, never later than your computer's clock nor more than 10 minutes
+  before it (`SKEW_MS`), so a clock running up to 10 minutes ahead of Linear's does not shorten the lookback; one further
+  ahead can. A backlog read far behind Linear's now re-reads nothing: under the assumption every write before it is
+  already visible. A change that shows up more than two minutes late, or more than 10 seconds late during a burst that
+  shortens the lookback without a gap (below), is missed without a sign. When a live burst lists more than the
+  cursor's hashes hold,
   the lookback is shortened. If what it still covers reaches back at least 10 seconds (`MIN_COVER_MS`, ten times the
   assumed sub-second delay), nothing the assumption allows can be lost and there is no gap, so a steady stream below
   about 2.4 changes a second never answers one. If it covers less, as in a bulk edit faster than that, the page answers
-  `gap` (`expired`, or `window-truncated` on a first read from `since`, since now), so a write behind it is covered.
+  `gap` (`expired`, or `window-truncated` on a first read from `since`, since Linear's now), so a write behind it is
+  covered.
 - **Jelly's relay sign-in is not yet checked with Linear.** The Jelly declaration lets a sign-in come back through
   Jelly's relay, based only on Linear's server metadata; Linear does not document its redirect rules, and no relay
   sign-in has been made yet.

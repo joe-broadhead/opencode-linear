@@ -177,13 +177,14 @@ describe("a read that drains after a cut", () => {
     expect(after).toMatchObject({ events: [], more: false })
   })
 
-  test("late arrivals in both feeds stamped in the last two minutes of wall time are listed once; older is the stated assumption", async () => {
+  test("late arrivals in both feeds stamped in Linear's last two minutes are listed once; older is the stated assumption", async () => {
     const data: Data = { issues: [issue(1, ago(10_000))], notifications: [note(1, ago(10_000))] }
     const host = linear(data, 2)
     const first = await run(host)({ since: SINCE })
     expect(first.events).toHaveLength(2)
-    data.issues.push(issue(2, ago(100_000)), issue(3, ago(125_000)))
-    data.notifications.push(note(2, ago(10_001)), note(3, ago(130_000)))
+    // Linear's now is its newest stamp, 10 s ago: the lookback reaches back to 130 s ago.
+    data.issues.push(issue(2, ago(100_000)), issue(3, ago(135_000)))
+    data.notifications.push(note(2, ago(10_001)), note(3, ago(140_000)))
     const next = await run(host)({ cursor: first.cursor })
     expect(next.events.map((event) => event.external_id).sort()).toEqual([`ENG-2@${ago(100_000)}`, noteId(2)].sort())
     const after = await run(host)({ cursor: next.cursor })

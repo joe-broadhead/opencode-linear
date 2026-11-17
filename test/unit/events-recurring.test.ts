@@ -387,6 +387,35 @@ describe("the recurring bugs, and late arrivals", () => {
       }
     }, SLOW)
 
+    test(`SKEW ${feed}: the host clock ahead of or behind Linear's, a live bulk of 1,000 in Linear's last second, then a write 200 ms before its end: listed or gapped, never silent`, async () => {
+      for (const skew of [0, 5, 15, 60, 180, -30, -60]) {
+        const data = empty()
+        for (let k = 0; k < 1000; k++) add(data, 1000 + k, NOW - 1000 + k)
+        const host = linear(data, 250)
+        const list = run(host, ACCOUNT, () => NOW + skew * S)
+        const pages = await drain(list, { since: iso(NOW - 3600 * S), limit: 500 })
+        add(data, 99999, NOW - 200)
+        const next = await list({ cursor: pages.at(-1)!.cursor })
+        const listedLate = next.events.some((e) => e.external_id === key(99999, NOW - 200))
+        const g = gaps([...pages, next])
+        const outcome = listedLate ? "listed" : g.some((x) => Date.parse(x.since) > NOW - 200) ? "gapped" : "SILENT"
+        expect({ skew, outcome }).not.toEqual({ skew, outcome: "SILENT" })
+      }
+    }, SLOW)
+
+    test(`SKEW2 ${feed}: the host clock ahead of or behind Linear's, a few changes (no shortening), then a write 200 ms behind the cursor: listed`, async () => {
+      for (const skew of [0, 60, 119, 121, 300, -30, -60]) {
+        const data = empty()
+        add(data, 1, NOW - 10 * S)
+        const host = linear(data, 50)
+        const list = run(host, ACCOUNT, () => NOW + skew * S)
+        const first = await list({ since: iso(NOW - 3600 * S) })
+        add(data, 2, NOW - 10 * S - 200)
+        const next = await list({ cursor: first.cursor })
+        expect({ skew, listed: next.events.map((e) => e.external_id) }).toEqual({ skew, listed: [key(2, NOW - 10 * S - 200)] })
+      }
+    }, SLOW)
+
     test(`K2 ${feed}: live, a late arrival inside what the lookback still names is listed`, async () => {
       const data = empty()
       for (let k = 0; k < 20; k++) add(data, 100 + k, NOW - 20 * S + k * S)

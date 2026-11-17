@@ -79,18 +79,26 @@ const NOTIFICATION_PAGES = 5
 /**
  * How far back each call reads again for late arrivals: a change Linear stamps before the cursor's position but shows
  * only after the listing read past it. Linear does not document how soon a write is visible to a list read; the plugin
- * assumes well under a second, and re-reads two minutes. Under that assumption only a change stamped within the last
- * two minutes of wall time can still be unseen, so the lookback reaches back two minutes from the later of the feed's
- * position and now: a backlog read far behind now needs none. What was listed in it is de-duplicated by the hashes the
- * cursor carries.
+ * assumes well under a second, and re-reads two minutes. Under that assumption only a change stamped within Linear's
+ * last two minutes can still be unseen, so the lookback reaches back two minutes from the later of the feed's position
+ * and Linear's now: a backlog read far behind it needs none. Linear's now is estimated from below as the newest stamp a
+ * call reads, never past the host's clock nor more than SKEW_MS before it, so a host clock running ahead of Linear's
+ * (up to ten minutes) cannot move the line. What was
+ * listed in it is de-duplicated by the hashes the cursor carries.
  */
 export const LOOKBACK_MS = 120_000
 /**
  * The least wall time a shortened lookback must still cover for no gap: ten times the stated sub-second assumption.
- * A lookback whose kept hashes reach back at least 10 s before now covers every write that can still be unseen, so a
+ * A lookback whose kept hashes reach back at least 10 s before Linear's now covers every write that can still be unseen, so a
  * steady stream below about 2.4 changes a second never answers a gap; a faster burst, which leaves less, does.
  */
 export const MIN_COVER_MS = 10_000
+/**
+ * How far ahead of Linear's clock the host's may run without moving the lookback: Linear's now is estimated as the
+ * newest stamp a call reads, but never earlier than the host's now less this, so a quiet account's old changes are not
+ * taken for live ones. A host clock more than ten minutes ahead of Linear's is outside it.
+ */
+export const SKEW_MS = 600_000
 /**
  * The most listed items per feed whose hashes the cursor carries for the lookback, each 36 bits in 6 base64url
  * characters; fewer when the contract's 1,024 characters do not hold them all. More listed in a live lookback pull that
@@ -638,17 +646,17 @@ interface NextLookback {
 }
 
 /**
- * A feed's next lookback: from two minutes before the later of its new position and now (never before the old line, nor
+ * A feed's next lookback: from two minutes before the later of its new position and Linear's now (never before the old line, nor
  * behind a cut, nor past the position), with the hashes of what was listed after the line: what the walk read there
  * that was already accounted for, and what this page consumed. More than `max` pull the line in to the newest `max`,
  * never past an item still to be listed nor past the position: `shortened` names the new line. A feed held for an
  * unlistable entry keeps its lookback.
  */
-function nextLookback(walk: Walk | undefined, consumed: ReadonlySet<string>, old: Lookback, at: Position, now: number, max: number): NextLookback {
+function nextLookback(walk: Walk | undefined, consumed: ReadonlySet<string>, old: Lookback, at: Position, linearNow: number, max: number): NextLookback {
   if (walk === undefined) return { line: old.line, seen: [...old.seen].join("") }
   const found = new Set(walk.found.map((item) => item.event.external_id))
   const id = (item: IssueChange) => item.event.external_id
-  let line: Position = { t: Math.max(at.t, now) - LOOKBACK_MS, k: END }
+  let line: Position = { t: Math.max(at.t, linearNow) - LOOKBACK_MS, k: END }
   if (walk.cut !== undefined && isAfter(walk.cut, line)) line = walk.cut
   if (walk.cut === undefined && isAfter(old.line, line)) line = old.line
   if (isAfter(line, at)) line = at
@@ -743,17 +751,22 @@ export async function linearEvents(read: Read, signedIn: SignedIn | undefined, i
   const taken = new Set(merged.slice(0, consumed).map((item) => item.event.external_id))
   const more = consumed < merged.length
   const newestRead = Math.max(0, ...[...issueWalk.read, ...notificationWalk.read].map((item) => item.at.t))
+  // Linear's clock, from below: the newest stamp this call read from Linear, never past the host's now (which may run
+  // ahead or behind), nor more than SKEW_MS before it, so an old change in a quiet account is not taken for a live one.
+  // The lookback's anchor and the coverage gate use it, so a host clock up to SKEW_MS ahead of Linear's cannot move the
+  // line past a write Linear may still show late.
+  const linearNow = Math.min(now, Math.max(newestRead, now - SKEW_MS))
   // The page answers a gap once: for a cut (expired for a cursor, window-truncated for since), or for a lookback this
   // page shortened past the line the last such gap named, leaving less than MIN_COVER_MS covered. A shortening's gap
-  // names the later of now and the newest change this call read (Linear's clock may run ahead of ours): every write
+  // names the later of Linear's now (from below) and the newest change this call read: every write
   // stamped before it is visible by the plugin's assumption, or behind that gap, so the shortenings that follow while
   // that burst drains answer no other.
   const encode = (max: number) => {
-    const li = nextLookback(issuesRead, taken, from.issuesLookback, next.issues, now, max)
-    const ln = nextLookback(notificationsRead, taken, from.notificationsLookback, next.notifications, now, max)
-    // Only a shortening that leaves less than MIN_COVER_MS of wall time covered can lose a write the assumption allows.
-    const raised = [li.shortened, ln.shortened].flatMap((line) => (line !== undefined && line.t > now - MIN_COVER_MS && (from.gapLine === undefined || line.t >= from.gapLine) ? [line] : []))
-    const lookbackGap = raised.length === 0 ? undefined : Math.max(now, newestRead + 1, ...raised.map((line) => line.t + 1))
+    const li = nextLookback(issuesRead, taken, from.issuesLookback, next.issues, linearNow, max)
+    const ln = nextLookback(notificationsRead, taken, from.notificationsLookback, next.notifications, linearNow, max)
+    // Only a shortening that leaves less than MIN_COVER_MS of Linear's time covered can lose a write the assumption allows.
+    const raised = [li.shortened, ln.shortened].flatMap((line) => (line !== undefined && line.t > linearNow - MIN_COVER_MS && (from.gapLine === undefined || line.t >= from.gapLine) ? [line] : []))
+    const lookbackGap = raised.length === 0 ? undefined : Math.max(linearNow, newestRead + 1, ...raised.map((line) => line.t + 1))
     const sinces = [...edges.map((edge) => edge.t + 1), ...(lookbackGap === undefined ? [] : [lookbackGap])]
     const gap: EventsGap | undefined =
       sinces.length === 0 ? undefined : { reason: request.cursor === undefined ? "window-truncated" : "expired", since: new Date(Math.max(...sinces)).toISOString() }

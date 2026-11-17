@@ -492,11 +492,13 @@ events_list({ account, since?, cursor?, limit?, source? })
   either, the listing starts 24 hours ago. An older cursor lists the same events again.
 - **Late arrivals**: Linear does not document how soon a write is visible to a list read; the plugin assumes well under
   a second, and re-reads two minutes (`LOOKBACK_MS`). Every call reads each feed again from two minutes before the
-  later of the cursor and now, and lists what it had not listed there: a change Linear stamped before the cursor but
-  showed only after the listing passed it. A backlog read far behind now re-reads nothing, since under the assumption
-  every write before it is already visible. The cursor carries 36-bit hashes of what it listed in the lookback, up to
+  later of the cursor and Linear's now, and lists what it had not listed there: a change Linear stamped before the
+  cursor but showed only after the listing passed it. Linear's now is the newest stamp the call read, never later than
+  the host's clock nor more than 10 minutes before it (`SKEW_MS`), so a host clock up to 10 minutes ahead of Linear's
+  cannot move the line or the gate below. A backlog read far behind Linear's now re-reads nothing, since under the
+  assumption every write before it is already visible. The cursor carries 36-bit hashes of what it listed in the lookback, up to
   24 a feed and within the contract's 1,024 characters, so nothing is listed twice. When a live burst lists more than
-  that, the lookback is shortened. A shortened lookback that still covers at least the last 10 seconds of wall time
+  that, the lookback is shortened. A shortened lookback that still covers at least Linear's last 10 seconds
   (`MIN_COVER_MS`, ten times the assumed sub-second delay) answers no gap: every write the assumption allows to be
   unseen is still covered, so a steady stream below about 2.4 changes a second never gaps. One that covers less, as in
   a faster bulk edit, answers `gap` (`expired` for a cursor, `window-truncated` for a first read from `since`, since the
