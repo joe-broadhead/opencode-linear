@@ -27,6 +27,8 @@ All notable changes to this project are documented here. The format follows [Kee
   word (`scripts/jelly-family-block.md`, which `npm run check` holds it to). The sentence that a tool declared `allow`
   runs what the plugin's own default allows is reworded: a declared `allow` changes nothing in Jelly, and each tool
   follows the access choice and its `readOnly`.
+- CI's concurrency group names the event (`ci-<event>-<ref>`), so a run by hand on `master` never cancels the push run
+  a release stands on.
 
 ### Fixed
 
