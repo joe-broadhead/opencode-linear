@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The source contract is `@we-the-rebel-alliance/source-contract` v0.2.0, pinned as
+  `github:we-the-rebel-alliance/source-contract#v0.2.0` (commit `88bdc1e`) and bundled into `dist/index.js`, with still
+  no runtime dependency. `linear.activity`'s declaration, its pages and `probe`'s answer are unchanged: the plugin
+  declares and sends none of the keys v0.2.0 adds, which a consumer still on v0.1.x refuses.
+- **The conformance report is complete and ok.** The conformance test tells the kit that the source's cursors never
+  expire (`noExpiry`: a cursor is the last listed update time of each feed, not a Linear token, so the plugin never
+  answers `CURSOR_EXPIRED` or a `gap`), beside `atomicPages` (each Linear read answers one page in one call, so no single
+  event can fail). Both checks are reported not applicable with those reasons; every other check that applies runs.
+  The test pins the set of checks that are not applicable.
+- `npm run conformance` (`bun test ./test/conformance`) runs the kit alone and writes
+  `reports/conformance-report.json`; `npm run check` still runs it as its `conformance` stage.
+- The release kit is revision 4.1 (`1f452e5`, the family's): a release runs `npm run conformance` on the parent in a
+  job of its own, with no write token, stops unless the report is `ok` for this version, and attaches it as the Release
+  asset `conformance-report.json`, listed in `SHA256SUMS`; the pack job records the kept tarball's sha256 and the stage
+  and publish jobs check it after every download. `test/support/jelly-kit.ts` is the family copy that checks jelly's
+  `cost` and `admin` lines.
+- [In Jelly](docs/jelly.md#tools-and-permissions) carries Jelly's shared rules for every plugin of the family, word for
+  word (`scripts/jelly-family-block.md`, which `npm run check` holds it to). The sentence that a tool declared `allow`
+  runs what the plugin's own default allows is reworded: a declared `allow` changes nothing in Jelly, and each tool
+  follows the access choice and its `readOnly`.
+
 ## [0.0.4] - 2026-11-15
 
 ### Changed
