@@ -1,6 +1,6 @@
 // The source contract's conformance kit over the source this plugin declares in package.json's `sources`, run on the
 // plugin's own events_list and probe methods against recorded Linear answers (test/fixtures/sources.json, all
-// invented): no Linear call, no sign-in. The reads go through a fake of OpenCode's executor that asserts
+// invented, and a bulk change of 2,100 issues made from it here): no Linear call, no sign-in. The reads go through a fake of OpenCode's executor that asserts
 // `linear_<tool>` on the kit's recording permission, as the host asserts it, so the kit sees exactly what each read
 // asserts. The report is written to reports/conformance-report.json, for a release to attach.
 import { describe, expect, test } from "bun:test"
@@ -30,32 +30,50 @@ const NOW = Date.parse("2026-11-08T12:00:00Z")
 const SINCE = "2026-11-01T00:00:00Z"
 /** The account probe names: the workspace's id and the signed-in email. */
 const ACCOUNT = `${LINEAR["workspace"].id}/${LINEAR["me"].email}`
-/** Each Linear read answers one page in one call, so no single event can fail on its own. */
-const ATOMIC = "Linear answers each list_issues and get_notifications read as one page in one call, so no single event can fail on its own"
+/** Every event comes whole from a page of a list read, and any failed read fails the whole listing. */
+const ATOMIC = "Each event comes whole from a list_issues or get_notifications page, never from a read of its own, and a failed read fails the whole listing, so no single event can fail on its own"
 /**
- * A cursor is the plugin's own: the last listed update time of each feed, never a token Linear issues. Linear filters
- * assigned issues by updatedAt and lists the inbox newest first from any time, so no cursor loses history: the plugin
- * never answers CURSOR_EXPIRED or a gap.
+ * A bulk change on 20 October: 2,100 of Sam's issues moved a second apart, more than one call reads (8 pages of 250).
+ * It is older than every case's since, so only a consumer whose cursor is from before it meets it: the cursor's history
+ * is then out of reach, and the source answers an expired gap. No noExpiry: Linear loses history a reader has not seen
+ * (a burst past one call's reach, a deleted issue, an inbox item removed), so the kit's expired-cursor check runs.
  */
-const NO_EXPIRY = "A cursor is the last listed update time of each feed, not a Linear token, and Linear lists assigned issues by updatedAt and the inbox from any time, so a cursor never loses history and the plugin never answers CURSOR_EXPIRED or a gap"
+const BULK = Array.from({ length: 2100 }, (_, n) => ({
+  ...LINEAR["issues"][0],
+  id: `ENG-${1000 + n}`,
+  uuid: `0b5e0000-0000-4000-8000-${String(1000 + n).padStart(12, "0")}`,
+  title: `Imported issue ${1000 + n}`,
+  description: "Moved to the new board in the bulk change.",
+  url: `https://linear.app/example-co/issue/ENG-${1000 + n}/imported-issue-${1000 + n}`,
+  updatedAt: new Date(Date.parse("2026-10-20T09:00:00Z") + n * 1000).toISOString(),
+}))
+/** A consumer that last read on 19 October, before the bulk change: its cursor's history is out of reach. */
+const BEFORE_BULK = Date.parse("2026-10-19T00:00:00Z")
 
 const answer = (value: unknown) => ({ output: value, content: [{ type: "text", text: JSON.stringify(value) }] })
 
 /**
  * OpenCode's executors for Linear's reads, answering as Linear does from the recorded data: assigned issues newest
- * first after `updatedAt`, notifications newest first, one page each. Each asserts its own `linear_<tool>` on the
- * session's permission first, as the host does.
+ * first after `updatedAt`, notifications newest first, in pages of `limit` with Linear's cursor. Each asserts its own
+ * `linear_<tool>` on the session's permission first, as the host does.
  */
 function executors(permission: SessionContext["permission"]) {
+  const paged = (key: string, items: unknown[], input: Record<string, unknown>) => {
+    const from = Number(input["cursor"] ?? 0)
+    const size = Number(input["limit"] ?? 50)
+    const more = from + size < items.length
+    return answer({ [key]: items.slice(from, from + size), hasNextPage: more, ...(more ? { cursor: String(from + size) } : {}) })
+  }
+  const newest = (field: string) => (a: Record<string, string>, b: Record<string, string>) => Date.parse(b[field]!) - Date.parse(a[field]!)
   const execute = (tool: string, input: Record<string, unknown>) => {
     if (tool === "linear_get_user") return answer(input["query"] === "me" ? LINEAR["me"] : {})
     if (tool === "linear_get_workspace") return answer(LINEAR["workspace"])
     if (tool === "linear_list_issues") {
       const after = Date.parse(String(input["updatedAt"]))
-      const issues = (LINEAR["issues"] as { updatedAt: string }[]).filter((item) => Date.parse(item.updatedAt) > after).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-      return answer({ issues, hasNextPage: false })
+      const issues = [...LINEAR["issues"], ...BULK].filter((item: { updatedAt: string }) => Date.parse(item.updatedAt) > after).sort(newest("updatedAt"))
+      return paged("issues", issues, input)
     }
-    return answer({ notifications: LINEAR["notifications"], hasNextPage: false })
+    return paged("notifications", [...LINEAR["notifications"]].sort(newest("createdAt")), input)
   }
   return {
     list: async () =>
@@ -90,7 +108,14 @@ async function cases(): Promise<PageCase[]> {
   await probeMethod(options(open)).run({ source: LINEAR_SOURCE }, call())
   const first = (await list({ source: LINEAR_SOURCE, account: ACCOUNT, since: SINCE, limit: 2 }))["cursor"] as string
   const done = (await list({ source: LINEAR_SOURCE, account: ACCOUNT, cursor: first, limit: 500 }))["cursor"] as string
+  const old = encodeBoundCursor({ plugin: NAMESPACE, source: LINEAR_SOURCE, account: ACCOUNT }, { a: ACCOUNT, i: [BEFORE_BULK, ""], n: [BEFORE_BULK, ""] })
   return [
+    { name: "a cursor from before a bulk change bigger than one call reads: expired, once", input: { source: LINEAR_SOURCE, account: ACCOUNT, cursor: old }, expect: "expired" },
+    {
+      name: "a since from before the bulk change: window-truncated once, and not on the page its cursor names",
+      input: { source: LINEAR_SOURCE, account: ACCOUNT, since: new Date(BEFORE_BULK).toISOString(), limit: 50 },
+      expect: "page",
+    },
     { name: "a first listing, one issue refused for a secret", input: { source: LINEAR_SOURCE, account: ACCOUNT, since: SINCE }, expect: "page" },
     { name: "two at a time", input: { source: LINEAR_SOURCE, account: ACCOUNT, since: SINCE, limit: 2 }, expect: "page" },
     { name: "what came after the first two", input: { source: LINEAR_SOURCE, account: ACCOUNT, cursor: first }, expect: "page" },
@@ -134,17 +159,15 @@ describe("the source contract's conformance kit", () => {
       sources,
       describe: { id: TOOLS_RPC_ID },
       atomicPages: { reason: ATOMIC },
-      noExpiry: { reason: NO_EXPIRY },
     })
     reports.push(report)
     expect(report.problems).toEqual([])
-    // Every check that applies runs, so the report is complete. failed-holds-cursor and gap-and-cursor-expired are not
-    // applicable with the reasons above (source-contract#30, item 5); the others not run are about what this source
-    // never declares or sends: a gap, removals[], a price, details, suggest, a snapshot's output.
+    // Every check that applies runs, so the report is complete. The expired-cursor check and gap-once-per-read run on
+    // the bulk change; failed-holds-cursor is not applicable with the reason above; the others not run are about what
+    // this source never declares or sends: removals[], a price, details, suggest, a snapshot's output.
     expect(report.checks.filter((check) => !check.ran && !check.notApplicable).map((check) => check.name)).toEqual([])
-    expect(report.checks.filter((check) => check.notApplicable).map((check) => check.name).sort()).toEqual(
-      ["billed-cost", "details", "failed-holds-cursor", "gap-and-cursor-expired", "gap-once-per-read", "output-schema", "removals-are-final", "suggest"],
-    )
+    expect(report.checks.filter((check) => check.notApplicable).map((check) => check.name).sort()).toEqual(["billed-cost", "details", "failed-holds-cursor", "output-schema", "removals-are-final", "suggest"])
+    for (const name of ["gap-and-cursor-expired", "gap-once-per-read"]) expect(report.checks.find((check) => check.name === name)).toMatchObject({ ran: true, notApplicable: false, problems: [] })
     expect(report.ok).toBe(true)
   })
 

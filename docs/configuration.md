@@ -494,8 +494,11 @@ events_list({ account, since?, cursor?, limit?, source? })
   page's `refused[]` with `reason: "secret"`, and the cursor moves past it. Every page also names `plugin` and
   `asOf`.
 - **Limits**: `limit` is 1 to 500 (100 by default); a result stops early, with `more: true`, rather than pass 900 KB.
-  One call reads at most 8 pages of 250 issues and 5 pages of 100 notifications; more is `TOO_MANY_CHANGES`, never a
-  skip.
+  One call reads at most 8 pages of 250 issues and 5 pages of 100 notifications, newest first.
+- **Gap**: when more changed after the cursor or `since` than one call reads, the oldest of them are out of reach. The
+  page then answers `gap` once, `{ reason: "expired", since }` for a cursor or `{ reason: "window-truncated", since }`
+  for `since`, and lists everything from `since` on; its cursor resumes there, so the next call goes on and a burst
+  drains rather than stops. What changed before `since` is not listed: a consumer resyncs on the gap.
 - **Permissions**: it asserts `linear_events_list`, then each Linear read it makes goes through OpenCode's own
   executor, so `linear_list_issues` and `linear_get_notifications` follow their own rules. With the default rules
   neither asks. Every result carries `trust: "untrusted"`: issue and notification text is other people's, never
@@ -528,10 +531,9 @@ consumer (Memory, jelly, Artifacts) reads it from the installed package:
 
 `npm run check` and `npm run conformance` run the contract's conformance kit over the source, on recorded answers
 with no Linear call, and write `reports/conformance-report.json`, which a release attaches; it must say `ok: true`.
-Every check that applies runs. Two cannot apply, and the test tells the kit why, so the report shows each reason:
-`atomicPages` (each Linear read answers one page in one call, so no single event can fail on its own, and `failed[]`
-never happens) and `noExpiry` (a cursor is the last listed update time of each feed, not a Linear token, so it never
-loses history and the plugin never answers `CURSOR_EXPIRED` or a `gap`).
+Every check that applies runs, the expired-cursor and gap checks on a recorded bulk change of 2,100 issues. One cannot
+apply, and the test tells the kit why (`atomicPages`), so the report shows the reason: every event comes whole from a
+page of a list read, and a failed read fails the whole listing, so `failed[]` never happens.
 
 ## Errors
 
@@ -555,7 +557,6 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 | `UNAVAILABLE` | `linear_events_list`: no `probe` has named the current sign-in yet (a new sign-in, or OpenCode restarted). | Call `probe` for the `linear` source, then call `events_list` again. |
 | `ACCOUNT_MISMATCH` | `linear_events_list`: `account` is not the one `probe` read for the current sign-in, or the cursor was issued for another account. `probe`: `account` is not the signed-in one. | Pass the cursor with the account it was issued for, or sign in to Linear as that account; `probe` names the signed-in account. |
 | `CURSOR_INVALID` | `linear_events_list`: the cursor is malformed, another source's or plugin's, changed, or issued by 0.0.2 or earlier. | Call without a cursor, with `since`, to start again. |
-| `TOO_MANY_CHANGES` | `linear_events_list`: more assigned issues or notifications changed after the cursor or `since` than one call reads. | Call again with a later `since`, without a cursor. |
 
 For example:
 

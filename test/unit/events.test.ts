@@ -187,6 +187,7 @@ describe("linear_events_list", () => {
       assignee: "me",
       orderBy: "updatedAt",
       updatedAt: "2026-10-31T23:59:59.000Z",
+      includeArchived: true,
       limit: 250,
       fields: ["id", "uuid", "title", "description", "url", "updatedAt", "status", "statusType", "priority", "labels", "assignee", "assigneeId", "createdBy", "createdById"],
     })
@@ -203,8 +204,9 @@ describe("linear_events_list", () => {
     host.calls.length = 0
     const end = await run(host)({ cursor: all.cursor })
     expect(end.events).toEqual([])
-    // The newest notification is the cursor's, so the walk stops on the first page.
-    expect(host.calls.filter((call) => call.tool === "get_notifications")).toHaveLength(1)
+    // The newest notification is the cursor's. Linear may order another of the same millisecond after it, so the walk
+    // reads one more page and stops at the first older one.
+    expect(host.calls.filter((call) => call.tool === "get_notifications")).toHaveLength(2)
   })
 
   test("makes one issue event per change: identifier, title, status, actors, link and labels", () => {
@@ -345,9 +347,83 @@ describe("linear_events_list", () => {
     expect(rest.events.map((event: { external_id: string }) => event.external_id)).toEqual(LISTED.slice(3))
   })
 
-  test("stops with TOO_MANY_CHANGES rather than skip, when more changed than one call reads", async () => {
-    const many = { ...fixture(), issues: Array.from({ length: 30 }, (_, n) => issue(100 + n, `2026-11-0${2 + (n % 5)}T09:00:00.000Z`)) }
-    await expect(run(linear(many, 3))({ since: SINCE })).rejects.toThrow(/^TOO_MANY_CHANGES: More assigned issues changed/)
+  /** Every page of a read from `first` on, following each cursor until more is false (at most 50 calls). */
+  async function drain(list: (input: EventsListInput) => Promise<EventsListResult>, first: EventsListInput) {
+    const pages: EventsListResult[] = [await list(first)]
+    while (pages.at(-1)!.more) {
+      if (pages.length > 50) throw new Error("the read does not drain")
+      pages.push(await list({ cursor: pages.at(-1)!.cursor, limit: first.limit }))
+    }
+    return pages
+  }
+  const ids = (pages: EventsListResult[]) => pages.flatMap((page) => page.events.map((event) => event.external_id))
+  /** 30 of Sam's issues changed a minute apart on 2 November: more than 8 pages of 3 hold. */
+  const burst = (from = 0) => Array.from({ length: 30 }, (_, n) => issue(100 + n, `2026-11-02T10:${String(from + n).padStart(2, "0")}:00.000Z`))
+  const burstId = (n: number) => `ENG-${100 + n}@2026-11-02T10:${String(n).padStart(2, "0")}:00.000Z`
+
+  test("a burst bigger than one call reads from since answers a window-truncated gap once, then drains", async () => {
+    const data = { ...fixture(), issues: burst() }
+    const pages = await drain(run(linear(data, 3)), { since: SINCE, limit: 5 })
+    // Eight pages of three reach back to issue 106 (10:06): only what changed after its minute is listed whole.
+    expect(pages[0]!.gap).toEqual({ reason: "window-truncated", since: "2026-11-02T10:06:00.001Z" })
+    expect(pages.slice(1).map((page) => page.gap)).toEqual(pages.slice(1).map(() => undefined))
+    const listed = ids(pages)
+    expect(listed.filter((id) => id.startsWith("ENG-"))).toEqual(Array.from({ length: 23 }, (_, n) => burstId(7 + n)))
+    // The inbox is unaffected: every notification after since is listed, once.
+    expect(listed.filter((id) => id.startsWith("notification:"))).toEqual(LISTED.filter((id) => id.startsWith("notification:")))
+    expect(new Set(listed).size).toBe(listed.length)
+    for (const page of pages) expect(resultProblems(page, 5)).toEqual([])
+  })
+
+  test("a cursor more changes came after than one call reads answers an expired gap once, and the read goes on", async () => {
+    const data = fixture()
+    const host = linear(data, 3)
+    const first = await run(host)({ since: SINCE, limit: 1 })
+    expect(first.events.map((event) => event.external_id)).toEqual(LISTED.slice(0, 1))
+    data.issues.push(...burst())
+    const pages = await drain(run(host), { cursor: first.cursor, limit: 5 })
+    // The fixture's three later issues take three of the 24 places read, so the cut is at issue 109 (10:09).
+    expect(pages[0]!.gap).toEqual({ reason: "expired", since: "2026-11-02T10:09:00.001Z" })
+    expect(pages.slice(1).every((page) => page.gap === undefined)).toBe(true)
+    const listed = ids(pages)
+    expect(listed.filter((id) => id.startsWith("ENG-1"))).toEqual(Array.from({ length: 20 }, (_, n) => burstId(10 + n)))
+    // What changed after the cut is listed once, the fixture's later issues too; issue 2 was listed before the cursor.
+    expect(listed).toEqual(expect.arrayContaining(["ENG-3@2026-11-03T09:00:00.000Z", "ENG-5@2026-11-06T09:00:00.000Z", "ENG-6@2026-11-07T09:00:00.000Z"]))
+    expect(new Set(listed).size).toBe(listed.length)
+    // A later read from the last cursor is quiet: no gap again, nothing listed twice.
+    const after = await run(host)({ cursor: pages.at(-1)!.cursor })
+    expect(after).toMatchObject({ events: [], more: false })
+    expect(after.gap).toBeUndefined()
+  })
+
+  test("a bulk change bigger than one call reads, all in one millisecond, is cut whole and never jams the cursor", async () => {
+    const at = "2026-11-02T10:00:00.000Z"
+    const data = { ...fixture(), issues: Array.from({ length: 30 }, (_, n) => issue(100 + n, at)) }
+    const host = linear(data, 3)
+    const pages = await drain(run(host), { since: SINCE, limit: 5 })
+    expect(pages[0]!.gap).toEqual({ reason: "window-truncated", since: "2026-11-02T10:00:00.001Z" })
+    expect(ids(pages).filter((id) => id.startsWith("ENG-"))).toEqual([])
+    // The next read stops at the bulk's millisecond on its first page: the cursor has passed it whole.
+    host.calls.length = 0
+    const later = await run(host)({ cursor: pages.at(-1)!.cursor })
+    expect(later.gap).toBeUndefined()
+    expect(host.calls.filter((call) => call.tool === "list_issues")).toHaveLength(1)
+  })
+
+  test("a notification sharing a millisecond with the cursor's is listed, even on the next page of Linear's order", async () => {
+    const at = "2026-11-03T08:00:00.000Z"
+    const data = { ...fixture(), issues: [], notifications: [notification(20, at), notification(21, at)] }
+    const pages = await drain(run(linear(data, 1)), { since: SINCE, limit: 1 })
+    expect(ids(pages)).toEqual([`notification:${notification(20, "").id}`, `notification:${notification(21, "").id}`])
+  })
+
+  test("the inbox is cut like the issues when more notifications came than one call reads", async () => {
+    const notes = Array.from({ length: 8 }, (_, n) => notification(30 + n, `2026-11-03T08:0${n}:00.000Z`))
+    const data = { ...fixture(), issues: [], notifications: notes }
+    const pages = await drain(run(linear(data, 1)), { since: SINCE, limit: 10 })
+    // Five pages of one reach back to notification 33 (08:03): the three before it are out of reach.
+    expect(pages[0]!.gap).toEqual({ reason: "window-truncated", since: "2026-11-03T08:03:00.001Z" })
+    expect(ids(pages)).toEqual([34, 35, 36, 37].map((n) => `notification:${notification(n, "").id}`))
   })
 
   test("passes a refused read through untouched, and names Linear's own failure and an unreadable answer", async () => {

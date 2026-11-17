@@ -326,7 +326,6 @@ Run `/linear-status` first. Its last line is the next step.
 | `CURSOR_INVALID` from `linear_events_list` | The cursor was not issued by `events_list` for this Linear account, or by 0.0.2 or earlier. Call `events_list` without a cursor, with `since`, to start again. |
 | `UNAVAILABLE` from `linear_events_list` | No `probe` has named the current Linear sign-in yet, after a new sign-in or a restart of OpenCode. Call `probe` for the `linear` source, then list again. |
 | `ACCOUNT_MISMATCH` from `linear_events_list` or `probe` | The cursor was issued for another account, or Linear is signed in to another account than `probe` was asked for. Pass the cursor with its own account, or sign in to Linear as that account. |
-| `TOO_MANY_CHANGES` from `linear_events_list` | More changes than one `events_list` call reads came after the cursor or `since`. Call `events_list` again with a later `since`, without a cursor. |
 | `UPSTREAM_ERROR` from `linear_events_list` | Linear's read failed. Run `/linear-status`, then call `events_list` again with the same cursor. |
 
 A script's errors from the tools RPC have their own codes, listed in
@@ -364,9 +363,13 @@ store.
   that and never reads the identity itself. The plugin forgets it on every credential update or switch, so after a
   new sign-in or a restart of OpenCode a listing answers `UNAVAILABLE` until the next `probe`. The conformance kit runs on Linear answers
   that are invented, modelled on the tools' descriptions in the live tool list, and not live-verified.
-- **A Linear cursor never expires.** It holds an update time in each feed, so the plugin never answers
-  `CURSOR_EXPIRED` or a `gap`. The conformance test says so to the kit (`noExpiry`, with that reason), so the kit's
-  expired-cursor check is reported not applicable and the report is complete.
+- **A burst bigger than one listing reads is cut, not stopped.** One `events_list` call reads at most 2,000 assigned
+  issues and 500 notifications, newest first. When more changed after the cursor or `since`, the oldest are out of
+  reach: the page answers `gap` once (`expired` for a cursor, `window-truncated` for `since`) and lists from
+  `gap.since` on, so the next call goes on. Archived issues are listed too.
+- **What Linear no longer shows is not listed.** A change to an issue deleted, or no longer assigned to you, before a
+  listing reads it, and an inbox notification deleted or archived before then, are never listed, and nothing says so:
+  Linear's tools do not show what was removed.
 - **Jelly's relay sign-in is not yet checked with Linear.** The Jelly declaration lets a sign-in come back through
   Jelly's relay, based only on Linear's server metadata; Linear does not document its redirect rules, and no relay
   sign-in has been made yet.

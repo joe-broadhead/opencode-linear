@@ -10,11 +10,12 @@ All notable changes to this project are documented here. The format follows [Kee
   `github:we-the-rebel-alliance/source-contract#v0.2.0` (commit `88bdc1e`) and bundled into `dist/index.js`, with still
   no runtime dependency. `linear.activity`'s declaration, its pages and `probe`'s answer are unchanged: the plugin
   declares and sends none of the keys v0.2.0 adds, which a consumer still on v0.1.x refuses.
-- **The conformance report is complete and ok.** The conformance test tells the kit that the source's cursors never
-  expire (`noExpiry`: a cursor is the last listed update time of each feed, not a Linear token, so the plugin never
-  answers `CURSOR_EXPIRED` or a `gap`), beside `atomicPages` (each Linear read answers one page in one call, so no single
-  event can fail). Both checks are reported not applicable with those reasons; every other check that applies runs.
-  The test pins the set of checks that are not applicable.
+- **The conformance report is complete and ok, with no `noExpiry`.** Linear can lose history a reader has not seen
+  (below), so the kit's expired-cursor check and `gap-once-per-read` really run, on a recorded bulk change of 2,100
+  issues met by a cursor and by a `since` from before it. Only `failed-holds-cursor` is not applicable, with its reason
+  (`atomicPages`): every event comes whole from a page of a list read, and a failed read fails the whole listing. The
+  test pins the set of checks that are not applicable, and the recorded Linear now pages by `limit` and cursor as
+  Linear does.
 - `npm run conformance` (`bun test ./test/conformance`) runs the kit alone and writes
   `reports/conformance-report.json`; `npm run check` still runs it as its `conformance` stage.
 - The release kit is revision 4.1 (`1f452e5`, the family's): a release runs `npm run conformance` on the parent in a
@@ -26,6 +27,22 @@ All notable changes to this project are documented here. The format follows [Kee
   word (`scripts/jelly-family-block.md`, which `npm run check` holds it to). The sentence that a tool declared `allow`
   runs what the plugin's own default allows is reworded: a declared `allow` changes nothing in Jelly, and each tool
   follows the access choice and its `readOnly`.
+
+### Fixed
+
+- **A burst of changes bigger than one `events_list` call reads no longer jams the cursor.** Since 0.0.0, more than
+  2,000 assigned issues or 500 notifications changed after a cursor answered `TOO_MANY_CHANGES` on every call, so a
+  collector could never move on. Now the oldest of them, which one call cannot reach, are cut: the page answers `gap`
+  once, `{ reason: "expired", since }` for a cursor or `{ reason: "window-truncated", since }` for `since`, lists from
+  `since` on, and its cursor resumes there, so the read drains. A bulk change all in one millisecond is cut whole and
+  never read again. `TOO_MANY_CHANGES` is gone. **For Memory and every consumer:** resync on the gap, as the contract
+  says; nothing else changes.
+- A notification, or an issue change, in the same millisecond as the cursor's own could be skipped when Linear ordered
+  it after the one already listed and on the next page: a walk now reads past the cursor's millisecond before it stops.
+- `events_list` lists archived issues too (`includeArchived` on `list_issues`), so a change to an issue archived
+  before a listing reads it is no longer lost. What Linear's tools do not show, an issue deleted or no longer assigned
+  to the person and an inbox notification deleted or archived, is still not listed
+  ([README, Known limits](README.md#known-limits)).
 
 ## [0.0.4] - 2026-11-15
 
