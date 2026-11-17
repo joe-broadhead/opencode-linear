@@ -40,8 +40,10 @@ All notable changes to this project are documented here. The format follows [Kee
   on, and its cursor resumes there, so the read drains. Until the read has listed what the gap promised, the cursor
   also carries the newest position the cutting call read (`fi`, `fn`), and changes newer than it get their own
   allowance, so an arrival during the drain never cuts the read again or skips anything after `since`; only more
-  arrivals than one call reads, a new burst, answer a new gap. A bulk change all in one millisecond is cut whole and
-  never read again. `TOO_MANY_CHANGES` is gone. **For Memory and every consumer:** resync on the gap, as the contract
+  arrivals than one call reads, a new burst, answer a new gap. Only items not yet listed count toward the caps, never
+  ones at the cursor's own millisecond that the read already listed, and a cut needs the page after the caps to hold
+  another such item: a tie the cursor is part way through, or exactly a cap's worth, never answers a gap. A bulk change
+  all in one millisecond is cut whole and never read again. `TOO_MANY_CHANGES` is gone. **For Memory and every consumer:** resync on the gap, as the contract
   says; nothing else changes.
 - A notification, or an issue change, in the same millisecond as the cursor's own could be skipped when Linear ordered
   it after the one already listed and on the next page: a walk now reads past the cursor's millisecond before it stops.

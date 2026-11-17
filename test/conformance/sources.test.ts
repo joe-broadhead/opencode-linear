@@ -1,6 +1,6 @@
 // The source contract's conformance kit over the source this plugin declares in package.json's `sources`, run on the
 // plugin's own events_list and probe methods against recorded Linear answers (test/fixtures/sources.json, all
-// invented, and a bulk change of 2,100 issues made from it here): no Linear call, no sign-in. The reads go through a fake of OpenCode's executor that asserts
+// invented, and a bulk change of 2,600 issues made from it here): no Linear call, no sign-in. The reads go through a fake of OpenCode's executor that asserts
 // `linear_<tool>` on the kit's recording permission, as the host asserts it, so the kit sees exactly what each read
 // asserts. The report is written to reports/conformance-report.json, for a release to attach.
 import { describe, expect, test } from "bun:test"
@@ -33,12 +33,13 @@ const ACCOUNT = `${LINEAR["workspace"].id}/${LINEAR["me"].email}`
 /** Every event comes whole from a page of a list read, and any failed read fails the whole listing. */
 const ATOMIC = "Each event comes whole from a list_issues or get_notifications page, never from a read of its own, and a failed read fails the whole listing, so no single event can fail on its own"
 /**
- * A bulk change on 20 October: 2,100 of Sam's issues moved a second apart, more than one call reads (8 pages of 250).
+ * A bulk change on 20 October: 2,600 of Sam's issues moved a second apart, more than one call reads (8 pages of 250, and a
+ * ninth still full of them).
  * It is older than every case's since, so only a consumer whose cursor is from before it meets it: the cursor's history
  * is then out of reach, and the source answers an expired gap. No noExpiry: Linear loses history a reader has not seen
  * (a burst past one call's reach, a deleted issue, an inbox item removed), so the kit's expired-cursor check runs.
  */
-const BULK = Array.from({ length: 2100 }, (_, n) => ({
+const BULK = Array.from({ length: 2600 }, (_, n) => ({
   ...LINEAR["issues"][0],
   id: `ENG-${1000 + n}`,
   uuid: `0b5e0000-0000-4000-8000-${String(1000 + n).padStart(12, "0")}`,

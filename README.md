@@ -365,8 +365,10 @@ store.
   that are invented, modelled on the tools' descriptions in the live tool list, and not live-verified.
 - **A burst bigger than one listing reads is cut, not stopped.** To bound what one call costs, the plugin reads at most
   2,000 assigned issues and 500 notifications per `events_list` call, newest first (8 and 5 pages; Linear's own limit
-  is 250 a page, and Linear keeps the history). These caps are the plugin's, not Linear's. When more changed after the
-  cursor or `since`, the plugin does not read the oldest: the page answers `gap` once (`expired` for a cursor,
+  is 250 a page, and Linear keeps the history). These caps are the plugin's, not Linear's. Only changes the listing
+  has not yet listed count toward them, never ones it re-reads at the cursor's own millisecond. When more of those
+  changed after the cursor or `since`, and the page after the caps still holds one, the plugin does not read the
+  oldest: the page answers `gap` once (`expired` for a cursor,
   `window-truncated` for `since`) and lists from `gap.since` on, so the next call goes on. The cursor remembers the
   cut until the read has listed what it promised, so changes that arrive meanwhile never cut the read again; only more
   arrivals than one call reads, a new burst, answer a new gap. Archived issues are listed too.

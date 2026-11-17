@@ -495,9 +495,12 @@ events_list({ account, since?, cursor?, limit?, source? })
   `asOf`.
 - **Limits**: `limit` is 1 to 500 (100 by default); a result stops early, with `more: true`, rather than pass 900 KB.
   One call reads at most 8 pages of 250 issues and 5 pages of 100 notifications, newest first. These caps are the
-  plugin's own, to bound what one call costs; Linear's limit is 250 a page, and Linear keeps the history.
-- **Gap**: when more changed after the cursor or `since` than one call reads, the plugin does not read the oldest of
-  them. The page then answers `gap` once, `{ reason: "expired", since }` for a cursor or
+  plugin's own, to bound what one call costs; Linear's limit is 250 a page, and Linear keeps the history. Only items
+  not yet listed count toward them: the issues and notifications at the cursor's own millisecond that it already
+  listed, which a call reads again for ties, never do.
+- **Gap**: when more changed after the cursor or `since` than one call reads, and the page after the caps still holds
+  one not yet listed, the plugin does not read the oldest of them. When that page reaches the cursor instead,
+  everything was read and there is no gap. The page then answers `gap` once, `{ reason: "expired", since }` for a cursor or
   `{ reason: "window-truncated", since }` for `since`, and lists everything from `since` on; its cursor resumes there,
   so the next call goes on and a burst drains rather than stops. What changed before `since` is not listed: a consumer
   resyncs on the gap. Until the read has listed what the gap promised, the cursor also carries the newest position
@@ -536,7 +539,7 @@ consumer (Memory, jelly, Artifacts) reads it from the installed package:
 
 `npm run check` and `npm run conformance` run the contract's conformance kit over the source, on recorded answers
 with no Linear call, and write `reports/conformance-report.json`, which a release attaches; it must say `ok: true`.
-Every check that applies runs, the expired-cursor and gap checks on a recorded bulk change of 2,100 issues. One cannot
+Every check that applies runs, the expired-cursor and gap checks on a recorded bulk change of 2,600 issues. One cannot
 apply, and the test tells the kit why (`atomicPages`), so the report shows the reason: every event comes whole from a
 page of a list read, and a failed read fails the whole listing, so `failed[]` never happens.
 

@@ -392,13 +392,16 @@ interface Walk {
 }
 
 /**
- * Reads a feed newest first until an item is behind `from` or Linear has no more, at most `pages` pages. Past the limit
- * it cuts rather than fail: a burst bigger than one call reads drains over the next calls, never jams.
+ * Reads a feed newest first until an item is behind `from` or Linear has no more, and cuts rather than fail when more
+ * is unseen than one call reads: a burst bigger than that drains over the next calls, never jams.
  *
- * With a `fence` (a cut earlier in the read), what lies at or before the fence was all read once by the cutting call, so
- * it fits in `pages` pages again (one more for the page it starts on), and what arrived after the fence has its own
- * `pages`: an arrival during the drain never cuts the read again, so the read answers its one gap and lists everything
- * after its `since`. Only more arrivals than one call reads cut it again, a new burst with a new gap.
+ * Only unseen items count, those after `from`: items the cursor already listed at its own millisecond, which the walk
+ * reads again for ties, never do. The allowance is `pages` pages' worth of items at the page size Linear answers with.
+ * With a `fence` (a cut earlier in the read), what lies after `from` and at or before the fence was all read once by
+ * the cutting call, so it fits its allowance again, and what arrived after the fence has an allowance of its own: an
+ * arrival during the drain never cuts the read again, so the read answers its one gap and lists everything after its
+ * `since`. Once an allowance is spent the walk reads on, and cuts only at a page that holds another unseen item without
+ * reaching `from`, so a gap answers only more unseen items than one call reads; at most `3 * pages + 2` pages in all.
  */
 async function walk(
   tool: string,
@@ -410,30 +413,44 @@ async function walk(
 ): Promise<Walk> {
   const read: IssueChange[] = []
   let cursor: string | undefined
+  let size = 0
   let fenced = 0
   let arrived = 0
-  for (;;) {
+  let spent = false
+  /** How many items were read when an allowance was spent: the cut is made among them, the pages after only show it. */
+  let counted = 0
+  for (let n = 0; ; n++) {
     const { items, next } = await readPage(cursor)
+    size = Math.max(size, items.length)
     let reached = false
-    let below = fence === undefined || items.length === 0
+    let unseen = 0
     for (const item of items) {
       const found = change(item)
       if (found === undefined) continue
-      if (behind(found.at, from)) reached = true
-      else read.push(found)
-      if (fence === undefined || !isAfter(found.at, fence)) below = true
+      if (behind(found.at, from)) {
+        reached = true
+        continue
+      }
+      read.push(found)
+      if (!isAfter(found.at, from)) continue
+      unseen++
+      if (fence === undefined || !isAfter(found.at, fence)) fenced++
+      else arrived++
     }
     if (reached || next === undefined) return { found: read.filter((item) => isAfter(item.at, from)).sort((a, b) => byPosition(a.at, b.at)), ...(fence === undefined ? {} : { fence }) }
-    if (below) fenced++
-    else arrived++
-    if (fenced >= (fence === undefined ? pages : pages + 1) || arrived >= pages) break
+    if ((spent && unseen > 0) || n + 1 >= 3 * pages + 2) break
+    if (!spent && (fenced >= pages * size || arrived >= pages * size)) {
+      spent = true
+      counted = read.length
+    }
     cursor = next
   }
-  // Linear has more, older than everything read: the oldest are out of this call's reach.
+  // Linear has more, older than everything read, and unseen beyond the allowance: the oldest are out of this call's reach.
   if (read.length === 0) throw unreadable(tool)
-  const edge: Position = { t: Math.min(...read.map((item) => item.at.t)), k: END }
+  const kept = spent ? read.slice(0, counted) : read
+  const edge: Position = { t: Math.min(...kept.map((item) => item.at.t)), k: END }
   const newest = read.reduce((a, b) => (isAfter(b.at, a.at) ? b : a)).at
-  return { found: read.filter((item) => isAfter(item.at, edge)).sort((a, b) => byPosition(a.at, b.at)), cut: edge, fence: newest }
+  return { found: read.filter((item) => isAfter(item.at, edge) && isAfter(item.at, from)).sort((a, b) => byPosition(a.at, b.at)), cut: edge, fence: newest }
 }
 
 /** Every change to an issue assigned to the person after `from`, archived issues included, oldest first. */
