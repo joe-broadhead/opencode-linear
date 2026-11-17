@@ -32,9 +32,13 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - **A burst of changes bigger than one `events_list` call reads no longer jams the cursor.** Since 0.0.0, more than
   2,000 assigned issues or 500 notifications changed after a cursor answered `TOO_MANY_CHANGES` on every call, so a
-  collector could never move on. Now the oldest of them, which one call cannot reach, are cut: the page answers `gap`
-  once, `{ reason: "expired", since }` for a cursor or `{ reason: "window-truncated", since }` for `since`, lists from
-  `since` on, and its cursor resumes there, so the read drains. A bulk change all in one millisecond is cut whole and
+  collector could never move on. Those caps are the plugin's own, bounding what one call costs (Linear allows 250 a
+  page and keeps the history). Now the oldest changes, past the caps, are cut: the page answers `gap` once,
+  `{ reason: "expired", since }` for a cursor or `{ reason: "window-truncated", since }` for `since`, lists from `since`
+  on, and its cursor resumes there, so the read drains. Until the read has listed what the gap promised, the cursor
+  also carries the newest position the cutting call read (`fi`, `fn`), and changes newer than it get their own
+  allowance, so an arrival during the drain never cuts the read again or skips anything after `since`; only more
+  arrivals than one call reads, a new burst, answer a new gap. A bulk change all in one millisecond is cut whole and
   never read again. `TOO_MANY_CHANGES` is gone. **For Memory and every consumer:** resync on the gap, as the contract
   says; nothing else changes.
 - A notification, or an issue change, in the same millisecond as the cursor's own could be skipped when Linear ordered

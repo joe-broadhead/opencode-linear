@@ -380,48 +380,71 @@ function page(tool: string, answer: unknown, key: string) {
 }
 
 /**
- * What a walk found after `from`, oldest first, and `cut` when it stopped at its page limit before reaching `from`:
- * Linear holds more, older than everything read, so only what came after `cut` (the end of the oldest millisecond
- * read) is listed whole, and the feed resumes there.
+ * What a walk found after `from`, oldest first; `cut` when it stopped at its page limit before reaching `from` (Linear
+ * holds more, older than everything read, so only what came after `cut`, the end of the oldest millisecond read, is
+ * listed whole and the feed resumes there); and `fence`, the newest position the cutting call read, which the cursor
+ * carries while what lies between the feed's position and it is still to be listed.
  */
 interface Walk {
   readonly found: IssueChange[]
   readonly cut?: Position
+  readonly fence?: Position
 }
 
 /**
- * Reads a feed newest first, at most `pages` pages, until an item is behind `from` or Linear has no more. Past the
- * limit it cuts rather than fail: a burst bigger than one call reads drains over the next calls, never jams.
+ * Reads a feed newest first until an item is behind `from` or Linear has no more, at most `pages` pages. Past the limit
+ * it cuts rather than fail: a burst bigger than one call reads drains over the next calls, never jams.
+ *
+ * With a `fence` (a cut earlier in the read), what lies at or before the fence was all read once by the cutting call, so
+ * it fits in `pages` pages again (one more for the page it starts on), and what arrived after the fence has its own
+ * `pages`: an arrival during the drain never cuts the read again, so the read answers its one gap and lists everything
+ * after its `since`. Only more arrivals than one call reads cut it again, a new burst with a new gap.
  */
-async function walk(tool: string, pages: number, from: Position, readPage: (cursor: string | undefined) => Promise<{ items: unknown[]; next: string | undefined }>, change: (item: unknown) => IssueChange | undefined): Promise<Walk> {
+async function walk(
+  tool: string,
+  pages: number,
+  from: Position,
+  fence: Position | undefined,
+  readPage: (cursor: string | undefined) => Promise<{ items: unknown[]; next: string | undefined }>,
+  change: (item: unknown) => IssueChange | undefined,
+): Promise<Walk> {
   const read: IssueChange[] = []
   let cursor: string | undefined
-  for (let n = 0; n < pages; n++) {
+  let fenced = 0
+  let arrived = 0
+  for (;;) {
     const { items, next } = await readPage(cursor)
     let reached = false
+    let below = fence === undefined || items.length === 0
     for (const item of items) {
       const found = change(item)
       if (found === undefined) continue
       if (behind(found.at, from)) reached = true
       else read.push(found)
+      if (fence === undefined || !isAfter(found.at, fence)) below = true
     }
-    if (reached || next === undefined) return { found: read.filter((item) => isAfter(item.at, from)).sort((a, b) => byPosition(a.at, b.at)) }
+    if (reached || next === undefined) return { found: read.filter((item) => isAfter(item.at, from)).sort((a, b) => byPosition(a.at, b.at)), ...(fence === undefined ? {} : { fence }) }
+    if (below) fenced++
+    else arrived++
+    if (fenced >= (fence === undefined ? pages : pages + 1) || arrived >= pages) break
     cursor = next
   }
-  // Every page was full of items after from, and Linear has more: the oldest are out of this call's reach.
+  // Linear has more, older than everything read: the oldest are out of this call's reach.
   if (read.length === 0) throw unreadable(tool)
   const edge: Position = { t: Math.min(...read.map((item) => item.at.t)), k: END }
-  return { found: read.filter((item) => isAfter(item.at, edge)).sort((a, b) => byPosition(a.at, b.at)), cut: edge }
+  const newest = read.reduce((a, b) => (isAfter(b.at, a.at) ? b : a)).at
+  return { found: read.filter((item) => isAfter(item.at, edge)).sort((a, b) => byPosition(a.at, b.at)), cut: edge, fence: newest }
 }
 
 /** Every change to an issue assigned to the person after `from`, archived issues included, oldest first. */
-async function issueChanges(read: Read, account: string, from: Position): Promise<Walk> {
+async function issueChanges(read: Read, account: string, from: Position, fence: Position | undefined): Promise<Walk> {
   // Linear's updatedAt filter takes changes after a time; a second early covers a filter that rounds or excludes it.
   const updatedAt = new Date(Math.max(0, from.t - 1000)).toISOString()
   return walk(
     "list_issues",
     ISSUE_PAGES,
     from,
+    fence,
     async (cursor) =>
       page("list_issues", await read("list_issues", { assignee: "me", orderBy: "updatedAt", updatedAt, includeArchived: true, limit: ISSUE_PAGE, fields: ISSUE_FIELDS, ...(cursor === undefined ? {} : { cursor }) }), "issues"),
     (item) => issueEvent(account, item),
@@ -429,11 +452,12 @@ async function issueChanges(read: Read, account: string, from: Position): Promis
 }
 
 /** Every notification after `from`, oldest first. Linear lists them newest first, so the walk stops at `from`. */
-async function notificationChanges(read: Read, account: string, from: Position): Promise<Walk> {
+async function notificationChanges(read: Read, account: string, from: Position, fence: Position | undefined): Promise<Walk> {
   return walk(
     "get_notifications",
     NOTIFICATION_PAGES,
     from,
+    fence,
     async (cursor) => page("get_notifications", await read("get_notifications", { limit: NOTIFICATION_PAGE, ...(cursor === undefined ? {} : { cursor }) }), "notifications"),
     (item) => notificationEvent(account, item),
   )
@@ -475,16 +499,27 @@ function cursorFor(cursor: string, account: string): void {
   }
 }
 
-function stateOf(cursor: string, account: string): { issues: Position; notifications: Position } {
+/** Where each feed stands, and its fence while a cut earlier in the read is still being listed (`fi`, `fn`). */
+interface Feeds {
+  readonly issues: Position
+  readonly notifications: Position
+  readonly issuesFence?: Position
+  readonly notificationsFence?: Position
+}
+
+function stateOf(cursor: string, account: string): Feeds {
   cursorFor(cursor, account)
   const decoded = decodeBoundCursor(bindingOf(account), cursor)
   const state = decoded.ok ? decoded.state : {}
   const issues = position(state["i"])
   const notifications = position(state["n"])
-  if (!decoded.ok || state["a"] !== account || issues === undefined || notifications === undefined) {
+  const issuesFence = state["fi"] === undefined ? undefined : position(state["fi"])
+  const notificationsFence = state["fn"] === undefined ? undefined : position(state["fn"])
+  const fenceBroken = (state["fi"] !== undefined && issuesFence === undefined) || (state["fn"] !== undefined && notificationsFence === undefined)
+  if (!decoded.ok || state["a"] !== account || issues === undefined || notifications === undefined || fenceBroken) {
     throw linearError("CURSOR_INVALID", "The cursor was not issued by events_list for this Linear account.", START_AGAIN)
   }
-  return { issues, notifications }
+  return { issues, notifications, ...(issuesFence ? { issuesFence } : {}), ...(notificationsFence ? { notificationsFence } : {}) }
 }
 
 /**
@@ -510,9 +545,9 @@ export async function linearEvents(read: Read, signedIn: SignedIn | undefined, i
   }
   const owner = signedIn.owner
   const start: Position = { t: startTime(request, now), k: "" }
-  const from = request.cursor === undefined ? { issues: start, notifications: start } : stateOf(request.cursor, account)
-  const issueWalk = await issueChanges(read, account, from.issues)
-  const notificationWalk = await notificationChanges(read, account, from.notifications)
+  const from: Feeds = request.cursor === undefined ? { issues: start, notifications: start } : stateOf(request.cursor, account)
+  const issueWalk = await issueChanges(read, account, from.issues, from.issuesFence)
+  const notificationWalk = await notificationChanges(read, account, from.notifications, from.notificationsFence)
   const issues = issueWalk.found.map((change) => ({ ...change, feed: 0 }))
   const notifications = notificationWalk.found.map((change) => ({ ...change, feed: 1 }))
   // A feed cut at its page limit resumes after the cut whatever this page lists, and the page answers the gap once:
@@ -537,7 +572,18 @@ export async function linearEvents(read: Read, signedIn: SignedIn | undefined, i
     consumed++
   }
   const refused = merged.slice(0, consumed).flatMap((item) => refusedIds.get(item.event.external_id) ?? [])
-  const cursor = encodeBoundCursor(bindingOf(account), { a: account, i: [next.issues.t, next.issues.k], n: [next.notifications.t, next.notifications.k] })
+  // A fence stays while that feed has found items this page did not list and its position is short of the fence.
+  const left = merged.slice(consumed)
+  const keep = (fence: Position | undefined, at: Position, feed: number) => (fence !== undefined && isAfter(fence, at) && left.some((item) => item.feed === feed) ? [fence.t, fence.k] : undefined)
+  const fi = keep(issueWalk.fence, next.issues, 0)
+  const fn = keep(notificationWalk.fence, next.notifications, 1)
+  const cursor = encodeBoundCursor(bindingOf(account), {
+    a: account,
+    i: [next.issues.t, next.issues.k],
+    n: [next.notifications.t, next.notifications.k],
+    ...(fi === undefined ? {} : { fi }),
+    ...(fn === undefined ? {} : { fn }),
+  })
   return eventsListResult(
     { source: LINEAR_SOURCE, account, owner },
     listed.map((item) => item.event),

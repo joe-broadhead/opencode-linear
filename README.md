@@ -363,13 +363,19 @@ store.
   that and never reads the identity itself. The plugin forgets it on every credential update or switch, so after a
   new sign-in or a restart of OpenCode a listing answers `UNAVAILABLE` until the next `probe`. The conformance kit runs on Linear answers
   that are invented, modelled on the tools' descriptions in the live tool list, and not live-verified.
-- **A burst bigger than one listing reads is cut, not stopped.** One `events_list` call reads at most 2,000 assigned
-  issues and 500 notifications, newest first. When more changed after the cursor or `since`, the oldest are out of
-  reach: the page answers `gap` once (`expired` for a cursor, `window-truncated` for `since`) and lists from
-  `gap.since` on, so the next call goes on. Archived issues are listed too.
+- **A burst bigger than one listing reads is cut, not stopped.** To bound what one call costs, the plugin reads at most
+  2,000 assigned issues and 500 notifications per `events_list` call, newest first (8 and 5 pages; Linear's own limit
+  is 250 a page, and Linear keeps the history). These caps are the plugin's, not Linear's. When more changed after the
+  cursor or `since`, the plugin does not read the oldest: the page answers `gap` once (`expired` for a cursor,
+  `window-truncated` for `since`) and lists from `gap.since` on, so the next call goes on. The cursor remembers the
+  cut until the read has listed what it promised, so changes that arrive meanwhile never cut the read again; only more
+  arrivals than one call reads, a new burst, answer a new gap. Archived issues are listed too.
 - **What Linear no longer shows is not listed.** A change to an issue deleted, or no longer assigned to you, before a
   listing reads it, and an inbox notification deleted or archived before then, are never listed, and nothing says so:
   Linear's tools do not show what was removed.
+- **A change stamped just before the cursor and visible only after the listing is missed.** Linear stamps each change
+  when its write starts, so one that becomes visible a moment after a listing, stamped before that listing's last
+  event, is behind the cursor and not listed. The window is a write's own delay.
 - **Jelly's relay sign-in is not yet checked with Linear.** The Jelly declaration lets a sign-in come back through
   Jelly's relay, based only on Linear's server metadata; Linear does not document its redirect rules, and no relay
   sign-in has been made yet.

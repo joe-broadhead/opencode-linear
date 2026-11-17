@@ -47,8 +47,30 @@ const BULK = Array.from({ length: 2100 }, (_, n) => ({
   url: `https://linear.app/example-co/issue/ENG-${1000 + n}/imported-issue-${1000 + n}`,
   updatedAt: new Date(Date.parse("2026-10-20T09:00:00Z") + n * 1000).toISOString(),
 }))
+/**
+ * 120 inbox notifications from the morning of 20 October, before the bulk change: they are older than the cut, so the
+ * first pages of a read from before the bulk change list them, and none of the cut issues, while issues arrive.
+ */
+const EARLY_INBOX = Array.from({ length: 120 }, (_, n) => ({
+  ...LINEAR["notifications"][0],
+  id: `9a7d0000-0000-4000-8000-${String(1000 + n).padStart(12, "0")}`,
+  createdAt: new Date(Date.parse("2026-10-20T06:00:00Z") + n * 1000).toISOString(),
+}))
 /** A consumer that last read on 19 October, before the bulk change: its cursor's history is out of reach. */
 const BEFORE_BULK = Date.parse("2026-10-19T00:00:00Z")
+const OLD = encodeBoundCursor({ plugin: NAMESPACE, source: LINEAR_SOURCE, account: ACCOUNT }, { a: ACCOUNT, i: [BEFORE_BULK, ""], n: [BEFORE_BULK, ""] })
+/**
+ * Issue changes that land while the bulk change is being read: one after each call from the first bulk case on, so the
+ * kit's next read of a cut read meets an arrival, which must not cut it again (the cursor's fence).
+ */
+const ARRIVED: Record<string, unknown>[] = []
+let arriving = false
+const arrive = (input: Record<string, unknown>) => {
+  if (input["cursor"] === OLD || input["since"] === new Date(BEFORE_BULK).toISOString()) arriving = true
+  if (!arriving) return
+  const n = ARRIVED.length
+  ARRIVED.push({ ...LINEAR["issues"][0], id: `ENG-${5000 + n}`, uuid: `0b5e0000-0000-4000-8000-${String(5000 + n).padStart(12, "0")}`, title: `New issue ${5000 + n}`, url: `https://linear.app/example-co/issue/ENG-${5000 + n}/new-issue-${5000 + n}`, updatedAt: new Date(Date.parse("2026-11-08T11:00:00Z") + n * 1000).toISOString() })
+}
 
 const answer = (value: unknown) => ({ output: value, content: [{ type: "text", text: JSON.stringify(value) }] })
 
@@ -70,10 +92,10 @@ function executors(permission: SessionContext["permission"]) {
     if (tool === "linear_get_workspace") return answer(LINEAR["workspace"])
     if (tool === "linear_list_issues") {
       const after = Date.parse(String(input["updatedAt"]))
-      const issues = [...LINEAR["issues"], ...BULK].filter((item: { updatedAt: string }) => Date.parse(item.updatedAt) > after).sort(newest("updatedAt"))
+      const issues = [...LINEAR["issues"], ...BULK, ...ARRIVED].filter((item: { updatedAt: string }) => Date.parse(item.updatedAt) > after).sort(newest("updatedAt"))
       return paged("issues", issues, input)
     }
-    return paged("notifications", [...LINEAR["notifications"]].sort(newest("createdAt")), input)
+    return paged("notifications", [...LINEAR["notifications"], ...EARLY_INBOX].sort(newest("createdAt")), input)
   }
   return {
     list: async () =>
@@ -108,14 +130,7 @@ async function cases(): Promise<PageCase[]> {
   await probeMethod(options(open)).run({ source: LINEAR_SOURCE }, call())
   const first = (await list({ source: LINEAR_SOURCE, account: ACCOUNT, since: SINCE, limit: 2 }))["cursor"] as string
   const done = (await list({ source: LINEAR_SOURCE, account: ACCOUNT, cursor: first, limit: 500 }))["cursor"] as string
-  const old = encodeBoundCursor({ plugin: NAMESPACE, source: LINEAR_SOURCE, account: ACCOUNT }, { a: ACCOUNT, i: [BEFORE_BULK, ""], n: [BEFORE_BULK, ""] })
   return [
-    { name: "a cursor from before a bulk change bigger than one call reads: expired, once", input: { source: LINEAR_SOURCE, account: ACCOUNT, cursor: old }, expect: "expired" },
-    {
-      name: "a since from before the bulk change: window-truncated once, and not on the page its cursor names",
-      input: { source: LINEAR_SOURCE, account: ACCOUNT, since: new Date(BEFORE_BULK).toISOString(), limit: 50 },
-      expect: "page",
-    },
     { name: "a first listing, one issue refused for a secret", input: { source: LINEAR_SOURCE, account: ACCOUNT, since: SINCE }, expect: "page" },
     { name: "two at a time", input: { source: LINEAR_SOURCE, account: ACCOUNT, since: SINCE, limit: 2 }, expect: "page" },
     { name: "what came after the first two", input: { source: LINEAR_SOURCE, account: ACCOUNT, cursor: first }, expect: "page" },
@@ -130,6 +145,14 @@ async function cases(): Promise<PageCase[]> {
       expect: { refuses: "CURSOR_INVALID" },
     },
     { name: "a source this plugin does not have", input: { source: "jira", account: ACCOUNT }, expect: { refuses: "SOURCE_UNKNOWN" } },
+    // Last, because an issue arrives after each of their calls (ARRIVED): the kit reads the page each cursor names
+    // with the arrival in Linear, and checks that the read neither expires again nor repeats its gap.
+    { name: "a cursor from before a bulk change bigger than one call reads: expired, once", input: { source: LINEAR_SOURCE, account: ACCOUNT, cursor: OLD }, expect: "expired" },
+    {
+      name: "a since from before the bulk change: window-truncated once, and not on the page its cursor names",
+      input: { source: LINEAR_SOURCE, account: ACCOUNT, since: new Date(BEFORE_BULK).toISOString(), limit: 50 },
+      expect: "page",
+    },
   ]
 }
 
@@ -151,7 +174,11 @@ describe("the source contract's conformance kit", () => {
       source,
       tools,
       calls: {
-        list: (input, context) => list(input, context),
+        list: async (input, context) => {
+          const page = await list(input, context)
+          arrive(input)
+          return page
+        },
         probe: (input, context) => probeMethod(options(context)).run(input, call()),
       },
       cases: await cases(),
@@ -168,6 +195,7 @@ describe("the source contract's conformance kit", () => {
     expect(report.checks.filter((check) => !check.ran && !check.notApplicable).map((check) => check.name)).toEqual([])
     expect(report.checks.filter((check) => check.notApplicable).map((check) => check.name).sort()).toEqual(["billed-cost", "details", "failed-holds-cursor", "output-schema", "removals-are-final", "suggest"])
     for (const name of ["gap-and-cursor-expired", "gap-once-per-read"]) expect(report.checks.find((check) => check.name === name)).toMatchObject({ ran: true, notApplicable: false, problems: [] })
+    expect(ARRIVED.length).toBeGreaterThan(1)
     expect(report.ok).toBe(true)
   })
 

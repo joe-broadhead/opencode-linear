@@ -494,11 +494,16 @@ events_list({ account, since?, cursor?, limit?, source? })
   page's `refused[]` with `reason: "secret"`, and the cursor moves past it. Every page also names `plugin` and
   `asOf`.
 - **Limits**: `limit` is 1 to 500 (100 by default); a result stops early, with `more: true`, rather than pass 900 KB.
-  One call reads at most 8 pages of 250 issues and 5 pages of 100 notifications, newest first.
-- **Gap**: when more changed after the cursor or `since` than one call reads, the oldest of them are out of reach. The
-  page then answers `gap` once, `{ reason: "expired", since }` for a cursor or `{ reason: "window-truncated", since }`
-  for `since`, and lists everything from `since` on; its cursor resumes there, so the next call goes on and a burst
-  drains rather than stops. What changed before `since` is not listed: a consumer resyncs on the gap.
+  One call reads at most 8 pages of 250 issues and 5 pages of 100 notifications, newest first. These caps are the
+  plugin's own, to bound what one call costs; Linear's limit is 250 a page, and Linear keeps the history.
+- **Gap**: when more changed after the cursor or `since` than one call reads, the plugin does not read the oldest of
+  them. The page then answers `gap` once, `{ reason: "expired", since }` for a cursor or
+  `{ reason: "window-truncated", since }` for `since`, and lists everything from `since` on; its cursor resumes there,
+  so the next call goes on and a burst drains rather than stops. What changed before `since` is not listed: a consumer
+  resyncs on the gap. Until the read has listed what the gap promised, the cursor also carries the newest position
+  the cutting call read, and changes newer than it get their own allowance, so an arrival during the drain never cuts
+  the read again or skips anything after `since`. Only more arrivals than one call reads, a new burst, answer a new
+  gap.
 - **Permissions**: it asserts `linear_events_list`, then each Linear read it makes goes through OpenCode's own
   executor, so `linear_list_issues` and `linear_get_notifications` follow their own rules. With the default rules
   neither asks. Every result carries `trust: "untrusted"`: issue and notification text is other people's, never
