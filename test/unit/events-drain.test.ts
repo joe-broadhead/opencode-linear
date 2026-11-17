@@ -159,7 +159,7 @@ describe("a read that drains after a cut", () => {
     expect(pages.at(-1)!.more).toBe(false)
   })
 
-  test("known limit (README): an issue change stamped a moment before the cursor, visible only after the read, is not listed", async () => {
+  test("a late arrival (round 1's FALSIFY 3): a change stamped a moment before the cursor, visible only after the read, is listed once", async () => {
     const data: Data = { issues: [issue(1, "2026-11-03T09:00:00.500Z")], notifications: [] }
     const host = linear(data, 50)
     const first = await run(host)({ since: SINCE })
@@ -167,8 +167,47 @@ describe("a read that drains after a cut", () => {
     // A concurrent write stamped 200 ms earlier commits after the read.
     data.issues.push(issue(2, "2026-11-03T09:00:00.300Z"))
     const next = await run(host)({ cursor: first.cursor })
-    expect(next.events).toEqual([])
+    expect(next.events.map((event) => event.external_id)).toEqual(["ENG-2@2026-11-03T09:00:00.300Z"])
     expect(next.gap).toBeUndefined()
+    // Listed once: the next read names neither again.
+    const after = await run(host)({ cursor: next.cursor })
+    expect(after).toMatchObject({ events: [], more: false })
+  })
+
+  test("late arrivals in both feeds, up to two minutes behind the cursor, are listed once; older than that is the known limit", async () => {
+    const data: Data = { issues: [issue(1, "2026-11-03T09:00:00.000Z")], notifications: [note(1, "2026-11-03T09:00:00.000Z")] }
+    const host = linear(data, 2)
+    const first = await run(host)({ since: SINCE })
+    expect(first.events).toHaveLength(2)
+    data.issues.push(issue(2, "2026-11-03T08:58:30.000Z"), issue(3, "2026-11-03T08:57:00.000Z"))
+    data.notifications.push(note(2, "2026-11-03T08:59:59.999Z"), note(3, "2026-11-03T08:50:00.000Z"))
+    const next = await run(host)({ cursor: first.cursor })
+    expect(next.events.map((event) => event.external_id).sort()).toEqual(["ENG-2@2026-11-03T08:58:30.000Z", noteId(2)].sort())
+    const after = await run(host)({ cursor: next.cursor })
+    expect(after).toMatchObject({ events: [], more: false })
+  })
+
+  test("a late arrival waiting behind a full page is listed on a later page, and nothing is listed twice", async () => {
+    const data: Data = { issues: Array.from({ length: 5 }, (_, n) => issue(10 + n, `2026-11-03T09:00:0${n}.000Z`)), notifications: [] }
+    const host = linear(data, 2)
+    const pages = await drain(run(host), { since: SINCE, limit: 2 }, (n) => {
+      if (n === 1) data.issues.push(issue(99, "2026-11-03T09:00:00.500Z"))
+    })
+    const listed = ids(pages)
+    expect(new Set(listed).size).toBe(listed.length)
+    expect(listed).toHaveLength(6)
+    expect(listed).toContain("ENG-99@2026-11-03T09:00:00.500Z")
+  })
+
+  test("an entry Linear answers without an id or a time refuses the listing UNAVAILABLE, and the cursor is held", async () => {
+    for (const broken of ["issues", "notifications"] as const) {
+      const data: Data = { issues: [issue(1, "2026-11-03T09:00:00.000Z")], notifications: [note(1, "2026-11-03T09:00:00.000Z")] }
+      const host = linear(data, 50)
+      const first = await run(host)({ since: SINCE })
+      if (broken === "issues") data.issues.push({ ...issue(2, "2026-11-03T10:00:00.000Z"), id: undefined as never })
+      else data.notifications.push({ ...note(2, "2026-11-03T10:00:00.000Z"), id: undefined as never })
+      await expect(run(host)({ cursor: first.cursor })).rejects.toThrow(/^UNAVAILABLE: Linear's (list_issues|get_notifications) answered an entry without an id or a time/)
+    }
   })
 
   test("same-millisecond ties straddling Linear's pages at the cursor's millisecond are all listed once (limit 1..3)", async () => {

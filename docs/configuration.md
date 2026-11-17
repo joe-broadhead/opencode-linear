@@ -490,12 +490,21 @@ events_list({ account, since?, cursor?, limit?, source? })
   Linear read; a changed one, or
   one issued by 0.0.2 or earlier, is `CURSOR_INVALID`: start again with `since`. A cursor wins over `since`; without
   either, the listing starts 24 hours ago. An older cursor lists the same events again.
+- **Late arrivals**: every call reads each feed again from two minutes before the cursor (`LOOKBACK_MS`), and lists
+  what it had not listed there: a change Linear stamped before the cursor but showed only after the listing passed it,
+  such as one whose write committed a moment late (normally well under a second). The cursor carries 48-bit hashes of
+  what it listed in those two minutes, at most 16 a feed, so nothing is listed twice; more than 16 pull that feed's
+  lookback in to the newest 16. An item Linear's pages show twice in one call is listed once. An entry Linear answers
+  without an id or a time is `UNAVAILABLE`, with the cursor held: never skipped.
 - **Secrets**: an event whose title or text holds a secret, such as a password in a URL, is never listed: it is in the
   page's `refused[]` with `reason: "secret"`, and the cursor moves past it. Every page also names `plugin` and
   `asOf`.
 - **Limits**: `limit` is 1 to 500 (100 by default); a result stops early, with `more: true`, rather than pass 900 KB.
-  One call reads at most 8 pages of 250 issues and 5 pages of 100 notifications, newest first. These caps are the
-  plugin's own, to bound what one call costs; Linear's limit is 250 a page, and Linear keeps the history. Only items
+  One call lists at most 8 pages' worth of issues (2,000) and 5 of notifications (500) it has not listed, newest first.
+  These caps are the plugin's own, to bound what one call costs; Linear's limit is 250 a page, and Linear keeps the
+  history. In the worst case, re-reading ties at the cursor and the pages that show an overflow, one call makes 26
+  `list_issues` and 17 `get_notifications` reads (`3 * pages + 2` each), 43 requests against the person's Linear rate
+  limit (5,000 an hour for an OAuth app); a quiet call makes one of each. Only items
   not yet listed count toward them: the issues and notifications at the cursor's own millisecond that it already
   listed, which a call reads again for ties, never do.
 - **Gap**: when more changed after the cursor or `since` than one call reads, and the page after the caps still holds
@@ -562,7 +571,7 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 | `UPSTREAM_ERROR` | `linear_events_list`: Linear answered one of its reads with an error. The message holds the first line, at most 300 characters, with tokens and URL query strings removed. | Run `/linear-status`, then call again with the same cursor. |
 | `INPUT_INVALID` | `linear_events_list` or `probe`: the input is not the contract's, such as a `limit` outside 1 to 500, a `since` that is not an ISO date or date-time, or a listing with no `account` or one that is not `<workspace id>/<email>`. | Pass `account`, `since`, `cursor`, `limit` or `source` as the schema describes them. |
 | `SOURCE_UNKNOWN` | `linear_events_list` or `probe`: `source` is not `linear`. | Leave `source` out, or pass `linear`. |
-| `UNAVAILABLE` | `linear_events_list`: no `probe` has named the current sign-in yet (a new sign-in, or OpenCode restarted). | Call `probe` for the `linear` source, then call `events_list` again. |
+| `UNAVAILABLE` | `linear_events_list`: no `probe` has named the current sign-in yet (a new sign-in, or OpenCode restarted); or Linear answered an entry without an id or a time. | Call `probe` for the `linear` source, then call `events_list` again; for an entry, call again later with the same cursor. |
 | `ACCOUNT_MISMATCH` | `linear_events_list`: `account` is not the one `probe` read for the current sign-in, or the cursor was issued for another account. `probe`: `account` is not the signed-in one. | Pass the cursor with the account it was issued for, or sign in to Linear as that account; `probe` names the signed-in account. |
 | `CURSOR_INVALID` | `linear_events_list`: the cursor is malformed, another source's or plugin's, changed, or issued by 0.0.2 or earlier. | Call without a cursor, with `since`, to start again. |
 

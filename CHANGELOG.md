@@ -45,6 +45,17 @@ All notable changes to this project are documented here. The format follows [Kee
   another such item: a tie the cursor is part way through, or exactly a cap's worth, never answers a gap. A bulk change
   all in one millisecond is cut whole and never read again. `TOO_MANY_CHANGES` is gone. **For Memory and every consumer:** resync on the gap, as the contract
   says; nothing else changes.
+- **A late arrival is listed.** A change Linear stamped before the cursor but showed only after a listing read past
+  it, such as a write that committed a moment late, was never listed. Every call now reads each feed again from two
+  minutes before the cursor, and lists what it had not listed there, once: the cursor carries 48-bit hashes of what it
+  listed in those two minutes, at most 16 a feed (more pull that feed's lookback in to the newest 16), and stays within
+  the contract's 1,024 characters. Linear's write delay is normally well under a second; only a change more than two
+  minutes late is still missed ([README, Known limits](README.md#known-limits)).
+- **An entry Linear answers without an id or a time is no longer skipped silently:** the listing answers
+  `UNAVAILABLE`, with the cursor held, so it is read again later. An item Linear's pages show twice in one call (pages
+  moving under an arrival) is listed once.
+- The docs give the true worst case per call: 26 `list_issues` and 17 `get_notifications` reads, 43 requests against
+  the person's Linear rate limit; a quiet call makes one of each.
 - A notification, or an issue change, in the same millisecond as the cursor's own could be skipped when Linear ordered
   it after the one already listed and on the next page: a walk now reads past the cursor's millisecond before it stops.
 - `events_list` lists archived issues too (`includeArchived` on `list_issues`), so a change to an issue archived

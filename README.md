@@ -324,7 +324,7 @@ Run `/linear-status` first. Its last line is the next step.
 | `INPUT_INVALID` from `linear_events_list` or `probe` | The input is invalid, and the message names the problems. Pass `account` (`<workspace id>/<email>`, as `probe` names it), `since`, `cursor`, `limit` or `source` as the tool's schema describes them. |
 | `SOURCE_UNKNOWN` from `linear_events_list` or `probe` | This plugin lists only the source `linear`. Leave `source` out, or pass `linear`. |
 | `CURSOR_INVALID` from `linear_events_list` | The cursor was not issued by `events_list` for this Linear account, or by 0.0.2 or earlier. Call `events_list` without a cursor, with `since`, to start again. |
-| `UNAVAILABLE` from `linear_events_list` | No `probe` has named the current Linear sign-in yet, after a new sign-in or a restart of OpenCode. Call `probe` for the `linear` source, then list again. |
+| `UNAVAILABLE` from `linear_events_list` | No `probe` has named the current Linear sign-in yet, after a new sign-in or a restart of OpenCode: call `probe` for the `linear` source, then list again. Or Linear answered an entry without an id or a time, which the listing never skips: call `events_list` again later with the same cursor, which has not moved. |
 | `ACCOUNT_MISMATCH` from `linear_events_list` or `probe` | The cursor was issued for another account, or Linear is signed in to another account than `probe` was asked for. Pass the cursor with its own account, or sign in to Linear as that account. |
 | `UPSTREAM_ERROR` from `linear_events_list` | Linear's read failed. Run `/linear-status`, then call `events_list` again with the same cursor. |
 
@@ -364,8 +364,11 @@ store.
   new sign-in or a restart of OpenCode a listing answers `UNAVAILABLE` until the next `probe`. The conformance kit runs on Linear answers
   that are invented, modelled on the tools' descriptions in the live tool list, and not live-verified.
 - **A burst bigger than one listing reads is cut, not stopped.** To bound what one call costs, the plugin reads at most
-  2,000 assigned issues and 500 notifications per `events_list` call, newest first (8 and 5 pages; Linear's own limit
-  is 250 a page, and Linear keeps the history). These caps are the plugin's, not Linear's. Only changes the listing
+  2,000 assigned issues and 500 notifications per `events_list` call, newest first (8 and 5 pages' worth; Linear's own
+  limit is 250 a page, and Linear keeps the history). These caps are the plugin's, not Linear's. In the worst case,
+  with ties re-read at the cursor and the pages that show an overflow, one call makes 26 `list_issues` and 17
+  `get_notifications` reads, 43 requests against your Linear rate limit (5,000 an hour for an app you sign in to); a
+  quiet call makes one of each. Only changes the listing
   has not yet listed count toward them, never ones it re-reads at the cursor's own millisecond. When more of those
   changed after the cursor or `since`, and the page after the caps still holds one, the plugin does not read the
   oldest: the page answers `gap` once (`expired` for a cursor,
@@ -375,9 +378,11 @@ store.
 - **What Linear no longer shows is not listed.** A change to an issue deleted, or no longer assigned to you, before a
   listing reads it, and an inbox notification deleted or archived before then, are never listed, and nothing says so:
   Linear's tools do not show what was removed.
-- **A change stamped just before the cursor and visible only after the listing is missed.** Linear stamps each change
-  when its write starts, so one that becomes visible a moment after a listing, stamped before that listing's last
-  event, is behind the cursor and not listed. The window is a write's own delay.
+- **A change that becomes visible more than two minutes after its time is missed.** Linear stamps each change when
+  its write runs, and a list read sees it once the write commits, normally well under a second. Each listing reads
+  the last two minutes before the cursor again, and lists what it had not listed there, once (the cursor carries the
+  hashes of what it listed in those two minutes). Only a change that shows up more than two minutes late, or behind the
+  17th newest change listed in a feed's last two minutes (the cursor holds 16 such hashes a feed), is not listed.
 - **Jelly's relay sign-in is not yet checked with Linear.** The Jelly declaration lets a sign-in come back through
   Jelly's relay, based only on Linear's server metadata; Linear does not document its redirect rules, and no relay
   sign-in has been made yet.
