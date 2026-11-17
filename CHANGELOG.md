@@ -2,6 +2,76 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.5] - 2026-11-17
+
+### Changed
+
+- The source contract is `@we-the-rebel-alliance/source-contract` v0.2.0, pinned as
+  `github:we-the-rebel-alliance/source-contract#v0.2.0` (commit `88bdc1e`) and bundled into `dist/index.js`, with still
+  no runtime dependency. `linear.activity`'s declaration, its pages and `probe`'s answer are unchanged: the plugin
+  declares and sends none of the keys v0.2.0 adds, which a consumer still on v0.1.x refuses.
+- **The conformance report is complete and ok, with no `noExpiry`.** Linear can lose history a reader has not seen
+  (below), so the kit's expired-cursor check and `gap-once-per-read` really run, on a recorded bulk change of 2,100
+  issues met by a cursor and by a `since` from before it. Only `failed-holds-cursor` is not applicable, with its reason
+  (`atomicPages`): every event comes whole from a page of a list read, and a failed read fails the whole listing. The
+  test pins the set of checks that are not applicable, and the recorded Linear now pages by `limit` and cursor as
+  Linear does.
+- `npm run conformance` (`bun test ./test/conformance`) runs the kit alone and writes
+  `reports/conformance-report.json`; `npm run check` still runs it as its `conformance` stage.
+- The release kit is revision 4.1 (`1f452e5`, the family's): a release runs `npm run conformance` on the parent in a
+  job of its own, with no write token, stops unless the report is `ok` for this version, and attaches it as the Release
+  asset `conformance-report.json`, listed in `SHA256SUMS`; the pack job records the kept tarball's sha256 and the stage
+  and publish jobs check it after every download. `test/support/jelly-kit.ts` is the family copy that checks jelly's
+  `cost` and `admin` lines.
+- [In Jelly](docs/jelly.md#tools-and-permissions) carries Jelly's shared rules for every plugin of the family, word for
+  word (`scripts/jelly-family-block.md`, which `npm run check` holds it to). The sentence that a tool declared `allow`
+  runs what the plugin's own default allows is reworded: a declared `allow` changes nothing in Jelly, and each tool
+  follows the access choice and its `readOnly`.
+- CI's concurrency group names the event (`ci-<event>-<ref>`), so a run by hand on `master` never cancels the push run
+  a release stands on.
+- Tested hosts unchanged: OpenCode 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0 (`TESTED_HOSTS` in `src/constants.ts`), in
+  the supported range `>=2.2.3 <2.4.0`.
+
+### Fixed
+
+- **A burst of changes bigger than one `events_list` call reads no longer jams the cursor.** Since 0.0.0, more than
+  2,000 assigned issues or 500 notifications changed after a cursor answered `TOO_MANY_CHANGES` on every call, so a
+  collector could never move on. Those caps are the plugin's own, bounding what one call costs (Linear allows 250 a
+  page and keeps the history). Now the oldest changes, past the caps, are cut: the page answers `gap` once,
+  `{ reason: "expired", since }` for a cursor or `{ reason: "window-truncated", since }` for `since`, lists from `since`
+  on, and its cursor resumes there, so the read drains. Until the read has listed what the gap promised, the cursor
+  also carries the newest position the cutting call read (`fi`, `fn`), and changes newer than it get their own
+  allowance, so an arrival during the drain never cuts the read again or skips anything after `since`; only more
+  arrivals than one call reads, a new burst, answer a new gap. Only items not yet listed count toward the caps, never
+  ones at the cursor's own millisecond that the read already listed, and a cut needs the page after the caps to hold
+  another such item: a tie the cursor is part way through, or exactly a cap's worth, never answers a gap. A bulk change
+  all in one millisecond is cut whole and never read again. `TOO_MANY_CHANGES` is gone. **For Memory and every consumer:** resync on the gap, as the contract
+  says; nothing else changes.
+- **A late arrival is listed.** A change Linear stamped before the cursor but showed only after a listing read past
+  it, such as a write that committed a moment late, was never listed. Linear does not document how soon a write is
+  visible; the plugin assumes well under a second, and every call now reads each feed again from two minutes before the
+  later of the cursor and Linear's now (the newest stamp a call reads, never later than the host's clock nor more than
+  10 minutes before it, so a host clock up to 10 minutes ahead of Linear's cannot move the line), and lists what it
+  had not listed there, once. The cursor carries 36-bit hashes of what
+  it listed in the lookback, up to 24 a feed, within the contract's 1,024 characters. A backlog read far behind now
+  re-reads nothing. When a live burst lists more than the hashes hold, the lookback is shortened; if it still covers
+  the last 10 seconds (`MIN_COVER_MS`, ten times the assumed delay) there is no gap, so a steady stream below about 2.4
+  changes a second never answers one. If it covers less, that page answers `gap` (`expired`, or `window-truncated` on
+  a first read from `since`; since the later of now and the newest change read, kept in the cursor as `gl`), so
+  nothing behind it is lost without a sign; later shortenings while that burst drains answer no other. Only a change more than two
+  minutes late is still missed ([README, Known limits](README.md#known-limits)).
+- **An entry Linear answers without an id or a time is no longer skipped silently:** that feed is held where it was
+  while the other is listed, and a call with nothing else to list answers `UPSTREAM_UNREADABLE`. An item Linear's pages
+  show twice in one call (pages moving under an arrival) is listed once.
+- The docs give the true worst case per call: 26 `list_issues` and 17 `get_notifications` reads, 43 requests against
+  the person's Linear rate limit; a quiet call makes one of each.
+- A notification, or an issue change, in the same millisecond as the cursor's own could be skipped when Linear ordered
+  it after the one already listed and on the next page: a walk now reads past the cursor's millisecond before it stops.
+- `events_list` lists archived issues too (`includeArchived` on `list_issues`), so a change to an issue archived
+  before a listing reads it is no longer lost. What Linear's tools do not show, an issue deleted or no longer assigned
+  to the person and an inbox notification deleted or archived, is still not listed
+  ([README, Known limits](README.md#known-limits)).
+
 ## [0.0.4] - 2026-11-15
 
 ### Changed

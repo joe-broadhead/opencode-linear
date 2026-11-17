@@ -18,15 +18,16 @@ declaration, because that schema accepts no unknown keys.
 the signed-in user and workspace, but Linear marks it `readOnlyHint: false`, so it is declared not read-only: a
 read-only helper is not given it, and at `read-only` it is denied. `linear.get_user` with `me` reads the same account
 and is read-only. Jelly's agents have no base "allow everything"
-rule, so this plugin's own default rules, which it puts after that rule, never reach them. Jelly
-writes each declared `ask` or `deny` as that tool's default instead (the person's own choice
-replaces it), and denies a read-only helper every tool not marked `readOnly`. A declared `allow`
-changes nothing in Jelly.
+rule, so this plugin's own default rules, which it puts after that rule, never reach them. Every tool
+is declared `allow`, which changes nothing in Jelly: each tool follows the access choice and its
+`readOnly`, by Jelly's shared rules below, and a read-only helper is denied every tool not marked `readOnly`.
 
-- Ask: none. Every tool is declared `allow`, so a Jelly agent runs what the plugin's own default allows.
-- Off: none. To make one ask or stop, declare `ask` or `deny` for it, or set the plugin's `access` option in the agent's options.
-- Everything else runs, as the plugin's own rules let it. `linear.events_list` is for Memory's collector, which runs
-  it unattended, so it never asks; each Linear read it makes follows that read's own effect.
+- Ask: none declared. At Ask before changes, every tool not marked `readOnly` asks first.
+- Off: none declared. At Read only, every tool not marked `readOnly` is off. A choice the person makes for one tool wins
+  over both.
+- `linear.events_list`, the plugin's own read for Memory's collector, which runs it unattended, is marked `readOnly`,
+  so it runs at every access choice and never asks; the Linear reads it makes, `list_issues` and `get_notifications`,
+  are marked `readOnly` too.
 
 A tool the upstream server adds later is not declared, so in Jelly it is not asked about by
 default. Keep `jelly.tools` in step with the known-tool list; `test/unit/jelly.test.ts` checks
@@ -34,6 +35,23 @@ each declared effect against the plugin's own default rules. `test/unit/live-too
 against Linear's own tool list, captured live on 14 November 2026 in `test/fixtures/live-tools.json`
 (`provenance.json` says how): every tool Linear serves is declared, every declared tool is served or is the plugin's
 own (`test/fixtures/tool-registry.json`), and each `readOnly` is Linear's `readOnlyHint`.
+
+Jelly's shared rules for every plugin of the family, word for word:
+
+<!-- family-block:start -->
+- At Allowed (`all`), the default, every tool runs without asking, declared or not, whatever its `effect`.
+- At Ask before changes (`ask-changes`), a `readOnly` tool runs, and every other tool asks first, including a tool this plugin does not declare.
+- At Read only (`read-only`), a `readOnly` tool runs, and every other tool is off, including a tool this plugin does not declare.
+- A declared `effect` of `allow` changes nothing: the tool follows the access choice and its `readOnly`.
+- A declared `effect` of `ask` makes the tool ask at Ask before changes, even when it is `readOnly`, and changes nothing at Allowed or Read only.
+- A declared `effect` of `deny` turns the tool off at Ask before changes and at Read only, and changes nothing at Allowed.
+- An action listed in `asks` asks first at Ask before changes and at Read only, and never at Allowed.
+- A tool named with one `*`, such as another account's `plaud-*.get_file`, follows the same rules as a tool named in full.
+- A choice the person makes for one tool wins over the access choice and the declared `effect`.
+- jelly leaves out a key it does not know at the top level of the `jelly` block, and reads the rest.
+- jelly refuses the plugin for a key it does not know inside anything it reads, such as a tool, a sign-in or a setting.
+- jelly refuses the plugin, with one plain line, when `requires` names a field or a feature it does not read.
+<!-- family-block:end -->
 
 ## Skills
 
