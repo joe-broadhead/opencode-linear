@@ -51,7 +51,7 @@ page.
 - Default: `false`.
 
 The plugin supports OpenCode `>=2.2.3 <2.4.0`, the range `opencode.host` in `package.json` declares, and every check
-runs on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0, the tested releases. Status shows the version, whether it is tested and the supported
+runs on 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2, the tested releases. Status shows the version, whether it is tested and the supported
 range in its `OpenCode` row, for example `2.2.5 (tested; supported range >=2.2.3 <2.4.0)`.
 
 - **A tested release:** the plugin starts.
@@ -611,7 +611,7 @@ plugin of this family shares, with the same names and meanings:
 | `tools` | How many Linear tools OpenCode lists |
 | `unknownCount`, `unknownTools` | How many of them the plugin does not know, and at most 20 of their names, only those made of lowercase letters, digits and `_` |
 | `unguardedAgents` | Agents where a new Linear tool would run without asking; empty when there are none. An agent whose own rules already ask or deny for every Linear tool is not listed. |
-| `host` | `version` (`null` if OpenCode reports none), `range` (the supported range) and `tested` (true only for 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7 and 2.3.0) |
+| `host` | `version` (`null` if OpenCode reports none), `range` (the supported range) and `tested` (true only for 2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2) |
 | `problems` | Setup problems, each `CODE: What happened. Next step: What to do.` |
 | `nextStep` | Exactly one next step: the `Next step` row, `Nothing to do.` when nothing is needed |
 
