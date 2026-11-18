@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **List snapshot** `linear.issues` (`output: "list"`). An app can bind it and render assigned issues without knowing Linear. It calls the existing `linear_issues` read (`list_issues`), not a second client. `linear.activity` stays the events source and is not renamed. No write is declared. The source-contract pin stays v0.2.0: `list` is already in that pin, and this change sends none of v0.3.0's new fields.
+
 ## [0.0.5] - 2026-11-17
 
 ### Changed
