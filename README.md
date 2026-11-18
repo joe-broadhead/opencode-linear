@@ -49,7 +49,7 @@ for a direct call, not for one made inside Code Mode.
 since a cursor, as normalised events, oldest first: each change to an issue assigned to you, and each notification in
 your Linear inbox, with the issue's identifier and link. Each listing names its account, `<workspace id>/<email>`, which must be the one `probe` read for the current sign-in. It only
 reads, through Linear's `list_issues` and `get_notifications`, and never asks with the default rules. It is this
-plugin's source `linear.activity` under the shared source contract, which `package.json` declares, with the tools RPC
+plugin's source `linear.activity` under the shared source contract, which `package.json` declares, and `linear.issues`, the assigned-issues read as a `list` snapshot an app can render without knowing Linear. `linear.activity` is not renamed. The tools RPC
 method `probe`, which names who is signed in through `get_workspace` and `get_user` with `me`
 ([configuration](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/configuration.md#events-list)).
 
