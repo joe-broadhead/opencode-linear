@@ -106,6 +106,39 @@
         "urlHosts": [
           "linear.app"
         ]
+      },
+      {
+        "id": "linear.issues",
+        "kind": "snapshot",
+        "tool": "issues",
+        "input": {
+          "source": "linear"
+        },
+        "output": "list",
+        "accounts": {
+          "named": false
+        },
+        "permission": {
+          "tool": "linear_issues",
+          "operations": [
+            "get_workspace",
+            "get_user",
+            "list_issues"
+          ],
+          "identity": [
+            "get_workspace",
+            "get_user"
+          ]
+        },
+        "private": true,
+        "cost": {
+          "class": "free"
+        },
+        "maxAgeSec": 900,
+        "maxBytes": 65536,
+        "urlHosts": [
+          "linear.app"
+        ]
       }
     ]
   },
