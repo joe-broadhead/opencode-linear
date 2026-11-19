@@ -157,6 +157,19 @@ async function cases(): Promise<PageCase[]> {
   ]
 }
 
+/**
+ * v0.3 checks this source carries nothing for. The kit marks each not applicable on its own; an empty reason would be
+ * no reason, so each states why.
+ */
+const ABSENT = {
+  "actor-kind": "the fixture names no machine actor, so actor-kind does not apply",
+  "commitment-key": "no page carries a commitment, so commitment-key does not apply",
+  facts: "no page carries a fact, so facts does not apply",
+  hints: "the source declares no hint file, so hints does not apply",
+  "parts-stable": "no page carries a part, so parts-stable does not apply",
+  routines: "the source declares no routine file, so routines does not apply",
+}
+
 const reports: ConformanceReport[] = []
 
 describe("the source contract's conformance kit", () => {
@@ -192,9 +205,27 @@ describe("the source contract's conformance kit", () => {
     expect(report.problems).toEqual([])
     // Every check that applies runs, so the report is complete. The expired-cursor check and gap-once-per-read run on
     // the bulk change; failed-holds-cursor is not applicable with the reason above; the others not run are about what
-    // this source never declares or sends: removals[], a price, details, suggest, a snapshot's output.
+    // this source never declares or sends: removals[], a price, details, suggest, a snapshot's output. The v0.3 checks
+    // in `absent` do not apply either: each reason is non-empty, which is what the kit accepts for a stated skip.
     expect(report.checks.filter((check) => !check.ran && !check.notApplicable).map((check) => check.name)).toEqual([])
-    expect(report.checks.filter((check) => check.notApplicable).map((check) => check.name).sort()).toEqual(["billed-cost", "details", "failed-holds-cursor", "output-schema", "removals-are-final", "suggest"])
+    expect(report.checks.filter((check) => check.notApplicable).map((check) => check.name).sort()).toEqual([
+      "actor-kind",
+      "billed-cost",
+      "commitment-key",
+      "details",
+      "facts",
+      "failed-holds-cursor",
+      "hints",
+      "output-schema",
+      "parts-stable",
+      "removals-are-final",
+      "routines",
+      "suggest",
+    ])
+    for (const [name, reason] of Object.entries(ABSENT)) {
+      expect(reason.trim()).not.toBe("")
+      expect(report.checks.find((check) => check.name === name)).toMatchObject({ ran: false, notApplicable: true, problems: [] })
+    }
     for (const name of ["gap-and-cursor-expired", "gap-once-per-read"]) expect(report.checks.find((check) => check.name === name)).toMatchObject({ ran: true, notApplicable: false, problems: [] })
     expect(ARRIVED.length).toBeGreaterThan(1)
     expect(report.ok).toBe(true)
@@ -204,7 +235,7 @@ describe("the source contract's conformance kit", () => {
     expect(reports.map((report) => report.source)).toEqual(["linear.activity"])
     const installed = readInstalledDescriptor(root, { version: pkg.version })
     const report = {
-      contract: "@we-the-rebel-alliance/source-contract@0.2.0",
+      contract: "@we-the-rebel-alliance/source-contract@0.3.0",
       plugin: PACKAGE,
       version: pkg.version,
       descriptorHash: installed.ok ? installed.value.hash : null,
