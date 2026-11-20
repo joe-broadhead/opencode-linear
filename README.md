@@ -17,7 +17,7 @@ Linear is a trademark of Linear Orbit, Inc.; this unofficial plugin is not endor
 ## Install
 
 ```sh
-opencode plugin add github:joe-broadhead/opencode-linear#v0.0.8
+opencode plugin add github:joe-broadhead/opencode-linear#v0.0.9
 ```
 
 Run `opencode reload`, or restart OpenCode. Then run `/linear-status`: it shows `sign-in required` until you sign in
@@ -30,7 +30,7 @@ server, which has its own sign-in.
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.8" }] }
+{ "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.9" }] }
 ```
 
 The plugin registers Linear's MCP server under the name `linear`, adds default permission rules, the `/linear-status`
@@ -122,7 +122,7 @@ Nothing asks first. Restrict it in any of these three ways:
    | `"read-only"` | the read tools | nothing: every write is **denied** |
 
    ```json
-   { "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.8", "options": { "access": "read-only" } }] }
+   { "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.9", "options": { "access": "read-only" } }] }
    ```
 
    `"read"` and `"write"` still work: they mean `"read-only"` and `"all"`, and `/linear-status` says they are
@@ -259,7 +259,7 @@ Set options with the object form of the plugin entry:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.8", "options": { "access": "read-only" } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.9", "options": { "access": "read-only" } }]
 }
 ```
 
@@ -282,7 +282,7 @@ entry in the system config: `/Library/Application Support/opencode/opencode.json
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.8", "options": { "access": "ask-changes" } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.9", "options": { "access": "ask-changes" } }]
 }
 ```
 
@@ -340,7 +340,7 @@ store.
 1. Sign out: `opencode mcp logout linear`. Right after OpenCode starts or reloads, it can answer
    `MCP server not found: linear` for a few seconds; wait, then run it again.
 2. Check: `opencode auth list` no longer lists **Linear**.
-3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-linear#v0.0.8` (the spec you installed), then `opencode reload`.
+3. Remove the plugin: `opencode plugin remove github:joe-broadhead/opencode-linear#v0.0.9` (the spec you installed), then `opencode reload`.
    `opencode mcp list` no longer lists `linear`.
 4. Remove any Linear rules you copied into your agents' own `permissions`.
 
