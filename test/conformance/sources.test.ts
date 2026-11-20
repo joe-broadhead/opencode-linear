@@ -13,6 +13,7 @@ import { readInstalledDescriptor } from "@we-the-rebel-alliance/source-contract/
 import { SOURCES_SCHEMA, type Sources } from "@we-the-rebel-alliance/source-contract/schema"
 import type { ToolCall } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 import { LINEAR_SOURCE, NAMESPACE, PACKAGE, eventsMethod, probeMethod, signIns, type EventsToolOptions } from "../../src/events.js"
+import { issuesMethod } from "../../src/issues.js"
 import type { Status } from "../../src/status.js"
 import { TOOLS_RPC_ID } from "../../src/tools-rpc.js"
 
@@ -92,8 +93,9 @@ function executors(permission: SessionContext["permission"]) {
     if (tool === "linear_get_user") return answer(input["query"] === "me" ? LINEAR["me"] : {})
     if (tool === "linear_get_workspace") return answer(LINEAR["workspace"])
     if (tool === "linear_list_issues") {
-      const after = Date.parse(String(input["updatedAt"]))
-      const issues = [...LINEAR["issues"], ...BULK, ...ARRIVED].filter((item: { updatedAt: string }) => Date.parse(item.updatedAt) > after).sort(newest("updatedAt"))
+      const raw = input["updatedAt"]
+      const after = typeof raw === "string" ? Date.parse(raw) : Number.NaN
+      const issues = [...LINEAR["issues"], ...BULK, ...ARRIVED].filter((item: { updatedAt: string }) => !Number.isFinite(after) || Date.parse(item.updatedAt) > after).sort(newest("updatedAt"))
       return paged("issues", issues, input)
     }
     return paged("notifications", [...LINEAR["notifications"], ...EARLY_INBOX].sort(newest("createdAt")), input)
@@ -179,7 +181,8 @@ describe("the source contract's conformance kit", () => {
     expect(declarationProblems(pkg.sources, { tools })).toEqual([])
     expect(sources.rpc).toBe(TOOLS_RPC_ID)
     expect(pkg.name).toBe(PACKAGE)
-    expect(sources.items.map((item) => item.id)).toEqual(["linear.activity"])
+    expect(sources.items.map((item) => item.id)).toEqual(["linear.activity", "linear.issues"])
+    expect(sources.items.find((item) => item.id === "linear.issues")).toMatchObject({ kind: "snapshot", output: "list", tool: "issues" })
   })
 
   test("linear.activity keeps the contract", async () => {
@@ -231,8 +234,36 @@ describe("the source contract's conformance kit", () => {
     expect(report.ok).toBe(true)
   })
 
+  test("linear.issues keeps the contract", async () => {
+    const listed = sources.items.find((item) => item.id === "linear.issues")!
+    const report = await sourceConformance({
+      plugin: PACKAGE,
+      source: listed,
+      tools,
+      calls: {
+        snapshot: (input, context) =>
+          issuesMethod({
+            tool: executors(context.permission) as never,
+            owned: () => true,
+            status: async () => connected,
+            permission: context.permission as never,
+          }).run(input, call()),
+        probe: (input, context) => probeMethod(options(context)).run(input, call()),
+      },
+      snapshotCases: [{ ...(listed.input ?? {}), account: ACCOUNT }],
+      cases: [],
+      account: ACCOUNT,
+      sources,
+      describe: { id: TOOLS_RPC_ID },
+    })
+    reports.push(report)
+    expect(report.problems).toEqual([])
+    expect(report.ok).toBe(true)
+    expect(report.incomplete).toBe(false)
+  })
+
   test("writes the report a release attaches", () => {
-    expect(reports.map((report) => report.source)).toEqual(["linear.activity"])
+    expect(reports.map((report) => report.source).sort()).toEqual(["linear.activity", "linear.issues"])
     const installed = readInstalledDescriptor(root, { version: pkg.version })
     const report = {
       contract: "@we-the-rebel-alliance/source-contract@0.3.0",

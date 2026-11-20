@@ -541,8 +541,8 @@ sign-in. Another `account` is `ACCOUNT_MISMATCH`.
 
 ## Sources
 
-`package.json` declares the plugin's one source in its top-level `sources` key, under source-contract version 1, so a
-consumer (Memory, jelly, Artifacts) reads it from the installed package:
+`package.json` declares the plugin's sources in its top-level `sources` key, under source-contract version 1, so a
+consumer (Memory, jelly, Artifacts) reads them from the installed package. `linear.activity` is unchanged. `linear.issues` is the assigned-issues read `linear_issues` already makes, as the contract's `list` output, so an app can render it without knowing Linear. It is not editable, and it declares no write.
 
 | Key | Value |
 | --- | --- |
@@ -557,6 +557,8 @@ consumer (Memory, jelly, Artifacts) reads it from the installed package:
 | `maxBytes` | 900,000 |
 | `urlHosts` | `linear.app` |
 | `sources.rpc`, `sources.probe.action` | `linear.workspace.tools`, `linear_probe` |
+
+`linear.issues` is a snapshot. Its `tool` is `issues` (the plugin's `linear_issues`), its `output` is `list`, and its `input` is `{ "source": "linear" }`. `permission.tool` is `linear_issues`. `permission.operations` are `get_workspace` and `get_user` (identity, which only `probe` reads) and `list_issues` (the read the tool already makes). `private` is true. `cost` is free. `maxAgeSec` is 900. `maxBytes` is 65,536. `urlHosts` is `linear.app`. A source read returns `{ data: { items, editable: false }, asOf, trust }`. The model tool still returns the table.
 
 `npm run check` and `npm run conformance` run the contract's conformance kit over the source, on recorded answers
 with no Linear call, and write `reports/conformance-report.json`, which a release attaches; it must say `ok: true`.

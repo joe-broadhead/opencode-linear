@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { checkHost } from "../../src/host-version.js"
-import { issueRows, issuesTool, registerIssuesTool } from "../../src/issues.js"
+import { issueList, issueRows, issuesTool, registerIssuesTool } from "../../src/issues.js"
 import { defaultRules, evaluate } from "../../src/permissions.js"
 import { buildStatus, type StatusFacts } from "../../src/status.js"
 
@@ -35,6 +35,37 @@ const status = (more: Partial<StatusFacts> = {}) => async () => buildStatus({ ..
 const owned = () => true
 const SIGN_IN = "Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth linear opens it automatically)."
 const context = { sessionID: "ses_1", agent: "build", messageID: "msg_1", id: "call_1", signal: new AbortController().signal } as never
+
+describe("linear.issues list snapshot", () => {
+  test("reads assigned issues through list_issues and returns the list shape", async () => {
+    const { tool, calls } = host({
+      issues: [issue(1), issue(2, { status: "Done", title: "Ship it" }), issue(3, { status: "Canceled" })],
+      hasNextPage: true,
+    })
+    const asserted: unknown[] = []
+    const result = await issuesTool({
+      tool,
+      owned,
+      status: status(),
+      permission: { assert: async (input) => void asserted.push(input) },
+    }).execute({ source: "linear", account: "acme/sam.rivera@example.com" }, context)
+    expect(calls).toEqual([{ assignee: "me", limit: 50, fields: ["id", "title", "status", "priority", "url"] }])
+    expect(asserted).toEqual([expect.objectContaining({ action: "linear_issues", resources: ["*"] })])
+    expect(result.output).toMatchObject({
+      account: "acme/sam.rivera@example.com",
+      trust: "untrusted",
+      data: {
+        editable: false,
+        items: [
+          { id: "ENG-1", text: "Issue 1", note: "In Progress" },
+          { id: "ENG-2", text: "Ship it", note: "Done", done: true },
+          { id: "ENG-3", text: "Issue 3", note: "Canceled", done: true },
+        ],
+      },
+    })
+    expect(issueList([])).toEqual([])
+  })
+})
 
 describe("linear_issues", () => {
   test("asks Linear only for the fields the table shows, and answers Jelly's table from Linear's live shape", async () => {

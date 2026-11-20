@@ -94,7 +94,7 @@ export function createLinearPlugin(seam: LinearSeam) {
         })
       // The plugin's own server, or the user's adopted one; a server at another URL is not Linear's for this access.
       const owned = () => source?.type === "plugin" || source?.type === "adopted"
-      const issues = { tool: ctx.tool, owned, status: read }
+      const issues = { tool: ctx.tool, owned, status: read, permission: ctx.permission }
       await registerIssuesTool(issues)
       // Linear's source (package.json's `sources`): events_list, a Code Mode tool and a tools RPC method, and probe, a
       // tools RPC method.

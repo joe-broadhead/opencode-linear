@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **List snapshot** `linear.issues` (`output: "list"`). An app can bind it and render assigned issues without knowing Linear. It calls the existing `linear_issues` read (`list_issues`), not a second client. `linear.activity` stays the events source and is not renamed. No write is declared.
+
 ## [0.0.7] - 2026-11-20
 
 ### Fixed
@@ -18,6 +24,7 @@ All notable changes to this project are documented here. The format follows [Kee
   their own errors. A request that is invalid, or a cursor for another account, is still refused before any read.
   **For Memory and every consumer:** nothing changes in what the plugin declares or answers when it works; `probe`
   is unchanged. `package.json`'s `sources` is unchanged, so a consumer does not ask to confirm Linear again.
+
 
 ## [0.0.6] - 2026-11-18
 
