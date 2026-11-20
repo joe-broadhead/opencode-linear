@@ -1,4 +1,5 @@
 import type { Plugin } from "@opencode/plugin"
+import { secretKinds } from "@we-the-rebel-alliance/source-contract/events"
 import { linearError, SERVER_NAME } from "./constants.js"
 import type { PluginMethod } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 import type { Status } from "./status.js"
@@ -108,13 +109,17 @@ interface IssuesToolOptions {
 const LIST_CAP = 50
 const DONE = /^(done|canceled|cancelled|completed)$/i
 
-/** Assigned issues as the contract's `list` output: identifier, title, and the state as a note. Not editable. */
+/**
+ * Assigned issues as the contract's `list` output: identifier, title, and the state as a note. Not editable. A title,
+ * state or identifier that holds a secret is left out, as every list source does.
+ */
 export function issueList(rows: readonly IssueRow[]) {
   return rows.slice(0, LIST_CAP).flatMap((row) => {
     const id = row.identifier.slice(0, 128)
     const text = row.title.slice(0, 200)
-    if (id === "" || text === "") return []
+    if (id === "" || text === "" || secretKinds(id).length > 0 || secretKinds(text).length > 0) return []
     const note = row.state === null ? undefined : row.state.slice(0, 200)
+    if (note !== undefined && secretKinds(note).length > 0) return []
     const done = note !== undefined && DONE.test(note)
     return [{ id, text, ...(note === undefined || note === "" ? {} : { note }), ...(done ? { done: true } : {}) }]
   })

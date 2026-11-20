@@ -65,6 +65,19 @@ describe("linear.issues list snapshot", () => {
     })
     expect(issueList([])).toEqual([])
   })
+
+  test("leaves out an issue whose title, state or identifier holds a secret", () => {
+    const items = issueList([
+      { identifier: "ENG-1", title: "Rotate the staging key", state: "In Progress" },
+      { identifier: "ENG-2", title: "Wifi password: Ku7pLm2QzR9w", state: "Todo" },
+      { identifier: "ENG-3", title: "Plain title", state: "token sk-live-9d8f7g6h5j4k3l2m1n0p" },
+      { identifier: "ENG-4", title: "Another plain title", state: "Done" },
+    ])
+    expect(items).toEqual([
+      { id: "ENG-1", text: "Rotate the staging key", note: "In Progress" },
+      { id: "ENG-4", text: "Another plain title", note: "Done", done: true },
+    ])
+  })
 })
 
 describe("linear_issues", () => {
