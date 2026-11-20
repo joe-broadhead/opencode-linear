@@ -477,11 +477,13 @@ events_list({ account, since?, cursor?, limit?, source? })
   cursors. The owner is `linear:<user id>`, labelled with the user's name and, for display, the workspace's URL key
   (`Sam Rivera (acme)`).
   `probe` reads them (below) and the plugin keeps them for the sign-in, OpenCode's credential for the `linear` server.
-  Every listing names its `account`, and a listing never asks Linear who is signed in: it compares the account with
-  what `probe` read for the current sign-in, before any Linear read. Until a probe has named the sign-in (after a new
-  sign-in, or a restart of OpenCode, since this is kept in memory; the plugin forgets it on every
-  `credential.updated` and `credential.switched`, as a new sign-in may keep its credential id) a listing is
-  `UNAVAILABLE`: call `probe`, then list again. Another account than the one probe read is `ACCOUNT_MISMATCH`. A listing without `account`, or with one that
+  Every listing names its `account`, and compares it with who the current sign-in is, before any of its own Linear
+  reads. A listing needs no probe before it: when the plugin does not know the sign-in yet (after a start of OpenCode,
+  or a new sign-in, since this is kept in memory; the plugin forgets it on every `credential.updated` and
+  `credential.switched`, as a new sign-in may keep its credential id), the listing makes the same two identity reads
+  as `probe` itself, once, and keeps the answer. If Linear cannot answer them, or answers in a shape the plugin does not
+  read, the listing is `UNAVAILABLE`; a refused permission check or a server that cannot be called is that read's own
+  error. Another account than the one signed in is `ACCOUNT_MISMATCH`. A listing without `account`, or with one that
   is not `<workspace id>/<email>`, is `INPUT_INVALID`; another source is `SOURCE_UNKNOWN`. Memory compares the owner with
   the person it collects for.
 - **Cursor**: opaque, at most 1,024 characters: the source contract's bound cursor, tied to this plugin, the source and
@@ -549,7 +551,7 @@ consumer (Memory, jelly, Artifacts) reads it from the installed package:
 | `tool`, `input` | `events_list`, `{ "source": "linear" }` |
 | `accounts.named` | `false`: one sign-in |
 | `permission.events` | `linear_events_list` |
-| `permission.operations` | `get_workspace` and `get_user` (the identity operations, `permission.identity`, which only `probe` reads), `list_issues` and `get_notifications`: exactly the reads it makes |
+| `permission.operations` | `get_workspace` and `get_user` (the identity operations, `permission.identity`, which `probe` reads, and a listing reads when it does not know the sign-in yet), `list_issues` and `get_notifications`: exactly the reads it makes |
 | `private` | `true`: your assigned issues and your inbox |
 | `cost` | `free`: Linear's MCP server is not billed per call; it is rate-limited (see the README's Known limits) |
 | `maxBytes` | 900,000 |
@@ -581,8 +583,8 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 | `UPSTREAM_ERROR` | `linear_events_list`: Linear answered one of its reads with an error. The message holds the first line, at most 300 characters, with tokens and URL query strings removed. | Run `/linear-status`, then call again with the same cursor. |
 | `INPUT_INVALID` | `linear_events_list` or `probe`: the input is not the contract's, such as a `limit` outside 1 to 500, a `since` that is not an ISO date or date-time, or a listing with no `account` or one that is not `<workspace id>/<email>`. | Pass `account`, `since`, `cursor`, `limit` or `source` as the schema describes them. |
 | `SOURCE_UNKNOWN` | `linear_events_list` or `probe`: `source` is not `linear`. | Leave `source` out, or pass `linear`. |
-| `UNAVAILABLE` | `linear_events_list`: no `probe` has named the current sign-in yet (a new sign-in, or OpenCode restarted). | Call `probe` for the `linear` source, then call `events_list` again. |
-| `ACCOUNT_MISMATCH` | `linear_events_list`: `account` is not the one `probe` read for the current sign-in, or the cursor was issued for another account. `probe`: `account` is not the signed-in one. | Pass the cursor with the account it was issued for, or sign in to Linear as that account; `probe` names the signed-in account. |
+| `UNAVAILABLE` | `linear_events_list`: Linear could not say who is signed in, because `get_workspace` or `get_user` failed or answered in a shape the plugin does not read. | Run `/linear-status`, then call `events_list` again with the same cursor. |
+| `ACCOUNT_MISMATCH` | `linear_events_list`: `account` is not the one signed in to Linear now (the one `probe` names), or the cursor was issued for another account. `probe`: `account` is not the signed-in one. | Pass the cursor with the account it was issued for, or sign in to Linear as that account; `probe` names the signed-in account. |
 | `CURSOR_INVALID` | `linear_events_list`: the cursor is malformed, another source's or plugin's, changed, or issued by 0.0.2 or earlier. | Call without a cursor, with `since`, to start again. |
 
 For example:

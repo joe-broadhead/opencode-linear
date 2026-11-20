@@ -188,9 +188,10 @@ describe(`the default access on OpenCode ${HOST_VERSION}`, () => {
     const run = (sessionID: string, id: string) =>
       events.execute({ account: "c0ffee00-0000-4000-8000-000000000000/sam.rivera@example.com", since: "2026-11-01" }, { sessionID, agent: "build", messageID: "msg_host_test", id, signal: new AbortController().signal, progress: async () => {} } as never)
     const from = host.fake.inputs.length
-    // The default rules allow it. It never asks who is signed in, and no probe has named this sign-in, so it refuses
-    // to label a page with an account it has not seen signed in, before any Linear read.
-    await expect(run(await session(host), "call_events_1")).rejects.toThrow(/^UNAVAILABLE: .* Next step: Call probe for the linear source/)
+    // The default rules allow it. No probe has named this sign-in, so it first reads who is signed in, through the host's
+    // get_workspace executor. This fake server does not list that tool, so the listing stops there with the host's own
+    // answer, before any Linear read, rather than labelling a page with an account it has not seen signed in.
+    await expect(run(await session(host), "call_events_1")).rejects.toThrow(/^TOOL_UNAVAILABLE: OpenCode does not list Linear's get_workspace/)
     expect(host.fake.inputs.slice(from)).toEqual([])
     // A session that denies linear_events_list: the assert refuses it before any read.
     const permissions = [{ action: "linear_events_list", resource: "*", effect: "deny" as const }]
