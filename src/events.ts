@@ -193,7 +193,7 @@ export const EVENTS_OUTPUT: JsonSchema = {
           source: STRING,
           account: STRING,
           external_id: { type: "string", description: "<identifier>@<updated time> for an issue change, notification:<id> for a notification" },
-          kind: { type: "string", enum: ["issue", "event"] },
+          kind: { type: "string", enum: ["issue"] },
           occurred_at: { type: "string", description: "UTC ISO" },
           thread: { ...nullable("string"), description: "linear-issue: and the issue's id: every event of one issue" },
           actors: { type: "array", items: { type: "object", required: ["role", "id"], properties: { role: STRING, id: STRING, name: STRING } } },
@@ -386,18 +386,21 @@ export function notificationEvent(account: string, item: unknown): IssueChange |
   const what = type?.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").toLowerCase()
   const externalId = `notification:${id}`
   const title = identifier !== undefined ? (issueTitle ? `${identifier}: ${issueTitle}` : identifier) : (text(data["title"]) ?? what ?? "Linear notification")
+  // The source declares one kind, `issue`, and Memory refuses an event of any other, silently: a notification that names
+  // no issue keeps its former kind, `event`, as a label rather than in `kind`.
+  const formerKind = identifier === undefined ? ["event"] : []
   const event = makeEvent({
     source: LINEAR_SOURCE,
     account,
     external_id: externalId,
-    kind: identifier !== undefined ? "issue" : "event",
+    kind: "issue",
     occurred_at: created,
     thread: identifier !== undefined ? `linear-issue:${text(issue["uuid"]) ?? text(issue["id"]) ?? identifier}` : null,
     actors: actor("from", person(data["actor"], data["actorId"])),
     title,
     text: [what && `Notification: ${what}.`, text(data["subtitle"]), text(data["body"]) ?? text(record(data["comment"])["body"])].filter(Boolean).join("\n\n"),
     url: text(issue["url"]) ?? text(data["url"]) ?? null,
-    labels: ["notification", ...names([type])],
+    labels: ["notification", ...names([type]), ...formerKind],
   })
   return { at: { t: created, k: externalId }, event }
 }
