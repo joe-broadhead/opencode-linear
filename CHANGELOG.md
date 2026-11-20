@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`events_list` works after any restart of OpenCode, with no `probe` before it.** Until now the plugin kept who is
+  signed in only in memory, and only `probe` filled it. A consumer that probes once, at bind, such as Memory, found
+  every later listing `UNAVAILABLE` ("no probe has named this sign-in's account") after OpenCode started again, a
+  plugin reload, or a second OpenCode process, for good. Now a listing that does not know the sign-in yet makes the two
+  identity reads `probe` makes (`get_workspace` and `get_user` with `me`, the declared identity operations, which a
+  collection session already allows), once, keeps the answer for the sign-in as `probe` does, and then runs. The
+  account check is as strict as before: an account other than the signed-in one is `ACCOUNT_MISMATCH`. When Linear
+  cannot answer those reads, or answers in a shape the plugin does not read, the listing is `UNAVAILABLE`, with the
+  next step to run `/linear-status` and list again; a refused permission check and a server that cannot be called keep
+  their own errors. A request that is invalid, or a cursor for another account, is still refused before any read.
+  **For Memory and every consumer:** nothing changes in what the plugin declares or answers when it works; `probe`
+  is unchanged. `package.json`'s `sources` is unchanged, so a consumer does not ask to confirm Linear again.
+
 ## [0.0.6] - 2026-11-18
 
 ### Changed

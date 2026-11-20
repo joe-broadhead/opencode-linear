@@ -133,6 +133,12 @@ function linear(data = fixture(), pageSize = 3) {
   return { tool: { list: list as never }, calls, data }
 }
 
+type Executor = { id: string; execute: (input: Record<string, unknown>) => Promise<Answer> }
+/** The same host, with one executor replaced: a Linear read that fails, or a permission check that refuses it. */
+const replacing = (host: ReturnType<typeof linear>, id: string, execute: (original: Executor["execute"], input: Record<string, unknown>) => Promise<Answer>) => ({
+  list: async () => ((await (host.tool.list as unknown as () => Promise<Executor[]>)()).map((entry) => (entry.id === id ? { ...entry, execute: (input: Record<string, unknown>) => execute(entry.execute, input) } : entry))) as never,
+})
+
 const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "read-only", host: checkHost("2.2.3", false) }
 const status = async () => buildStatus(facts)
 const context = { sessionID: "ses_1", agent: "build", messageID: "msg_1", id: "call_1", signal: new AbortController().signal } as never
@@ -287,28 +293,93 @@ describe("linear_events_list", () => {
     expect(host.calls).toEqual([])
   })
 
-  test("before any probe has named the sign-in, a listing is UNAVAILABLE with the next step to call probe, and reads nothing", async () => {
+  test("after a restart, with no probe yet, a listing for the bound account reads who is signed in itself, keeps it, and lists", async () => {
     const host = linear()
-    await expect(eventsTool(options(host, [], null)).execute({ account: ACCOUNT, since: SINCE }, context)).rejects.toThrow(
-      /^UNAVAILABLE: The plugin does not know yet who is signed in to Linear.* Next step: Call probe for the linear source, then call events_list again\./,
-    )
-    // A new sign-in is another credential: what probe read for the old one does not cover it.
-    const switched = { ...options(host), signIn: async () => "cred_2" }
-    await expect(eventsTool(switched).execute({ account: ACCOUNT, since: SINCE }, context)).rejects.toThrow(/^UNAVAILABLE: /)
+    const opts = options(host, [], null)
+    const tool = eventsTool(opts)
+    const page = (await tool.execute({ account: ACCOUNT, since: SINCE }, context)).output
+    expect({ account: page.account, owner: page.owner }).toEqual({ account: ACCOUNT, owner: OWNER })
+    expect(page.events.map((event) => event.external_id)).toEqual(LISTED)
+    // The same two reads probe makes, once, before the listing's own.
+    const identity = (call: { tool: string }) => call.tool === "get_user" || call.tool === "get_workspace"
+    expect(host.calls.filter(identity)).toEqual([
+      { tool: "get_workspace", input: {} },
+      { tool: "get_user", input: { query: "me" } },
+    ])
+    expect(host.calls.slice(0, 2).every(identity)).toBe(true)
+    expect(opts.signIns.get("cred_1")).toEqual({ account: ACCOUNT, owner: OWNER })
+    // Kept for the process: the next listing asks Linear nothing about who is signed in.
+    host.calls.length = 0
+    await tool.execute({ account: ACCOUNT, since: SINCE }, context)
+    expect(host.calls.filter(identity)).toEqual([])
+  })
+
+  test("the same listing through the tools RPC method, after a restart with no probe, succeeds", async () => {
+    const method = eventsMethod(options(linear(), [], null))
+    const call: ToolCall = { sessionID: "ses_1", agent: "build", messageID: "msg_script", id: "script:1", signal: new AbortController().signal, progress: async () => {} }
+    const page = (await method.run({ account: ACCOUNT, since: SINCE }, call)) as EventsListResult
+    expect(page.events.map((event) => event.external_id)).toEqual(LISTED)
+  })
+
+  test("with no probe yet, an account that is not the signed-in one is ACCOUNT_MISMATCH, and nothing it asks for is listed", async () => {
+    const host = linear()
+    const opts = options(host, [], null)
+    for (const account of [AMA_ACCOUNT, `${WORKSPACE}/someone.else@example.com`, ELSEWHERE]) {
+      await expect(eventsTool(opts).execute({ account, since: SINCE }, context)).rejects.toThrow(/^ACCOUNT_MISMATCH: Linear is signed in to another account than /)
+    }
+    expect(host.calls.filter((call) => call.tool === "list_issues" || call.tool === "get_notifications")).toEqual([])
+  })
+
+  test("a request that is invalid reads nothing, not even who is signed in, with no probe yet", async () => {
+    const host = linear()
+    const tool = eventsTool(options(host, [], null))
+    await expect(tool.execute({ since: SINCE }, context)).rejects.toThrow(/^INPUT_INVALID: /)
+    await expect(tool.execute({ account: "not-an-account" }, context)).rejects.toThrow(/^INPUT_INVALID: /)
+    const theirs = (await run(linear(), [], ELSEWHERE)({ since: SINCE })).cursor
+    await expect(tool.execute({ account: ACCOUNT, cursor: theirs }, context)).rejects.toThrow(/^ACCOUNT_MISMATCH: The cursor is for another/)
     expect(host.calls).toEqual([])
   })
 
-  test("after a credential update or switch forgets what probe read, a listing is UNAVAILABLE until the next probe", async () => {
+  test("when Linear cannot say who is signed in, a listing is UNAVAILABLE with a next step, keeps nothing, and tries again next time", async () => {
+    const host = linear()
+    let broken = true
+    const failing = replacing(host, "linear_get_user", (original, input) => (broken ? Promise.reject({ _tag: "Tool.Error", message: "Linear is down" }) : original(input)))
+    const opts = { ...options(host, [], null), tool: failing }
+    await expect(eventsTool(opts).execute({ account: ACCOUNT, since: SINCE }, context)).rejects.toThrow(/^UNAVAILABLE: .*Linear.* Next step: .*events_list again/)
+    expect(opts.signIns.size).toBe(0)
+    expect(host.calls.filter((call) => call.tool === "list_issues" || call.tool === "get_notifications")).toEqual([])
+    // Linear is back: the next listing resolves the sign-in and lists, with nothing wrongly kept from the failure.
+    broken = false
+    expect((await eventsTool(opts).execute({ account: ACCOUNT, since: SINCE }, context)).output.account).toBe(ACCOUNT)
+  })
+
+  test("an identity answer the plugin cannot read is UNAVAILABLE, and a refused permission check reaches the caller untouched", async () => {
+    const data = fixture()
+    ;(data as { user: unknown }).user = { id: ME }
+    await expect(eventsTool(options(linear(data), [], null)).execute({ account: ACCOUNT, since: SINCE }, context)).rejects.toThrow(/^UNAVAILABLE: /)
+    const denied = new Error("Permission denied: linear_get_user")
+    const refused = replacing(linear(), "linear_get_user", () => Promise.reject(denied))
+    await expect(eventsTool({ ...options(linear(), [], null), tool: refused }).execute({ account: ACCOUNT, since: SINCE }, context)).rejects.toBe(denied)
+  })
+
+  test("a new credential has its own sign-in to resolve: what was read for the old one does not cover it", async () => {
+    const host = linear()
+    const opts = options(host)
+    const switched = { ...opts, signIn: async () => "cred_2" }
+    expect((await eventsTool(switched).execute({ account: ACCOUNT, since: SINCE }, context)).output.account).toBe(ACCOUNT)
+    expect([...opts.signIns.keys()].sort()).toEqual(["cred_1", "cred_2"])
+    expect(host.calls.filter((call) => call.tool === "get_user")).toHaveLength(1)
+  })
+
+  test("after a credential update or switch forgets what was read, the next listing reads who is signed in again", async () => {
     const host = linear()
     const opts = options(host, [], null)
-    const call: ToolCall = { sessionID: "ses_1", agent: "build", messageID: "msg_script", id: "script:1", signal: new AbortController().signal, progress: async () => {} }
-    await probeMethod(opts).run({}, call)
     expect((await eventsTool(opts).execute({ account: ACCOUNT, since: SINCE }, context)).output.account).toBe(ACCOUNT)
     // What the plugin does on credential.updated or credential.switched (src/plugin.ts, watchIntegration).
     opts.signIns.clear()
-    await expect(eventsTool(opts).execute({ account: ACCOUNT, since: SINCE }, context)).rejects.toThrow(/^UNAVAILABLE: /)
-    await probeMethod(opts).run({}, call)
+    host.calls.length = 0
     expect((await eventsTool(opts).execute({ account: ACCOUNT, since: SINCE }, context)).output.account).toBe(ACCOUNT)
+    expect(host.calls.filter((call) => call.tool === "get_user")).toHaveLength(1)
   })
 
   test("refuses another account's cursor, another workspace's included, with ACCOUNT_MISMATCH before any read", async () => {

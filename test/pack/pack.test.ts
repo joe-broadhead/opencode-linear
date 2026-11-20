@@ -400,11 +400,13 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     expect(await call("read-only", "reopen", "get_issue", { query: "q" })).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
   })
 
-  test("events_list runs the packed plugin's own spec, and before a probe has named the sign-in reads nothing", async () => {
+  test("events_list runs the packed plugin's own spec, and with no probe it first reads who is signed in, stopping at an answer it cannot read", async () => {
     const from = fake.calls.length
+    // The fake answers get_workspace with its call, not a workspace: the listing is UNAVAILABLE after that one read.
     const result = await call("read-only", "build", "events_list", { account: "c0ffee00-0000-4000-8000-000000000000/sam.rivera@example.com" })
     expect(result).toMatchObject({ type: "failed", code: "UNAVAILABLE" })
-    expect(toolCalls(from)).toEqual([])
+    expect(String(result.message)).toContain("UNAVAILABLE: events_list could not read who is signed in to Linear")
+    expect(toolCalls(from)).toEqual(["get_workspace"])
   })
 
   test("probe runs the packed plugin's own spec, reads through OpenCode, and reports an answer it cannot read with its own code", async () => {
