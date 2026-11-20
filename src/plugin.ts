@@ -105,6 +105,7 @@ export function createLinearPlugin(seam: LinearSeam) {
         return connection?.type === "credential" ? connection.id : undefined
       }
       const events = { tool: ctx.tool, permission: ctx.permission, owned, status: read, signIn, signIns: signIns() }
+      const issuesForRpc = { ...issues, signIn, signIns: events.signIns }
       await registerEventsTool(events)
       await registerSkills(ctx.skill, skills)
       await registerStatusCommand(ctx, read)
@@ -113,7 +114,7 @@ export function createLinearPlugin(seam: LinearSeam) {
       // a session and its agent: a write needs a prior allow rule for its action.
       const stopTools = await registerToolsRpc(ctx as never, {
         plugin: PLUGIN,
-        methods: [...METHODS, issuesMethod(issues), eventsMethod(events), probeMethod(events)],
+        methods: [...METHODS, issuesMethod(issuesForRpc), eventsMethod(events), probeMethod(events)],
         mcp: { server: SERVER_NAME, managed: owned },
       })
       // A sign-in that changes forgets what probe read for every sign-in: the next listing waits for a probe.

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { checkHost } from "../../src/host-version.js"
-import { issueList, issueRows, issuesTool, registerIssuesTool } from "../../src/issues.js"
+import { issueList, issueRows, issuesMethod, issuesTool, registerIssuesTool } from "../../src/issues.js"
 import { defaultRules, evaluate } from "../../src/permissions.js"
 import { buildStatus, type StatusFacts } from "../../src/status.js"
 
@@ -15,19 +15,30 @@ const issue = (n: number, extra: Record<string, unknown> = {}) => ({
 })
 
 /** The host's `linear_list_issues` executor, which answers with the server's structured content as `output`. */
-function host(answer: unknown) {
+/** The signed-in workspace and user the list checks its account against, as `get_workspace` and `get_user` "me". */
+const WORKSPACE = { id: "acme", urlKey: "acme", name: "Acme" }
+const ME = { id: "u_1", email: "sam.rivera@example.com", name: "Sam Rivera" }
+const ACCOUNT = "acme/sam.rivera@example.com"
+
+function host(answer: unknown, options: { readonly identity?: "fail" } = {}) {
   const calls: unknown[] = []
+  /** Only the list_issues call goes in `calls`; the two identity reads go in `reads`. */
+  const reads: unknown[] = []
+  const entry = (id: string, execute: (args: Record<string, unknown>) => unknown) => ({
+    id,
+    execute: async (args: Record<string, unknown>) => {
+      if (id === "linear_list_issues") calls.push(args)
+      else reads.push({ tool: id, args })
+      return { output: execute(args), content: [{ type: "text", text: JSON.stringify(execute(args)) }] }
+    },
+  })
   const list = async () =>
     [
-      {
-        id: "linear_list_issues",
-        execute: async (args: unknown) => {
-          calls.push(args)
-          return { output: answer, content: [{ type: "text", text: JSON.stringify(answer) }] }
-        },
-      },
+      entry("linear_list_issues", () => answer),
+      entry("linear_get_workspace", () => (options.identity === "fail" ? {} : WORKSPACE)),
+      entry("linear_get_user", () => (options.identity === "fail" ? {} : ME)),
     ] as never
-  return { tool: { list }, calls }
+  return { tool: { list }, calls, reads }
 }
 
 const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "all", host: checkHost("2.2.3", false) }
@@ -38,21 +49,26 @@ const context = { sessionID: "ses_1", agent: "build", messageID: "msg_1", id: "c
 
 describe("linear.issues list snapshot", () => {
   test("reads assigned issues through list_issues and returns the list shape", async () => {
-    const { tool, calls } = host({
+    const { tool, calls, reads } = host({
       issues: [issue(1), issue(2, { status: "Done", title: "Ship it" }), issue(3, { status: "Canceled" })],
       hasNextPage: true,
     })
     const asserted: unknown[] = []
-    const result = await issuesTool({
+    const result = await issuesMethod({
       tool,
       owned,
       status: status(),
       permission: { assert: async (input) => void asserted.push(input) },
-    }).execute({ source: "linear", account: "acme/sam.rivera@example.com" }, context)
+    }).run({ source: "linear", account: ACCOUNT }, context as never)
+    // The two identity reads come first, then the same list_issues call the table makes.
+    expect(reads).toEqual([
+      { tool: "linear_get_workspace", args: {} },
+      { tool: "linear_get_user", args: { query: "me" } },
+    ])
     expect(calls).toEqual([{ assignee: "me", limit: 50, fields: ["id", "title", "status", "priority", "url"] }])
     expect(asserted).toEqual([expect.objectContaining({ action: "linear_issues", resources: ["*"] })])
-    expect(result.output).toMatchObject({
-      account: "acme/sam.rivera@example.com",
+    expect(result).toMatchObject({
+      account: ACCOUNT,
       trust: "untrusted",
       data: {
         editable: false,
@@ -77,6 +93,49 @@ describe("linear.issues list snapshot", () => {
       { id: "ENG-1", text: "Rotate the staging key", note: "In Progress" },
       { id: "ENG-4", text: "Another plain title", note: "Done", done: true },
     ])
+  })
+})
+
+describe("linear.issues list rules", () => {
+  const row = (n: number, extra: Partial<{ identifier: string; title: string; state: string | null }> = {}) => ({ identifier: `ENG-${n}`, title: `Issue ${n}`, state: "Todo", priority: null, url: null, ...extra })
+
+  test("screens the whole title before the cut, screens the id, and lists a repeated identifier once", () => {
+    // A secret that only appears after the 200-character cut is still caught.
+    expect(issueList([row(1, { title: `${"a".repeat(196)}Password: Ku7pLm2QzR9w` })])).toEqual([])
+    // An identifier that is a token is left out.
+    expect(issueList([row(2, { identifier: "ghp_A1b2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8" })])).toEqual([])
+    // A repeated identifier is listed once, the first row winning.
+    expect(issueList([row(3, { title: "First" }), row(3, { title: "Second" })])).toEqual([{ id: "ENG-3", text: "First", note: "Todo" }])
+  })
+
+  test("caps at 50 items, keeps the order it is given, and holds maxBytes with 50 maximal multi-byte items", () => {
+    const many = Array.from({ length: 60 }, (_, index) => row(index, { title: `Issue ${index}` }))
+    const capped = issueList(many)
+    expect(capped).toHaveLength(50)
+    expect(capped.map((item) => item.id)).toEqual(many.slice(0, 50).map((item) => item.identifier))
+    // Three-byte characters everywhere the caps allow (128-unit identifier, 200-unit title, 200-unit state): 50 such
+    // items come to about 79 KB, so the answer has to shed whole items to stay inside the declared maxBytes.
+    const maximal = Array.from({ length: 50 }, (_, index) =>
+      row(index, { identifier: `语${index}`.padEnd(128, "语"), title: "语".repeat(200), state: "语".repeat(200) }),
+    )
+    const items = issueList(maximal)
+    const answer = { account: "acme/sam.rivera@example.com", data: { items, editable: false }, asOf: new Date().toISOString(), trust: "untrusted" }
+    expect(Buffer.byteLength(JSON.stringify(answer))).toBeLessThanOrEqual(65_536)
+    // Fewer than 50, and every item whole.
+    expect(items.length).toBeLessThan(50)
+    expect(items.length).toBeGreaterThan(0)
+  })
+
+  test("refuses another account than the signed-in one, and answers the signed-in account when none is passed", async () => {
+    const { tool, calls } = host({ issues: [issue(1)], hasNextPage: false })
+    const method = (given: Record<string, unknown>) => issuesMethod({ tool, owned, status: status() }).run(given, context as never)
+    await expect(method({ source: "linear", account: "other-workspace/other@example.com" })).rejects.toThrow(
+      /^ACCOUNT_MISMATCH: Linear is signed in to another account than "other-workspace\/other@example\.com"\./,
+    )
+    // The refusal comes before the issues are read.
+    expect(calls).toEqual([])
+    const answer = (await method({ source: "linear" })) as { account: string }
+    expect(answer.account).toBe(ACCOUNT)
   })
 })
 

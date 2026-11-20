@@ -11,10 +11,13 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Fixed
 
 - **`linear.issues` is readable through the tools RPC on every host.** It rides the `issues` method, which declared the model's table as its answer, and OpenCode validates a tools-RPC method's answer against that declaration, so a list read would have been refused `rpc.invalid_output`. The method now declares both shapes, the table and the list. A host test reads the list through the tools RPC on every tested release.
-- `linear.issues` leaves out an issue whose identifier, title or workflow state still holds a secret after masking, as every other list source does. It screens the whole text before it cuts, so a secret that straddles the cut cannot pass as a prefix; control characters are dropped, a repeated identifier is listed once, and the list stops before the answer passes the declared `maxBytes`.
+- `linear.issues` leaves out an issue whose identifier, title or workflow state still holds a secret after masking, as every other list source does. It screens the whole text before it cuts, so a secret that straddles the cut cannot pass as a prefix; control characters are dropped, a repeated identifier is listed once, and the 50 items the caps allow stay inside the declared `maxBytes`.
 
 ### Changed
 
+- `sources` gains `linear.issues`, so Jelly asks for consent again; `linear.activity` and the `jelly` section are unchanged.
+- `linear.issues` checks the account it is asked for against who is signed in, as the events source does: another account is `ACCOUNT_MISMATCH` before any read, and with no account the answer names the signed-in one.
+- The list's byte bound is measured in bytes: with 50 maximal multi-byte items it sheds whole items to stay inside the declared `maxBytes`.
 - The source-contract devDependency is pinned at v0.3.0, still bundled into `dist/index.js`. Linear declares no fact, hint or routine, so a page reads the same for a consumer still on v0.2.0.
 
 ## [0.0.7] - 2026-11-20

@@ -401,22 +401,23 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     expect(await call("read-only", "reopen", "get_issue", { query: "q" })).toMatchObject({ type: "failed", code: "PERMISSION_DENIED" })
   })
 
-  test("events_list runs the packed plugin's own spec, and with no probe it first reads who is signed in, stopping at an answer it cannot read", async () => {
+  test("events_list runs the packed plugin's own spec, and with no probe it first reads who is signed in", async () => {
     const from = fake.calls.length
-    // The fake answers get_workspace with its call, not a workspace: the listing is UNAVAILABLE after that one read.
+    // No probe yet: the listing reads the two identity operations itself, and refuses an account they do not name.
     const result = await call("read-only", "build", "events_list", { account: "c0ffee00-0000-4000-8000-000000000000/sam.rivera@example.com" })
-    expect(result).toMatchObject({ type: "failed", code: "UNAVAILABLE" })
-    expect(String(result.message)).toContain("UNAVAILABLE: events_list could not read who is signed in to Linear")
-    expect(toolCalls(from)).toEqual(["get_workspace"])
+    expect(result).toMatchObject({ type: "failed", code: "ACCOUNT_MISMATCH" })
+    expect(toolCalls(from)).toEqual(["get_workspace", "get_user"])
   })
 
-  test("probe runs the packed plugin's own spec, reads through OpenCode, and reports an answer it cannot read with its own code", async () => {
+  test("probe reads who is signed in through OpenCode, and a listing that names another account is refused", async () => {
     const from = fake.calls.length
-    // The fake answers get_workspace with its call, not a workspace.
-    const result = await call("read-only", "build", "probe", {})
-    expect(result).toMatchObject({ type: "failed", code: "UPSTREAM_UNREADABLE" })
-    expect(String(result.message)).toContain("UPSTREAM_UNREADABLE: Linear's get_workspace answered in a shape probe does not read.")
-    expect(toolCalls(from)).toEqual(["get_workspace"])
+    const probed = await call("read-only", "build", "probe", { account: "acme/sam.rivera@example.com" })
+    expect(probed).toMatchObject({ value: { account: "acme/sam.rivera@example.com" } })
+    expect(toolCalls(from)).toEqual(["get_workspace", "get_user"])
+    const before = fake.calls.length
+    expect(await call("read-only", "build", "events_list", { account: "someone-else/other@example.com" })).toMatchObject({ type: "failed", code: "ACCOUNT_MISMATCH" })
+    // The listing knows the sign-in from probe now: no identity read is made again.
+    expect(toolCalls(before)).toEqual([])
   })
 
   test("gives Linear's own error as UPSTREAM_ERROR: its first line, with the signed URL redacted", async () => {

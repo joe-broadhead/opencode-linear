@@ -247,6 +247,10 @@ describe("the source contract's conformance kit", () => {
             owned: () => true,
             status: async () => connected,
             permission: context.permission as never,
+            // The kit runs `probe` before the snapshot, as a consumer binds, so the identity is already known: a
+            // content read makes no identity read of its own.
+            signIn: async () => "cred_conformance",
+            signIns: known,
           }).run(input, call()),
         probe: (input, context) => probeMethod(options(context)).run(input, call()),
       },
