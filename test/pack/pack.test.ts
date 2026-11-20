@@ -320,7 +320,8 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
     }
     // The plugin's own reads are methods in both access modes: linear_issues, linear_events_list, then probe.
     expect(value.methods.at(-3)).toMatchObject({ name: "issues", kind: "plugin", class: "read", action: "linear_issues", available: true })
-    expect(Object.keys(value.methods.at(-3).input.properties)).toEqual(["limit"])
+    // The method declares the list snapshot's inputs beside the model tool's own; the model's tool schema keeps `limit`.
+    expect(Object.keys(value.methods.at(-3).input.properties)).toEqual(["limit", "source", "account"])
     expect(value.methods.at(-2)).toMatchObject({ name: "events_list", kind: "plugin", class: "read", action: "linear_events_list", available: true })
     expect(value.methods.at(-1)).toMatchObject({ name: "probe", kind: "plugin", class: "read", action: "linear_probe", available: true })
   })

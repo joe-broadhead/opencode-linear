@@ -8,6 +8,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - **List snapshot** `linear.issues` (`output: "list"`). An app can bind it and render assigned issues without knowing Linear. It calls the existing `linear_issues` read (`list_issues`), not a second client. `linear.activity` stays the events source and is not renamed. No write is declared.
 
+### Fixed
+
+- **`linear.issues` is readable through the tools RPC on every host.** It rides the `issues` method, which declared the model's table as its answer, and OpenCode validates a tools-RPC method's answer against that declaration, so a list read would have been refused `rpc.invalid_output`. The method now declares both shapes, the table and the list. A host test reads the list through the tools RPC on every tested release.
+- `linear.issues` leaves out an issue whose identifier, title or workflow state still holds a secret after masking, as every other list source does. It screens the whole text before it cuts, so a secret that straddles the cut cannot pass as a prefix; control characters are dropped, a repeated identifier is listed once, and the list stops before the answer passes the declared `maxBytes`.
+
+### Changed
+
+- The source-contract devDependency is pinned at v0.3.0, still bundled into `dist/index.js`. Linear declares no fact, hint or routine, so a page reads the same for a consumer still on v0.2.0.
+
 ## [0.0.7] - 2026-11-20
 
 ### Fixed
@@ -24,7 +33,6 @@ All notable changes to this project are documented here. The format follows [Kee
   their own errors. A request that is invalid, or a cursor for another account, is still refused before any read.
   **For Memory and every consumer:** nothing changes in what the plugin declares or answers when it works; `probe`
   is unchanged. `package.json`'s `sources` is unchanged, so a consumer does not ask to confirm Linear again.
-
 
 ## [0.0.6] - 2026-11-18
 

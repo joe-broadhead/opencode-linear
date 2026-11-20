@@ -109,20 +109,36 @@ interface IssuesToolOptions {
 const LIST_CAP = 50
 const DONE = /^(done|canceled|cancelled|completed)$/i
 
+/** The most JSON bytes one list answer may take: the declared `maxBytes`, with room for the envelope. */
+const LIST_BUDGET = 60_000
+/** Control characters would escape to six bytes each in JSON and only make an issue's title unreadable. */
+const CONTROLS = /[\u0000-\u001f\u007f-\u009f]/g
+
 /**
- * Assigned issues as the contract's `list` output: identifier, title, and the state as a note. Not editable. A title,
- * state or identifier that holds a secret is left out, as every list source does.
+ * Assigned issues as the contract's `list` output: identifier, title, and the state as a note. Not editable. An
+ * identifier, title or state that holds a secret is left out, screened whole and only then cut, so a secret that
+ * straddles the cut cannot pass as a prefix. A repeated identifier is listed once and items stop before the byte budget.
  */
 export function issueList(rows: readonly IssueRow[]) {
-  return rows.slice(0, LIST_CAP).flatMap((row) => {
-    const id = row.identifier.slice(0, 128)
-    const text = row.title.slice(0, 200)
-    if (id === "" || text === "" || secretKinds(id).length > 0 || secretKinds(text).length > 0) return []
-    const note = row.state === null ? undefined : row.state.slice(0, 200)
-    if (note !== undefined && secretKinds(note).length > 0) return []
-    const done = note !== undefined && DONE.test(note)
-    return [{ id, text, ...(note === undefined || note === "" ? {} : { note }), ...(done ? { done: true } : {}) }]
-  })
+  const items: { id: string; text: string; note?: string; done?: true }[] = []
+  const seen = new Set<string>()
+  let bytes = 0
+  for (const row of rows) {
+    if (items.length >= LIST_CAP) break
+    const id = row.identifier.replace(CONTROLS, "").slice(0, 128)
+    const full = row.title.replace(CONTROLS, " ").replace(/\s+/g, " ").trim()
+    const state = row.state === null ? undefined : row.state.replace(CONTROLS, " ").replace(/\s+/g, " ").trim()
+    if (id === "" || full === "" || seen.has(id) || secretKinds(id).length > 0 || secretKinds(full).length > 0) continue
+    if (state !== undefined && secretKinds(state).length > 0) continue
+    const note = state === undefined || state === "" ? undefined : state.slice(0, 200)
+    const item = { id, text: full.slice(0, 200), ...(note === undefined ? {} : { note }), ...(note !== undefined && DONE.test(note) ? { done: true as const } : {}) }
+    const size = JSON.stringify(item).length + 1
+    if (bytes + size > LIST_BUDGET) break
+    bytes += size
+    seen.add(id)
+    items.push(item)
+  }
+  return items
 }
 
 export function issuesTool({ tool, owned, status, permission }: IssuesToolOptions) {
@@ -191,6 +207,43 @@ export function issuesTool({ tool, owned, status, permission }: IssuesToolOption
  * `linear_issues` as a tools RPC method, `issues`: the tool's own spec, so the same table and the same read through the
  * host's `list_issues` executor. It is a direct-only read, as on the model path.
  */
+/** The registry's `list` output, as a consumer validates it. */
+const LIST_DATA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["items", "editable"],
+  properties: {
+    items: {
+      type: "array",
+      maxItems: LIST_CAP,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "text"],
+        properties: { id: { type: "string", minLength: 1, maxLength: 128 }, text: { type: "string", maxLength: 200 }, note: { type: "string", maxLength: 200 }, done: { type: "boolean" } },
+      },
+    },
+    editable: { type: "boolean" },
+  },
+} as const
+
+/**
+ * The `linear.issues` snapshot's answer: the family's snapshot envelope around the registry's `list` output. The host
+ * validates every tools-RPC method's answer against the method's declared output, so the method declares both this and
+ * the model tool's table, and a list read is not refused `rpc.invalid_output`.
+ */
+const LIST_ANSWER = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data", "asOf", "trust"],
+  properties: { account: { type: "string" }, data: LIST_DATA, asOf: { type: "string" }, trust: { type: "string", const: "untrusted" } },
+} as const
+
+/**
+ * The `issues` method: the model's table, and the `linear.issues` list snapshot a consumer reads with
+ * `{ "source": "linear" }`. The `list` and `account` inputs are the method's only: the model's tool keeps its own
+ * schema, so no agent can ask for a list.
+ */
 export function issuesMethod(options: IssuesToolOptions): PluginMethod {
   const tool = issuesTool(options)
   return {
@@ -200,8 +253,15 @@ export function issuesMethod(options: IssuesToolOptions): PluginMethod {
     name: ISSUES_TOOL,
     action: `${SERVER_NAME}_${ISSUES_TOOL}`,
     description: tool.description,
-    input: tool.input,
-    output: tool.output,
+    input: {
+      ...tool.input,
+      properties: {
+        ...tool.input.properties,
+        source: { type: "string", enum: ["linear"], description: "A consumer's list snapshot: linear answers the contract's `list` output, not the table." },
+        account: { type: "string", maxLength: 200, description: "The account a consumer echoes back; it is not checked against Linear, which reads who is signed in." },
+      },
+    },
+    output: { anyOf: [tool.output, LIST_ANSWER] },
     run: async (input, call) => (await tool.execute(input, call as unknown as Context)).output,
   }
 }

@@ -317,6 +317,37 @@ describe("a user linear server that points elsewhere", () => {
   })
 })
 
+// The host validates a tools-RPC method's answer against the method's declared output. `linear.issues` rides the
+// `issues` method, whose declared output is the model's table, so the method declares both shapes: without that, a list
+// read is refused `rpc.invalid_output`, and no consumer can read it on any host. A list read also records the account
+// for the sign-in, which is why this has a host of its own.
+describe(`linear.issues on the tools RPC, OpenCode ${HOST_VERSION}`, () => {
+  let host: Host
+  beforeAll(async () => {
+    host = await startHost()
+    await until("Linear's tools are registered", async () => (await host.probe().tool.list()).some((tool) => tool.id === "linear_list_issues"))
+  })
+  afterAll(() => host?.close())
+
+  test("a consumer reads the assigned issues as a list, and the model still gets the table", async () => {
+    const sessionID = await session(host)
+    const listed = await script(host, sessionID, "issues", { source: "linear" })
+    expect(listed.value, listed.message).toMatchObject({
+      data: {
+        editable: false,
+        items: [
+          { id: "ENG-1", text: "Fix login", note: "In Progress" },
+          { id: "ENG-2", text: "Write docs", note: "Done", done: true },
+        ],
+      },
+      trust: "untrusted",
+    })
+    expect(Number.isNaN(Date.parse(String((listed.value as { asOf: string }).asOf)))).toBe(false)
+    const table = await script(host, sessionID, "issues", {})
+    expect(table.value).toMatchObject({ columns: expect.any(Array), rows: expect.any(Array) })
+  })
+})
+
 // R18: one host per access value on the tools RPC path: the block that value generates, a read, and a write.
 describe(`access on OpenCode ${HOST_VERSION}`, () => {
   for (const access of ["all", "ask-changes", "read-only"] as const) {
