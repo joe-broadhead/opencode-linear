@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Every event `events_list` lists is kind `issue`, the one kind `linear.activity` declares.** A notification that
+  names no issue was listed as kind `event`, which Memory refuses event by event, without storing them, while its
+  cursor moves past them. It is kind `issue` now, and keeps its former kind as the label `event`. The declared
+  `sources` are unchanged, so their descriptor hash is too.
+
 ## [0.0.8] - 2026-11-20
 
 ### Added

@@ -2,7 +2,9 @@
 // events checks through the tool and through the tools RPC method, the events an issue change and a notification make,
 // the paged reads, the account a listing names, and the refusals. Every name, issue and id below is invented.
 import { describe, expect, test } from "bun:test"
+import { fileURLToPath } from "node:url"
 import { encodeBoundCursor, encodeCursor } from "@we-the-rebel-alliance/source-contract/cursor"
+import { readInstalledDescriptor } from "@we-the-rebel-alliance/source-contract/descriptor"
 import { assertEventsListConformance, resultProblems, type EventsListInput, type EventsListResult } from "@we-the-rebel-alliance/source-contract/events"
 import { registerToolsRpc, type ToolCall } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 import { checkHost } from "../../src/host-version.js"
@@ -29,6 +31,8 @@ import { PLUGIN } from "../../src/tools-rpc.js"
 
 const NOW = Date.parse("2026-11-08T12:00:00Z")
 const SINCE = "2026-11-01T00:00:00Z"
+/** This package, whose `sources` declaration the kind below is read from, as Memory reads it. */
+const ROOT = fileURLToPath(new URL("../..", import.meta.url))
 const ME = "4f1c2e9a-0000-4000-8000-000000000001"
 const AMA = "4f1c2e9a-0000-4000-8000-000000000002"
 /** The workspace's id, which the account names; its URL key, `acme`, is for display only. */
@@ -258,7 +262,8 @@ describe("linear_events_list", () => {
       labels: ["notification", "issueAssignedToYou"],
     })
     const project = notificationEvent(ACCOUNT, { id: "n-1", type: "projectUpdateCreated", createdAt: "2026-11-04T12:00:00.000Z", url: "https://linear.app/acme/project/p" })!.event
-    expect(project).toMatchObject({ kind: "event", thread: null, title: "project update created", url: "https://linear.app/acme/project/p", actors: [] })
+    // The source reads one kind, `issue`; a notification that names no issue keeps its former kind as the label `event`.
+    expect(project).toMatchObject({ kind: "issue", thread: null, title: "project update created", url: "https://linear.app/acme/project/p", actors: [], labels: ["notification", "projectUpdateCreated", "event"] })
   })
 
   test("names the account as the workspace key and the email, lowercase, and reads them from probe's answers", () => {
@@ -432,6 +437,35 @@ describe("linear_events_list", () => {
   /** 30 of Sam's issues changed a minute apart on 2 November: more than 8 pages of 3 hold. */
   const burst = (from = 0) => Array.from({ length: 30 }, (_, n) => issue(100 + n, `2026-11-02T10:${String(from + n).padStart(2, "0")}:00.000Z`))
   const burstId = (n: number) => `ENG-${100 + n}@2026-11-02T10:${String(n).padStart(2, "0")}:00.000Z`
+
+  test("lists every event with the one kind its declaration reads, for every declared source", async () => {
+    // A notification that names no issue: the one that used to be listed as kind `event`.
+    const project = notification(15, "2026-11-06T10:30:00.000Z", { type: "projectUpdateCreated", title: "Project update", issue: undefined, issueIdentifier: undefined })
+    const data = fixture()
+    data.notifications.push(project)
+    const listings: Record<string, () => Promise<EventsListResult[]>> = {
+      events_list: () => drain(run(linear(data)), { since: SINCE, limit: 500 }),
+    }
+    const installed = readInstalledDescriptor(ROOT)
+    if (!installed.ok) throw new Error(installed.problems.join("; "))
+    const declared = installed.value.sources.items.flatMap((item) => (item.kind === "events" ? [{ id: item.id, tool: item.tool, reads: item.reads }] : []))
+    expect(declared.length).toBeGreaterThan(0)
+    const listed = new Map<string, EventsListResult["events"]>()
+    for (const item of declared) {
+      const listing = listings[item.tool]
+      expect(listing, `no listing in this test runs ${item.tool} for ${item.id}`).toBeDefined()
+      const events = (await listing!()).flatMap((page) => page.events)
+      listed.set(item.id, events)
+      // Memory confirms one kind per source and refuses every event of another: an event listed as a kind its source does
+      // not read would be refused on ingest, and the cursor would move past it.
+      expect([...new Set<string>(events.map((event) => event.kind))], `${item.id} declares reads: ${item.reads}`).toEqual([item.reads])
+    }
+    // The kind is the declaration's; what the event was before it is kept where the contract allows: a label.
+    expect(listed.get("linear.activity")!.find((event) => event.external_id === `notification:${project.id}`)).toMatchObject({
+      kind: "issue",
+      labels: expect.arrayContaining(["event"]),
+    })
+  })
 
   test("a burst bigger than one call reads from since answers a window-truncated gap once, then drains", async () => {
     const data = { ...fixture(), issues: burst() }

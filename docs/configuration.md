@@ -468,8 +468,10 @@ events_list({ account, since?, cursor?, limit?, source? })
 - **An issue event**: kind `issue`, `external_id` `<identifier>@<update time>`, thread `linear-issue:<issue id>`,
   actors `linear:<user id>` (assignee, creator), title `<identifier>: <title>`, text the status, priority and
   description (at most 4,096 characters), the issue's link, and the labels `assigned`, its state type and its labels.
-- **A notification event**: kind `issue` (`event` when it names no issue), `external_id` `notification:<id>`, the
-  actor as `linear:<user id>`, the issue's identifier, title and link, and the labels `notification` and its type.
+- **A notification event**: kind `issue`, `external_id` `notification:<id>`, the
+  actor as `linear:<user id>`, the issue's identifier, title and link when it names one, and the labels `notification`,
+  its type, and `event` when it names no issue: the source declares one kind, and an event of any other would be
+  refused.
 - **Account and owner**: the account is `<workspace id>/<email>`, lowercase, such as
   `c0ffee00-0000-4000-8000-000000000000/sam@example.com`, so one person in two workspaces has two accounts. It names
   the workspace by its id, which never changes, not by its URL key, which an admin can change
@@ -547,7 +549,7 @@ consumer (Memory, jelly, Artifacts) reads them from the installed package. `line
 | Key | Value |
 | --- | --- |
 | `id` | `linear.activity` |
-| `kind`, `reads` | `events`, `issue` (a notification that names no issue is kind `event`) |
+| `kind`, `reads` | `events`, `issue` (a notification that names no issue keeps its former kind as the label `event`) |
 | `tool`, `input` | `events_list`, `{ "source": "linear" }` |
 | `accounts.named` | `false`: one sign-in |
 | `permission.events` | `linear_events_list` |
