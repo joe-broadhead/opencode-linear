@@ -13,6 +13,7 @@ import { readInstalledDescriptor } from "@we-the-rebel-alliance/source-contract/
 import { SOURCES_SCHEMA, type Sources } from "@we-the-rebel-alliance/source-contract/schema"
 import type { ToolCall } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 import { LINEAR_SOURCE, NAMESPACE, PACKAGE, eventsMethod, probeMethod, signIns, type EventsToolOptions } from "../../src/events.js"
+import { issuesMethod } from "../../src/issues.js"
 import type { Status } from "../../src/status.js"
 import { TOOLS_RPC_ID } from "../../src/tools-rpc.js"
 
@@ -92,8 +93,9 @@ function executors(permission: SessionContext["permission"]) {
     if (tool === "linear_get_user") return answer(input["query"] === "me" ? LINEAR["me"] : {})
     if (tool === "linear_get_workspace") return answer(LINEAR["workspace"])
     if (tool === "linear_list_issues") {
-      const after = Date.parse(String(input["updatedAt"]))
-      const issues = [...LINEAR["issues"], ...BULK, ...ARRIVED].filter((item: { updatedAt: string }) => Date.parse(item.updatedAt) > after).sort(newest("updatedAt"))
+      const raw = input["updatedAt"]
+      const after = typeof raw === "string" ? Date.parse(raw) : Number.NaN
+      const issues = [...LINEAR["issues"], ...BULK, ...ARRIVED].filter((item: { updatedAt: string }) => !Number.isFinite(after) || Date.parse(item.updatedAt) > after).sort(newest("updatedAt"))
       return paged("issues", issues, input)
     }
     return paged("notifications", [...LINEAR["notifications"], ...EARLY_INBOX].sort(newest("createdAt")), input)
@@ -157,6 +159,19 @@ async function cases(): Promise<PageCase[]> {
   ]
 }
 
+/**
+ * v0.3 checks this source carries nothing for. The kit marks each not applicable on its own; an empty reason would be
+ * no reason, so each states why.
+ */
+const ABSENT = {
+  "actor-kind": "the fixture names no machine actor, so actor-kind does not apply",
+  "commitment-key": "no page carries a commitment, so commitment-key does not apply",
+  facts: "no page carries a fact, so facts does not apply",
+  hints: "the source declares no hint file, so hints does not apply",
+  "parts-stable": "no page carries a part, so parts-stable does not apply",
+  routines: "the source declares no routine file, so routines does not apply",
+}
+
 const reports: ConformanceReport[] = []
 
 describe("the source contract's conformance kit", () => {
@@ -166,7 +181,8 @@ describe("the source contract's conformance kit", () => {
     expect(declarationProblems(pkg.sources, { tools })).toEqual([])
     expect(sources.rpc).toBe(TOOLS_RPC_ID)
     expect(pkg.name).toBe(PACKAGE)
-    expect(sources.items.map((item) => item.id)).toEqual(["linear.activity"])
+    expect(sources.items.map((item) => item.id)).toEqual(["linear.activity", "linear.issues"])
+    expect(sources.items.find((item) => item.id === "linear.issues")).toMatchObject({ kind: "snapshot", output: "list", tool: "issues" })
   })
 
   test("linear.activity keeps the contract", async () => {
@@ -192,19 +208,69 @@ describe("the source contract's conformance kit", () => {
     expect(report.problems).toEqual([])
     // Every check that applies runs, so the report is complete. The expired-cursor check and gap-once-per-read run on
     // the bulk change; failed-holds-cursor is not applicable with the reason above; the others not run are about what
-    // this source never declares or sends: removals[], a price, details, suggest, a snapshot's output.
+    // this source never declares or sends: removals[], a price, details, suggest, a snapshot's output. The v0.3 checks
+    // in `absent` do not apply either: each reason is non-empty, which is what the kit accepts for a stated skip.
     expect(report.checks.filter((check) => !check.ran && !check.notApplicable).map((check) => check.name)).toEqual([])
-    expect(report.checks.filter((check) => check.notApplicable).map((check) => check.name).sort()).toEqual(["billed-cost", "details", "failed-holds-cursor", "output-schema", "removals-are-final", "suggest"])
+    expect(report.checks.filter((check) => check.notApplicable).map((check) => check.name).sort()).toEqual([
+      "actor-kind",
+      "billed-cost",
+      "commitment-key",
+      "details",
+      "facts",
+      "failed-holds-cursor",
+      "hints",
+      "output-schema",
+      "parts-stable",
+      "removals-are-final",
+      "routines",
+      "suggest",
+    ])
+    for (const [name, reason] of Object.entries(ABSENT)) {
+      expect(reason.trim()).not.toBe("")
+      expect(report.checks.find((check) => check.name === name)).toMatchObject({ ran: false, notApplicable: true, problems: [] })
+    }
     for (const name of ["gap-and-cursor-expired", "gap-once-per-read"]) expect(report.checks.find((check) => check.name === name)).toMatchObject({ ran: true, notApplicable: false, problems: [] })
     expect(ARRIVED.length).toBeGreaterThan(1)
     expect(report.ok).toBe(true)
   })
 
+  test("linear.issues keeps the contract", async () => {
+    const listed = sources.items.find((item) => item.id === "linear.issues")!
+    const report = await sourceConformance({
+      plugin: PACKAGE,
+      source: listed,
+      tools,
+      calls: {
+        snapshot: (input, context) =>
+          issuesMethod({
+            tool: executors(context.permission) as never,
+            owned: () => true,
+            status: async () => connected,
+            permission: context.permission as never,
+            // The kit runs `probe` before the snapshot, as a consumer binds, so the identity is already known: a
+            // content read makes no identity read of its own.
+            signIn: async () => "cred_conformance",
+            signIns: known,
+          }).run(input, call()),
+        probe: (input, context) => probeMethod(options(context)).run(input, call()),
+      },
+      snapshotCases: [{ ...(listed.input ?? {}), account: ACCOUNT }],
+      cases: [],
+      account: ACCOUNT,
+      sources,
+      describe: { id: TOOLS_RPC_ID },
+    })
+    reports.push(report)
+    expect(report.problems).toEqual([])
+    expect(report.ok).toBe(true)
+    expect(report.incomplete).toBe(false)
+  })
+
   test("writes the report a release attaches", () => {
-    expect(reports.map((report) => report.source)).toEqual(["linear.activity"])
+    expect(reports.map((report) => report.source).sort()).toEqual(["linear.activity", "linear.issues"])
     const installed = readInstalledDescriptor(root, { version: pkg.version })
     const report = {
-      contract: "@we-the-rebel-alliance/source-contract@0.2.0",
+      contract: "@we-the-rebel-alliance/source-contract@0.3.0",
       plugin: PACKAGE,
       version: pkg.version,
       descriptorHash: installed.ok ? installed.value.hash : null,

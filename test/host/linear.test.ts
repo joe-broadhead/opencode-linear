@@ -62,7 +62,7 @@ const hidden = (rules: readonly Rule[], action: string) => {
 const linearTools = (host: Host) =>
   until("Linear's tools are registered", async () => {
     const ids = (await host.probe().tool.list()).map((tool) => tool.id).filter((id) => id.startsWith("linear_"))
-    return ids.length === 5 && ids.sort()
+    return ids.length === 7 && ids.sort()
   })
 
 async function status(host: Host, sessionID: string) {
@@ -94,8 +94,8 @@ describe(`the default access on OpenCode ${HOST_VERSION}`, () => {
     expect(plugins.find((plugin) => plugin.id === "linear.workspace")?.state.status).toBe("active")
     const { data: servers } = await host.client.mcp.list({ location: host.location })
     expect(servers.find((server) => server.name === "linear")?.status).toEqual({ status: "connected" })
-    // The fake's three tools, and the plugin's own linear_issues and linear_events_list.
-    expect(await linearTools(host)).toEqual(["linear_events_list", "linear_issues", "linear_list_issues", "linear_save_issue", "linear_shiny_new_tool"])
+    // The fake's five tools (the two identity reads included), and the plugin's own linear_issues and linear_events_list.
+    expect(await linearTools(host)).toEqual(["linear_events_list", "linear_get_user", "linear_get_workspace", "linear_issues", "linear_list_issues", "linear_save_issue", "linear_shiny_new_tool"])
     const { data: skills } = await host.client.skill.list({ location: host.location })
     expect(skills.map((skill) => skill.id).filter((id) => id.startsWith("linear"))).toEqual(["linear", "linear-write"])
     const { data: commands } = await host.client.command.list({ location: host.location })
@@ -188,11 +188,11 @@ describe(`the default access on OpenCode ${HOST_VERSION}`, () => {
     const run = (sessionID: string, id: string) =>
       events.execute({ account: "c0ffee00-0000-4000-8000-000000000000/sam.rivera@example.com", since: "2026-11-01" }, { sessionID, agent: "build", messageID: "msg_host_test", id, signal: new AbortController().signal, progress: async () => {} } as never)
     const from = host.fake.inputs.length
-    // The default rules allow it. No probe has named this sign-in, so it first reads who is signed in, through the host's
-    // get_workspace executor. This fake server does not list that tool, so the listing stops there with the host's own
-    // answer, before any Linear read, rather than labelling a page with an account it has not seen signed in.
-    await expect(run(await session(host), "call_events_1")).rejects.toThrow(/^TOOL_UNAVAILABLE: OpenCode does not list Linear's get_workspace/)
-    expect(host.fake.inputs.slice(from)).toEqual([])
+    // The default rules allow it. No probe has named this sign-in, so it first reads who is signed in through the host's
+    // get_workspace and get_user executors, and refuses the account it was asked for: a page is never labelled with an
+    // account the sign-in does not name.
+    await expect(run(await session(host), "call_events_1")).rejects.toThrow(/^ACCOUNT_MISMATCH: Linear is signed in to another account/)
+    expect(host.fake.inputs.slice(from).map((input) => input.tool)).toEqual(["get_workspace", "get_user"])
     // A session that denies linear_events_list: the assert refuses it before any read.
     const permissions = [{ action: "linear_events_list", resource: "*", effect: "deny" as const }]
     const locked = (await host.client.sessions.create({ agent: "build", location: host.location, permissions })).id
@@ -223,7 +223,7 @@ describe(`the default access on OpenCode ${HOST_VERSION}`, () => {
     await linearTools(host)
     const text = await status(host, await session(host))
     expect(text).toContain(`- Connection: connected (${host.fake.endpoint}, registered by this plugin)`)
-    expect(text).toContain("- Tools: 5 available, 1 unknown: shiny_new_tool (unknown tools run too)\n")
+    expect(text).toContain("- Tools: 7 available, 1 unknown: shiny_new_tool (unknown tools run too)\n")
     expect(text).toContain(`- Agents without default rules: reviewer\n${AGENT_RULES}\n`)
     expect(text).toContain(`- Next step: ${AGENTS_NEXT_STEP}`)
     expect(text).toContain(`- OpenCode: ${HOST_VERSION} (${TESTED_HOSTS.includes(HOST_VERSION) ? "tested" : "untested"}; supported range ${SUPPORTED_HOST})`)
@@ -314,6 +314,43 @@ describe("a user linear server that points elsewhere", () => {
     const other = host.fake.url.replace(/\/mcp$/, "/other")
     expect(text).toContain(`- Connection: conflict (your mcp.servers.linear points at ${other})`)
     expect(text).toContain(`- Next step: Your OpenCode config defines mcp.servers.linear with ${other}, but this plugin uses ${host.fake.endpoint}.`)
+  })
+})
+
+// The host validates a tools-RPC method's answer against the method's declared output. `linear.issues` rides the
+// `issues` method, whose declared output is the model's table, so the method declares both shapes: without that, a list
+// read is refused `rpc.invalid_output`, and no consumer can read it on any host. A list read also records the account
+// for the sign-in, which is why this has a host of its own.
+describe(`linear.issues on the tools RPC, OpenCode ${HOST_VERSION}`, () => {
+  let host: Host
+  beforeAll(async () => {
+    host = await startHost()
+    await until("Linear's tools are registered", async () => (await host.probe().tool.list()).some((tool) => tool.id === "linear_list_issues"))
+  })
+  afterAll(() => host?.close())
+
+  test("a consumer reads the assigned issues as a list, and the model still gets the table", async () => {
+    const sessionID = await session(host)
+    const listed = await script(host, sessionID, "issues", { source: "linear" })
+    expect(listed.value, listed.message).toMatchObject({
+      data: {
+        editable: false,
+        items: [
+          { id: "ENG-1", text: "Fix login", note: "In Progress" },
+          { id: "ENG-2", text: "Write docs", note: "Done", done: true },
+        ],
+      },
+      trust: "untrusted",
+    })
+    expect(Number.isNaN(Date.parse(String((listed.value as { asOf: string }).asOf)))).toBe(false)
+    // The list checks the account against the sign-in, as the events source does: another is refused before any read.
+    const wrong = await script(host, sessionID, "issues", { source: "linear", account: "someone-else/other@example.com" })
+    expect(wrong).toMatchObject({ type: "failed", code: "ACCOUNT_MISMATCH" })
+    // With no account, the answer names the signed-in one.
+    const unnamed = await script(host, sessionID, "issues", { source: "linear" })
+    expect((unnamed.value as { account: string }).account).toBe((listed.value as { account: string }).account)
+    const table = await script(host, sessionID, "issues", {})
+    expect(table.value).toMatchObject({ columns: expect.any(Array), rows: expect.any(Array) })
   })
 })
 

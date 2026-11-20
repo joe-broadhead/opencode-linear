@@ -18,6 +18,9 @@ const schema = { type: "object", properties: { query: { type: "string" } } }
 export const NEW_TOOL = { name: "shiny_new_tool", description: "A tool added upstream after the tool lists were written", annotations: {} }
 const TOOLS = [
   { name: "list_issues", description: "List issues in the workspace", annotations: { readOnlyHint: true } },
+  // The source's two identity operations, which probe and the list read.
+  { name: "get_workspace", description: "Get the workspace", annotations: { readOnlyHint: true } },
+  { name: "get_user", description: "Get a user", annotations: { readOnlyHint: true } },
   { name: "save_issue", description: "Create or update an issue", annotations: { readOnlyHint: false, destructiveHint: false } },
   NEW_TOOL,
 ].map((tool) => ({ ...tool, inputSchema: { type: "object", properties: {} } }))
@@ -33,6 +36,11 @@ export const SCOPES = "read write"
 export interface FakeMcpOptions {
   /** `linear` lists Linear's known tools, as Linear's server does. */
   readonly catalog?: "linear"
+  /**
+   * Answer `get_workspace` and `get_user` with the tool call itself, not a workspace or a user, so a listing or probe
+   * reports `UPSTREAM_UNREADABLE`.
+   */
+  readonly unreadableIdentity?: boolean
   /**
    * Whether the token endpoint issues a refresh token. Without one, a 401 later needs a new sign-in and leaves the
    * credential in place, which is the `/connect` account the plugin marks.
@@ -65,6 +73,10 @@ export interface FakeMcp {
 }
 
 type Message = { jsonrpc: "2.0"; id?: number | string; method: string; params?: { protocolVersion?: string; name?: string; arguments?: { query?: unknown; assignee?: unknown } } }
+
+/** The signed-in workspace and user, as `get_workspace` and `get_user` "me" answer, and the account they name. */
+export const WORKSPACE = { id: "acme", urlKey: "acme", name: "Acme" }
+export const ME = { id: "u_1", email: "sam.rivera@example.com", name: "Sam Rivera" }
 
 /** Linear's live `list_issues` answer: `id` is the identifier, `status` a name, `priority` `{ value, name }`. */
 export const ASSIGNED = {
@@ -99,6 +111,8 @@ export async function startFakeMcp(options: FakeMcpOptions = {}): Promise<FakeMc
         const args = message.params?.arguments ?? {}
         inputs.push({ tool, arguments: args })
         if (tool === "list_issues" && args.assignee === "me") return reply({ content: [{ type: "text", text: JSON.stringify(ASSIGNED) }], structuredContent: ASSIGNED })
+        if (tool === "get_workspace" && !options.unreadableIdentity) return reply({ content: [{ type: "text", text: JSON.stringify(WORKSPACE) }], structuredContent: WORKSPACE })
+        if (tool === "get_user" && args.query === "me" && !options.unreadableIdentity) return reply({ content: [{ type: "text", text: JSON.stringify(ME) }], structuredContent: ME })
         if (String(args.query ?? "").startsWith("fail")) return reply({ content: [{ type: "text", text: UPSTREAM_FAILURE }], isError: true })
         if (String(args.query ?? "").startsWith("text")) return reply({ content: [{ type: "text", text: `text from ${tool}` }] })
         return reply({ content: [{ type: "text", text: `called ${tool}` }], structuredContent: { tool, path, arguments: args } })

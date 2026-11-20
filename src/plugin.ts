@@ -94,7 +94,7 @@ export function createLinearPlugin(seam: LinearSeam) {
         })
       // The plugin's own server, or the user's adopted one; a server at another URL is not Linear's for this access.
       const owned = () => source?.type === "plugin" || source?.type === "adopted"
-      const issues = { tool: ctx.tool, owned, status: read }
+      const issues = { tool: ctx.tool, owned, status: read, permission: ctx.permission }
       await registerIssuesTool(issues)
       // Linear's source (package.json's `sources`): events_list, a Code Mode tool and a tools RPC method, and probe, a
       // tools RPC method.
@@ -105,6 +105,7 @@ export function createLinearPlugin(seam: LinearSeam) {
         return connection?.type === "credential" ? connection.id : undefined
       }
       const events = { tool: ctx.tool, permission: ctx.permission, owned, status: read, signIn, signIns: signIns() }
+      const issuesForRpc = { ...issues, signIn, signIns: events.signIns }
       await registerEventsTool(events)
       await registerSkills(ctx.skill, skills)
       await registerStatusCommand(ctx, read)
@@ -113,7 +114,7 @@ export function createLinearPlugin(seam: LinearSeam) {
       // a session and its agent: a write needs a prior allow rule for its action.
       const stopTools = await registerToolsRpc(ctx as never, {
         plugin: PLUGIN,
-        methods: [...METHODS, issuesMethod(issues), eventsMethod(events), probeMethod(events)],
+        methods: [...METHODS, issuesMethod(issuesForRpc), eventsMethod(events), probeMethod(events)],
         mcp: { server: SERVER_NAME, managed: owned },
       })
       // A sign-in that changes forgets what probe read for every sign-in: the next listing waits for a probe.

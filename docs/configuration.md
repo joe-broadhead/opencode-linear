@@ -4,7 +4,7 @@ Every option is optional. The smallest setup is one entry in `plugins`:
 
 ```json
 {
-  "plugins": ["github:joe-broadhead/opencode-linear#v0.0.7"]
+  "plugins": ["github:joe-broadhead/opencode-linear#v0.0.8"]
 }
 ```
 
@@ -12,7 +12,7 @@ To set options, use the object form:
 
 ```json
 {
-  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.7", "options": { "access": "ask-changes" } }]
+  "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.8", "options": { "access": "ask-changes" } }]
 }
 ```
 
@@ -541,8 +541,8 @@ sign-in. Another `account` is `ACCOUNT_MISMATCH`.
 
 ## Sources
 
-`package.json` declares the plugin's one source in its top-level `sources` key, under source-contract version 1, so a
-consumer (Memory, jelly, Artifacts) reads it from the installed package:
+`package.json` declares the plugin's sources in its top-level `sources` key, under source-contract version 1, so a
+consumer (Memory, jelly, Artifacts) reads them from the installed package. `linear.activity` is unchanged. `linear.issues` is the assigned-issues read `linear_issues` already makes, as the contract's `list` output, so an app can render it without knowing Linear. It is not editable, and it declares no write.
 
 | Key | Value |
 | --- | --- |
@@ -557,6 +557,8 @@ consumer (Memory, jelly, Artifacts) reads it from the installed package:
 | `maxBytes` | 900,000 |
 | `urlHosts` | `linear.app` |
 | `sources.rpc`, `sources.probe.action` | `linear.workspace.tools`, `linear_probe` |
+
+`linear.issues` is a snapshot. Its `tool` is `issues` (the plugin's `linear_issues`), its `output` is `list`, and its `input` is `{ "source": "linear" }`. `permission.tool` is `linear_issues`. `permission.operations` are `get_workspace` and `get_user` (identity, which only `probe` reads) and `list_issues` (the read the tool already makes). `private` is true. `cost` is free. `maxAgeSec` is 900. `maxBytes` is 65,536. `urlHosts` is `linear.app`. A source read returns `{ account?, data: { items, editable: false }, asOf, trust }`. The model tool still returns the table: `source`, `list` and `account` are declared on the tools RPC method only, so no `list` input is ever a model's, and the method declares both answers, the table and the list, because the host validates a method's answer against its declaration.
 
 `npm run check` and `npm run conformance` run the contract's conformance kit over the source, on recorded answers
 with no Linear call, and write `reports/conformance-report.json`, which a release attaches; it must say `ok: true`.
@@ -590,7 +592,7 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 For example:
 
 ```text
-OPTIONS_INVALID: The option "access" must be "all" (the default), "ask-changes" or "read-only", found "admin". Next step: Fix the plugin options in opencode.json, for example "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.7", "options": { "access": "read-only" } }].
+OPTIONS_INVALID: The option "access" must be "all" (the default), "ask-changes" or "read-only", found "admin". Next step: Fix the plugin options in opencode.json, for example "plugins": [{ "package": "github:joe-broadhead/opencode-linear#v0.0.8", "options": { "access": "read-only" } }].
 ```
 
 Errors from Linear's server and from OpenCode pass through unchanged, except in the tools RPC for scripts, whose codes
