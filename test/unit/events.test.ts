@@ -143,7 +143,7 @@ const replacing = (host: ReturnType<typeof linear>, id: string, execute: (origin
   list: async () => ((await (host.tool.list as unknown as () => Promise<Executor[]>)()).map((entry) => (entry.id === id ? { ...entry, execute: (input: Record<string, unknown>) => execute(entry.execute, input) } : entry))) as never,
 })
 
-const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "read-only", host: checkHost("2.2.3", false) }
+const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "read-only", host: checkHost("2.4.1", false) }
 const status = async () => buildStatus(facts)
 const context = { sessionID: "ses_1", agent: "build", messageID: "msg_1", id: "call_1", signal: new AbortController().signal } as never
 
@@ -419,7 +419,7 @@ describe("linear_events_list", () => {
     const first = await run(linear(data))({ since: SINCE, limit: 2 })
     expect(first.refused).toEqual([expect.objectContaining({ external_id: "ENG-2@2026-11-02T09:00:00.000Z", reason: "secret" })])
     expect(first.events.map((event: { external_id: string }) => event.external_id)).toEqual(LISTED.slice(1, 3))
-    expect(first).toMatchObject({ plugin: "@joe-broadhead/opencode-linear", asOf: new Date(NOW).toISOString() })
+    expect(first).toMatchObject({ plugin: "@we-the-rebel-alliance/linear-plugin", asOf: new Date(NOW).toISOString() })
     const rest = await run(linear(data))({ cursor: first.cursor, limit: 500 })
     expect(rest.events.map((event: { external_id: string }) => event.external_id)).toEqual(LISTED.slice(3))
   })

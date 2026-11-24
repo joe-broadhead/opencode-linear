@@ -16,7 +16,7 @@ project.
 ## Data handling
 
 - The plugin adds two read tools: `linear_issues`, which calls Linear's `list_issues` through OpenCode, and
-  `linear_events_list`, which calls `list_issues` and `get_notifications` through OpenCode for Memory's collector, and
+  `linear_events_list`, which calls `list_issues` and `get_notifications` through OpenCode for a consumer's collector, and
   returns the issue changes and notifications as events whose text is marked untrusted; an event that holds a secret is
   never returned. Its cursor holds times, issue identifiers, notification ids and the account (workspace key and email), never a
   token. The tools RPC method `probe` calls `get_workspace` and `get_user` with `me` and returns only the account and
@@ -71,7 +71,7 @@ Things to know:
 ## Scripts
 
 The tools RPC (`linear.workspace.tools`, see
-[docs/scripting.md](https://github.com/joe-broadhead/opencode-linear/blob/HEAD/docs/scripting.md)) calls Linear's tools
+[docs/scripting.md](https://github.com/we-the-rebel-alliance/linear-plugin/blob/master/docs/scripting.md)) calls Linear's tools
 for a script, with no model. Every known tool is a method, with its class, but a method is not a grant:
 
 - A script names a session that names an agent, and runs as them. Before any call, the plugin resolves that method's
@@ -80,14 +80,12 @@ for a script, with no model. Every known tool is a method, with its class, but a
   A script gets the same default as the model, so at `access: "all"` it can read and change what the account can;
   under `"ask-changes"` an ask is refused and under `"read-only"` a change is denied.
 - A saved "Always allow" is **not** consulted: it lives outside the agent's and session's rules, so an old click does
-  not authorize a new script. A grant is reviewable in config, or in a Jobs one-off's approval.
+  not authorize a new script. A grant is reviewable in config.
 - After the resolve, an MCP call runs through OpenCode's own executor, which checks the action again, as it does for
   the model. `issues` runs the plugin's own `linear_issues` spec, which reads through the host's `linear_list_issues`,
   so that read's rules apply too. The plugin's permission hook still changes only an `ask` on one of its own script
   calls in flight, only to a deny, and leaves every other call alone.
-- A tool Linear adds later is not a method, so a script cannot reach it until a release classifies it.
-- Only the 41 known reads and the plugin's own `events_list` are methods. Linear's write tools never are, with either access, and neither is a tool that
-  Linear adds later, even with an allow rule.
+- A tool Linear adds later is not a method, even with an allow rule; a release classifies it first.
 - The call goes through OpenCode's own MCP connection and sign-in. The plugin never sees the token, and returns none.
 - Linear's error text reaches the script only as the first line, at most 300 characters, with tokens and URL query
   strings removed.

@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url))
-// Everything a user or the model reads about the current release. CHANGELOG keeps the counts of past releases.
+// Everything a user or the model reads about the current release.
 const FILES = [
   "README.md",
   "SECURITY.md",
@@ -16,11 +16,7 @@ const FILES = [
   ...readdirSync(join(ROOT, "skills")).map((name) => `skills/${name}/SKILL.md`),
 ]
 const text = (file: string) => readFileSync(join(ROOT, file), "utf8").replace(/\s+/g, " ")
-
-/** The release the install specs name: package.json's version. */
 const VERSION = (JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { version: string }).version
-/** The README's upgrade example removes an earlier release's entry; it must name one before VERSION. */
-const UPGRADE_FROM = /remove the old entry with `opencode plugin remove github:joe-broadhead\/opencode-linear#v(\d+)\.(\d+)\.(\d+)`/
 
 describe("docs", () => {
   test.each(FILES)("%s states the current number of read and write tools", (file) => {
@@ -35,6 +31,10 @@ describe("docs", () => {
     expect(named.filter((tool) => ![...READ_TOOLS, ...WRITE_TOOLS, "issues", "events_list", "probe"].includes(tool))).toEqual([])
   })
 
+  test.each(FILES)("%s points at the new organisation and has no removed Jelly guide", (file) => {
+    expect(text(file)).not.toMatch(/joe-broadhead|opencode-linear|docs\/jelly\.md/)
+  })
+
   // Once the plugin is removed and OpenCode reloads, `mcp logout linear` finds no server: the README signs out first,
   // once, since every access uses the one sign-in, then removes the plugin.
   test("the README's Uninstall signs out once before it removes the plugin", () => {
@@ -43,22 +43,12 @@ describe("docs", () => {
     const logout = at("opencode mcp logout linear")
     expect(logout).toBeGreaterThanOrEqual(0)
     expect(at('"access"')).toBe(-1)
-    expect(at("opencode auth list", logout)).toBeGreaterThan(logout)
-    expect(at(`opencode plugin remove github:joe-broadhead/opencode-linear#v${VERSION}`)).toBeGreaterThan(at("opencode auth list", logout))
+    expect(at(`opencode plugin remove github:we-the-rebel-alliance/linear-plugin#v${VERSION}`)).toBeGreaterThan(logout)
   })
 
-  test("the README and the configuration guide give linear_issues its allow rule and say why it is a direct tool", () => {
-    for (const file of ["README.md", "docs/configuration.md"]) {
-      expect(text(file)).toContain('{ "action": "linear_issues", "resource": "*", "effect": "allow" }')
-      expect(text(file)).toMatch(/direct tool.*Jelly/)
-    }
-  })
-
-  test("the Jelly guide states the declared tool counts, and no placeholder or version", () => {
-    const tools = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).jelly.tools as { readOnly: boolean }[]
-    expect(text("docs/jelly.md")).toContain(`${tools.length} tools are declared (${tools.filter((tool) => tool.readOnly).length} read-only)`)
-    expect(text("docs/jelly.md")).not.toMatch(/`latest` is|None yet/)
-    expect(text("docs/jelly.md")).toContain("the one line in `jelly.summary`, and beside it the mark in `jelly.icon`")
+  test("the configuration guide gives linear_issues its allow rule, and both it and the README place it in Code Mode", () => {
+    expect(text("docs/configuration.md")).toContain('{ "action": "linear_issues", "resource": "*", "effect": "allow" }')
+    for (const file of ["README.md", "docs/configuration.md"]) expect(text(file)).toMatch(/Code Mode/)
   })
 
   test("the scripting guide says the methods are every known tool, and names the reads and writes as one table", () => {
@@ -68,15 +58,10 @@ describe("docs", () => {
     expect(guide).toContain("`issues`")
     expect(guide).toContain("x-opencode-directory")
   })
-})
 
-describe("the upgrade example", () => {
-  test("removes an earlier release than the one the install specs name", () => {
-    const match = UPGRADE_FROM.exec(text("README.md"))
-    expect(match).not.toBeNull()
-    const earlier = match!.slice(1, 4).map(Number)
-    const current = VERSION.split(".").map(Number)
-    const order = earlier.map((part, index) => part - current[index]!).find((difference) => difference !== 0) ?? 0
-    expect(order).toBeLessThan(0)
+  test("every install spec names the new package and the one version", () => {
+    const specs = FILES.flatMap((file) => [...text(file).matchAll(/github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)#(v\d+\.\d+\.\d+)/g)].map((match) => ({ file, repo: match[1], tag: match[2] })))
+    expect(specs.length).toBeGreaterThan(0)
+    for (const spec of specs) expect(spec).toMatchObject({ repo: "we-the-rebel-alliance/linear-plugin", tag: `v${VERSION}` })
   })
 })

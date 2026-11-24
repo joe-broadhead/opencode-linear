@@ -1,6 +1,6 @@
 {
-  "name": "@joe-broadhead/opencode-linear",
-  "version": "0.0.9",
+  "name": "@we-the-rebel-alliance/linear-plugin",
+  "version": "0.0.0",
   "private": true,
   "description": "Unofficial OpenCode plugin for Linear: find, read and cite issues, projects and documents through Linear's official MCP server",
   "keywords": [
@@ -12,11 +12,11 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/joe-broadhead/opencode-linear.git"
+    "url": "git+https://github.com/we-the-rebel-alliance/linear-plugin.git"
   },
-  "homepage": "https://github.com/joe-broadhead/opencode-linear#readme",
+  "homepage": "https://github.com/we-the-rebel-alliance/linear-plugin#readme",
   "bugs": {
-    "url": "https://github.com/joe-broadhead/opencode-linear/issues"
+    "url": "https://github.com/we-the-rebel-alliance/linear-plugin/issues"
   },
   "exports": {
     ".": "./dist/index.js",
@@ -730,7 +730,7 @@
               "description": "Reads run. Changes never run."
             }
           ],
-          "description": "What Linear's tools may do without asking. Read only uses Linear's read-only server and may require signing in again."
+          "description": "What Linear's tools may do without asking. Every value uses Linear's one server, so changing it keeps the sign-in."
         }
       ]
     }

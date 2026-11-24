@@ -1,120 +1,61 @@
-# Repository rules
+# Repository guide
 
-This repository builds `@joe-broadhead/opencode-linear`, an OpenCode plugin that registers Linear's official MCP
-server and adds default permission rules, a status command, a status dialog, two skills, two read tools of its own
-(`linear_issues` and `linear_events_list`) and a tools RPC for scripts.
-Read [docs/architecture.md](docs/architecture.md) before you change code, and [CONTRIBUTING.md](CONTRIBUTING.md) for
-the checks and the release steps.
+`@we-the-rebel-alliance/linear-plugin` is an OpenCode plugin that registers Linear's official MCP server
+(`https://mcp.linear.app/mcp`) as `linear`, adds default permission rules, a status command and dialog, two skills and
+two reads of its own: `linear_issues` and `linear_events_list`. [README.md](README.md) describes what it does for a
+user; [docs/architecture.md](docs/architecture.md) describes the layers, and [CONTRIBUTING.md](CONTRIBUTING.md) the
+checks and the release.
+
+The repository is being rebuilt on plugin-contract v0. The current surface (the plugin id `linear.workspace`, the
+`sources` and `jelly` keys, the copied kit scripts) is what the contract replaces.
+
+## Commands
+
+- `npm ci` installs the devDependencies; `npm run check` runs every stage and is the one command that must pass.
+- `node scripts/check.mjs <stage>` runs one stage: `typecheck`, `unit`, `conformance`, `kit`, `build`, `icons`, `host`,
+  `pack`, `forbidden`, `copies`, `whitelist`, `actionlint`. The full check runs the host and pack stages on the stock
+  OpenCode in `TESTED_HOSTS`, so it binds fixed ports: never run two full checks at once on one machine.
+- `npm run build` bundles `dist/index.js` and `dist/tui.js`; nothing else belongs in `dist/`.
 
 ## Rules
 
-- **Public API only.** Use only the public `@opencode/plugin` 2.2.3 API. `opencode.host` in `package.json` and
-  `SUPPORTED_HOST` in `src/constants.ts` both say exactly `>=2.2.3 <2.4.0`, never `^2.2.3`. `TESTED_HOSTS` in
-  `src/constants.ts` is the one list of tested releases (2.2.3, 2.2.4, 2.2.5, 2.2.6, 2.2.7, 2.3.0, 2.3.1 and 2.3.2): status calls only those tested,
-  the host and pack stages and CI run on each. Inside the range an untested release still starts.
-- **Greenfield.** No legacy, migration code, compatibility shim, dual path or deprecated alias, and nothing dead.
-  Delete rather than deprecate.
-- **No peers, no runtime dependencies, no lifecycle scripts.** `@opencode/plugin`, `@opencode/sdk` and
-  `@opencode/client` (whose types the host tests use) are devDependencies pinned to exactly `2.2.3`. Do not add another host version to the lockfile: the host stage installs
-  the other tested SDKs into a temp folder.
-- **Ship prebuilt, one file per entry.** `scripts/build.mjs` bundles `src/index.ts` and `src/tui.ts` with esbuild into
-  the self-contained `dist/index.js` and `dist/tui.js`: no chunks, no relative imports, and only host-provided modules
-  external. `tsc` only typechecks. No declaration files, `.tsx` or JSX.
-- **Default rules, not hooks.** Permissions come from rules inserted through `ctx.agent.transform` directly after each
-  agent's base allow. A stricter agent is never weakened. Agents that miss the rules are named in status with the
-  per-agent fix, never patched, and the fix never goes in the top-level `permissions`.
+- **OpenCode 2.4.1 exactly.** `@opencode/plugin`, `@opencode/sdk` and `@opencode/client` are devDependencies pinned to
+  `2.4.1`, and `effect` to `4.1.0` because the plugin peer needs it. `SUPPORTED_HOST` in `src/constants.ts` and
+  `opencode.host` in `package.json` both say `>=2.4.1 <2.5.0`; `TESTED_HOSTS` is the one list of tested releases
+  (`2.4.1`). Status calls only those tested, and the host and pack stages run on each. Inside the range an untested
+  release still starts; outside it the plugin refuses with `HOST_UNTESTED` unless `allowUntestedHost` is set.
+- **Public API only.** Use `@opencode/plugin` 2.4.1. `scripts/check-forbidden.mjs` bans internal APIs, the V1 plugin
+  API and deprecated host surfaces.
+- **Greenfield.** No legacy, compatibility shim, dual path or deprecated alias, and nothing dead. Delete rather than
+  deprecate.
+- **No runtime dependencies, peers or lifecycle scripts.** The bundle is self-contained: only host modules and Node
+  built-ins stay external.
+- **Default rules, not hooks.** Permissions come from rules inserted through `ctx.agent.transform` after each agent's
+  base allow. A stricter agent is never weakened; agents that miss the rules are named in status, never patched. There
+  are no per-request text hooks.
 - **Transforms are cheap, synchronous and never throw.** Record failures for status instead.
-- **Errors** read `CODE: What happened. Next step: What to do.`, built by `linearError` or `errorText`. Codes have no
-  service prefix; shared failures use the shared names (`HOST_UNTESTED`, `OPTIONS_INVALID`, `STATUS_UNAVAILABLE`,
-  `SKILLS_INVALID`).
-- **Status.** `src/status.ts` builds one model for `/linear-status`, the `/linear` dialog and the status RPC. The RPC
-  keeps the fields every plugin of this family shares, `version`, `host` (`version`, `range`, `tested`), `state`,
-  `unguardedAgents` and `nextStep`, under those names. It never shows OpenCode's text for a needed sign-in, cuts a
-  failure's reason to one line of 160 characters without URL queries, and names at most 20 unknown tools, plain names
-  only. A status it cannot read is the declared RPC error `unavailable`, with a next step.
-- **`src/linear-tools.ts` and `src/constants.ts` have no runtime imports.** The drift script and `scripts/check.mjs`
-  load them with Node's type stripping. `READ_TOOLS` is exactly the tools Linear marks `readOnlyHint: true`,
-  and `WRITE_TOOLS` the rest, in Linear's live list (`test/fixtures/live-tools.json`).
-- **`linear_issues` is the one model tool of the plugin's own.** It reads through the host's `linear_list_issues`
-  executor, never with a credential of its own, and its default rule allows it. It stays a direct tool
-  (`codemode: false`) on purpose: Jelly draws its `table` card only from a direct call's result. That makes it present
-  in every session, also when Code Mode holds Linear's other tools, so add no other direct tool without the same
-  reason. Its answer keeps Jelly's `table` shape: at most 8 columns, 100 rows and 200 characters a cell.
-- **`linear_events_list` is Linear's source `linear.activity`** (`src/events.ts`), a Code Mode tool and the tools RPC
-  method `events_list`, with the tools RPC method `probe` beside it, under the source contract
-  (`@we-the-rebel-alliance/source-contract`, pinned to a tag in `package-lock.json` and bundled into `dist/index.js`;
-  `package.json`'s `sources` declares `linear.activity` and the list snapshot `linear.issues`). A listing names its
-  account, `<workspace id>/<email>`, and compares it with who the sign-in is: `probe` reads `get_workspace` and
-  `get_user` "me", the declared identity operations, and records them per sign-in; a listing that finds no record
-  (after a restart, which nothing keeps) makes the same two reads itself with `linearIdentity`, records them, and then
-  compares (an identity read that fails is `UNAVAILABLE`). Never make a listing depend on a probe in this process:
-  Memory probes only at bind. It asserts its own
-  action, reads only through the host's executors, never writes, never asks with the default rules; `npm test` runs the
-  contract's events checks on synthetic fixtures, and the `conformance` stage the contract's kit over the source.
-- **The `jelly` section** of `package.json` declares every known tool, the skills, the `linear_issues` table card,
-  the Home feed, the sign-in, a one-line `summary` and the `icon`, with only fields that Jelly's declaration schema
-  accepts: it refuses unknown keys, so a Jelly without `summary` and `icon` refuses the declaration.
-  `test/unit/jelly.test.ts` keeps it in step with the known tools and the default rules.
-- **The icons** `assets/icon.svg`, `assets/icon-128.png` and `assets/icon-256.png` are Linear's logomark, from the
-  brand assets Linear publishes at https://linear.app/brand, used under those guidelines: the mark unaltered and only
-  scaled (its path data is pre-scaled to the family's 48 grid), in Mercury White `#F4F5F8` on a tile in Nordic Gray
-  `#222326`, Linear's own colours. Never replace it with the stylised app icon (it needs filters, which Jelly refuses),
-  never recolour or combine it with other graphics, and keep the README's trademark line. They are checked by
-  `scripts/check-icons.mjs`, which is a byte-identical copy of the kit's. `opencode.icons` declares the three
-  files, `opencode.vendor` declares Linear as the vendor with `mark: true` (the icon is the vendor's own mark), and the
-  three `exports` and three `files` entries ship them.
-- **The workflows are linted** by `actionlint` (`scripts/actionlint.mjs`, and a CI job), because a `${{ }}` that exists
-  in some contexts only makes GitHub reject the whole file and run nothing.
-- **TypeScript.** No enums, namespaces or parameter properties. `import type` for types, `.js` in relative imports.
-- **The tools RPC.** The transport is the source contract's `tools-rpc`, shared by the family; Linear's part is
-  `src/tools-rpc.ts` (the plugin value, the method table and the next steps), and a change to the transport goes to the
-  package first. Its methods are every known tool (`READ_TOOLS` and `WRITE_TOOLS`, each with its class) and the owned
-  reads `issues`, `events_list` and `probe`, never an unknown tool. A rule
-  must allow a method before a script runs it: an `ask` is refused, and a saved "Always allow" is not a grant. Keep the
-  RPC id `linear.workspace.tools` and its method names stable: scripts call them by name.
+- **Errors** read `CODE: What happened. Next step: What to do.`, built by `linearError` or `errorText`.
+- **Fixed context.** The Code Mode namespace line is one string of at most 400 characters, every skill description is
+  at most 300, nothing is pinned and nothing is a direct tool. A skill names tools as `tools.linear.<method>`.
+- **`src/linear-tools.ts` and `src/constants.ts` have no runtime imports**, because `scripts/check.mjs` and the drift
+  script load them with Node's type stripping. `READ_TOOLS` is exactly the tools Linear marks `readOnlyHint: true`,
+  and `WRITE_TOOLS` the rest, in Linear's live list (`test/fixtures/live-tools.json`). `DESTRUCTIVE_TOOLS` names the
+  changes that cannot be undone (the four deletes and `merge_diff`); the tools RPC classes them `destructive`.
+- **The tools RPC.** Its transport is the source contract's `tools-rpc`, shared by the family; Linear's part is
+  `src/tools-rpc.ts`. Its methods are every known tool with its class, plus the owned reads `issues`, `events_list` and
+  `probe`; a tool Linear adds later is never a method. Keep the RPC id `linear.workspace.tools` and its method names
+  stable: scripts call them by name.
+- **`linear_events_list` is the source `linear.activity`** (`src/events.ts`), a Code Mode tool and the tools RPC method
+  `events_list`, with `probe` beside it, under the source contract. It reads only, through the host's own executors,
+  and an account it is asked for must be the signed-in one. `package.json`'s `sources` declares it and the list
+  snapshot `linear.issues`.
+- **The `jelly` section** of `package.json` is a declaration Jelly reads without loading the plugin. It stays until
+  the contract's `capabilities` replaces it; `test/unit/jelly.test.ts` keeps it in step with the known tools and the
+  default rules.
+- **Text.** Model-facing text and docs describe what the code does now, in plain language: no process narrative, test
+  counts, machine-local paths, secrets or personal data. The plugin names no app.
 - **Tests.** Unit tests use narrow `Pick<Plugin.Context, ...>` fakes. Host tests use the public `@opencode/sdk` with
-  `OpenCode.create({ app: { version } })`, a loopback fake server and the temp root from `test/host/isolate.ts`. On
-  2.3.1 and later the harness builds that host through `PromiseSdk.create`, which `OpenCode.create` calls, with the
-  SDK's `overrides` so that its Automation service also runs the scheduler, as `opencode serve` does: Code Mode with
-  nobody present runs there as an automation's code action (`unattended` in `test/host/harness.ts`).
-  Every temp root of the host and pack tests is a git repository under the system's `/tmp`, never under `TMPDIR` or
-  `HOME`, so OpenCode never finds a `.opencode` folder of whoever runs them; each stock server has its own port.
-  Never sign in to Linear or call its API from a check.
-- **Text.** Model-facing text and docs use plain language and describe what the code does now: no process
-  narrative, test counts, machine-local paths, secrets or personal data.
-- **Releases** come only from `.github/workflows/release.yml` ("Releasing" in [CONTRIBUTING.md](CONTRIBUTING.md)). A
-  release-prep PR sets `version` in `package.json` and the install specs and runs `node scripts/changelog.mjs release`;
-  once it is on `master` and CI passed, start the release with
-  `gh workflow run release.yml --ref master -f sha=<its full sha>`. The workflow builds `dist/`, makes the release
-  commit on a temporary `release/v<version>` branch, checks and stages everything, and waits for the owner to approve
-  the `release` environment; only then does it create the tag `v<version>` and the GitHub Release. Never push a tag or a
-  `release/*` branch, and never commit, tag or publish a release by hand. Agents never approve a release, never call the
-  deployment-approval API, and never bypass a ruleset or the environment.
-- **No personal email in anything we publish.** Every commit is authored and committed as
-  `joe-broadhead <91376460+joe-broadhead@users.noreply.github.com>`, except the release commit and tag, which the
-  release workflow makes as `github-actions[bot]`. Before committing or tagging, check that
-  `git config user.email` is that address: a fresh clone inherits the machine's global identity, which is not that
-  address. Never commit, tag or publish with a work or personal address, or with a local hostname.
-- **One check command.** `npm run check` passes before every commit. Never skip, weaken or delete a test to get
-  green.
-
-## Forbidden in this repository
-
-`scripts/check-forbidden.mjs` enforces this list in `src/`, `test/`, `scripts/` and `dist/`:
-
-- dispatch-lease, catalog-ownership and text-only markers, and tool `options.mcp` delegation;
-- `Plugin.image` and profile images;
-- imported OAuth grants;
-- the V1 plugin API: `@opencode-ai/*` packages and hooks such as `tool.execute.before`, `chat.message` or
-  `permission.ask`;
-- the deprecated `ctx.generate.text` and `experimental.policies`;
-- importing `@opencode/ai`;
-- a permission hook, except the one `permission.hook("evaluate")` of the source contract's tools RPC, in the bundle
-  that inlines it, exactly once: it turns an `ask` on one of the tools RPC's own script calls in flight into a deny,
-  because no one can answer it, and touches nothing else;
-- references to private host source or host checkouts;
-- machine-local home and temp paths;
-- `.tsx` or `.jsx` files in `dist/`.
-
-The pack test also rejects anything in `dist/` other than the two bundles, any relative, dynamic or `require` import in
-them, and any import of a module OpenCode does not provide.
+  `OpenCode.create({ app: { version } })`, a loopback fake server and the temp root from `test/host/isolate.ts`; the
+  harness starts the Automation scheduler so Code Mode can run with nobody present, and waits for the plugin to be
+  active before the first call. Never sign in to Linear or call its API from a check.
+- **One check command.** `npm run check` passes before every commit. Never skip or weaken a test to get green.
