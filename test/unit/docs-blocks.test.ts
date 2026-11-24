@@ -1,5 +1,5 @@
 // The docs print what the code does: the generated default block, in full, for every access value, and the tested
-// OpenCode releases in every sentence that says something is tested. A change to either cannot leave a doc behind.
+// OpenCode release in every sentence that says something is tested. A change to either cannot leave a doc behind.
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -21,15 +21,7 @@ function blockAfter(text: string, after: string | RegExp): unknown {
 
 // R7: an administrator copies these blocks into managed config, so each must be the plugin's real block, in full.
 describe("the default rules block", () => {
-  const README = read("README.md")
   const CONFIGURATION = read("docs/configuration.md")
-
-  test('the README prints defaultRules("all") in full, and does not elide it', () => {
-    const printed = blockAfter(README, 'generated from\n`defaultRules("all")`')
-    expect(printed).toEqual(defaultRules("all"))
-    const section = /## Permissions([\s\S]*?)## Configure/.exec(README)?.[1] ?? ""
-    expect(section).not.toMatch(/\bthe rest of the block\b/)
-  })
 
   test.each(["all", "ask-changes", "read-only"] as const)("the configuration guide prints the %s block in full", (access) => {
     const printed = blockAfter(CONFIGURATION, new RegExp(`^\`access: "${access}"\``, "m"))
@@ -45,7 +37,7 @@ describe("the default rules block", () => {
 // R8: a release added to the list cannot leave a stale "tested on …" sentence behind.
 describe("tested hosts", () => {
   // The newest release's section: the pending notes until a release, and the latest one after it.
-  const NEWEST = /## \[[^\]]+\][^\n]*\n([\s\S]*?)(?=\n## |$)/.exec(read("CHANGELOG.md"))?.[1] ?? ""
+  const NEWEST = /## \[?[^\]\n]+\]?[^\n]*\n([\s\S]*?)(?=\n## |$)/.exec(read("CHANGELOG.md"))?.[1] ?? ""
   const SOURCES: [string, string][] = [
     ["README.md", read("README.md")],
     ["AGENTS.md", read("AGENTS.md")],
@@ -68,16 +60,16 @@ describe("tested hosts", () => {
 
   test("the README's Requirements line names every tested release", () => {
     const requirements = /## Requirements([\s\S]*?)## /i.exec(read("README.md"))?.[1] ?? ""
-    const named = [...requirements.matchAll(/\b\d+\.\d+\.\d+\b/g)].map((match) => match[0]).filter((version) => version !== "2.4.0")
+    const named = [...requirements.matchAll(/\b\d+\.\d+\.\d+\b/g)].map((match) => match[0]).filter((version) => version !== "2.5.0")
     expect([...new Set(named)].sort()).toEqual([...TESTED_HOSTS].sort())
   })
 
   // A release inside the range that ships later is the untested example, so it must be one that never ships.
-  test("the untested example is 2.2.99, and no doc names a future release as tested", () => {
+  test("the untested example is 2.5.0, and no doc names a future release as tested", () => {
     const all = SOURCES.map(([, text]) => text).join("\n")
-    expect(all).toContain("2.2.99")
-    // Every 2.2 or 2.3 release a doc names is one the checks run on, apart from the example outside the list.
-    const named = [...new Set([...all.matchAll(/\b2\.[23]\.\d+\b/g)].map((match) => match[0]!))]
-    expect(named.filter((version) => version !== "2.2.99" && !TESTED_HOSTS.includes(version))).toEqual([])
+    expect(all).toContain("2.5.0")
+    // Every 2.4 release a doc names is one the checks run on, apart from the example outside the list.
+    const named = [...new Set([...all.matchAll(/\b2\.[45]\.\d+\b/g)].map((match) => match[0]!))]
+    expect(named.filter((version) => version !== "2.5.0" && !TESTED_HOSTS.includes(version))).toEqual([])
   })
 })

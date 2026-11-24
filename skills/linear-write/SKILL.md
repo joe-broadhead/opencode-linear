@@ -1,9 +1,9 @@
 ---
 name: linear-write
-description: Read before any change in Linear - creating or updating an issue, project or document, commenting, changing a status, assignee or label, sharing an issue, merging or reviewing a diff, or deleting. Covers reading the item first, confirming, one change at a time, the changes that reach beyond the item, and reporting links.
+description: Before any Linear change: create or update an issue, project or document, comment, change status, assignee or label, share, merge or delete. Read the item first, one change at a time, report links.
 ---
 
-If Linear's tools are absent, run `/connect` and choose Linear, or on Jelly call jelly_connection_request.
+If Linear's tools are absent, run `/connect` and choose Linear.
 
 # Changing Linear
 
@@ -29,7 +29,8 @@ item or update an existing one; the input schema says which. Labels have their o
 
 ## Changes that reach beyond the item
 
-`linear_share_issue` and `linear_unshare_issue` change who can see an issue, `linear_merge_diff` merges code, and
+`linear_share_issue` and `linear_unshare_issue` change who can see an issue, `linear_merge_diff` merges code (it and
+the four deletes are `destructive`: nothing in Linear undoes them), and
 `linear_submit_diff_review` publishes a review to other people. Use them only when the user asked for exactly that,
 and say what will happen before you call one. The same goes for uploads (`linear_prepare_file_upload`,
 `linear_create_attachment_from_upload`): attach only files the user named.
