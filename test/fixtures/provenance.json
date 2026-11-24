@@ -16,7 +16,8 @@
         "algorithm": "sha256",
         "of": "canonical JSON of the recorded tools, sorted by name",
         "value": "fb802b7c375ef30c045544b0cbcff8b3acdea1124ae18601ac34e9a88b03bf12"
-      }
+      },
+      "note": "`host` is the OpenCode release this capture was taken under (2026-11-14), not a supported-host claim."
     }
   ],
   "live": {

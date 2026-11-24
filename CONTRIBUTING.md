@@ -178,7 +178,7 @@ The changelog's first section is `## 0.0.0 (unreleased)` at the top of `CHANGELO
 
 1. On `master`, set `version` in `package.json` to the new version, and point every install spec at that tag. The
    README's Install section and the configuration examples use the `#v<version>` placeholder until the first release is
-   cut; `test/docs.test.ts` checks that every install spec names this package, uses the placeholder or the current
+   cut; `test/unit/docs.test.ts` checks that every install spec names this package, uses the placeholder or the current
    concrete version, and never an untagged repository. Run `npm run check`. The changelog script cannot shape this
    CHANGELOG yet (above); 4b's plugin-kit must accept the heading first.
 2. Push that commit to `master`, and wait for CI to pass on it. CI is the one job `ci` in `.github/workflows/ci.yml`, on

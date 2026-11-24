@@ -40,6 +40,9 @@ describe("parseOptions", () => {
       expect(code).toBe("OPTIONS_INVALID")
       expect(message.startsWith("OPTIONS_INVALID: ")).toBe(true)
       expect(nextStep).toContain(`"options": { "access": "read-only" }`)
+      // A release-tag placeholder, never a concrete tag: the only released tag is the pre-transfer one.
+      expect(nextStep).toContain("linear-plugin#v<version>")
+      expect(nextStep).not.toMatch(/linear-plugin#v\d/)
       expect(message.endsWith(`. Next step: ${nextStep}`)).toBe(true)
       expect(nextStep.endsWith(".")).toBe(true)
     }

@@ -1,6 +1,6 @@
 ---
 name: linear
-description: The user's Linear work: my issues, this cycle, a project's progress, comments, counts by state, a teammate's assignments, or an identifier such as ENG-123. Covers linear_issues versus list_issues, filters, paging and links. Not for GitHub or Jira issues.
+description: The user's Linear work: my issues, this cycle, a project's progress, comments, counts by state, a teammate's assignments, or an identifier such as ENG-123. Covers tools.linear.issues versus list_issues, filters, paging and links. Not for GitHub or Jira issues.
 ---
 
 If Linear's tools are absent, run `/connect` and choose Linear.

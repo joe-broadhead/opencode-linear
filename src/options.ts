@@ -11,7 +11,7 @@ interface Options {
   readonly allowUntestedHost: boolean
 }
 
-const EXAMPLE = `"plugins": [{ "package": "github:we-the-rebel-alliance/linear-plugin#v0.0.0", "options": { "access": "read-only" } }]`
+const EXAMPLE = `"plugins": [{ "package": "github:we-the-rebel-alliance/linear-plugin#v<version>", "options": { "access": "read-only" } }]`
 const ACCEPTED = {
   access: `"all" (the default), "ask-changes" or "read-only"`,
   allowUntestedHost: "true or false (the default)",

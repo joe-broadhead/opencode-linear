@@ -75,8 +75,7 @@ function run(command, args, options = {}) {
 }
 
 /**
- * The host suite on the locked @opencode/sdk, which is the one tested release. HOST_SDK_DIR runs another installed SDK
- * instead, for a one-off check.
+ * The host suite on the locked @opencode/sdk, which is the one tested release.
  */
 function host() {
   return run("bun", ["test", "./test/host"])
@@ -84,13 +83,13 @@ function host() {
 
 /**
  * The workflows are parsed as workflows, not as YAML: `actionlint` catches a `${{ }}` that only exists in some
- * contexts, which makes GitHub reject the whole file and run nothing. CI runs it in its own job; here it runs when the
- * tool is on PATH.
+ * contexts, which makes GitHub reject the whole file and run nothing. CI runs it as a step in the one `ci` job; here it
+ * runs when the tool is on PATH.
  */
 function actionlint() {
   const probe = spawnSync("actionlint", ["-version"], { encoding: "utf8" })
   if (probe.error?.code === "ENOENT") {
-    console.log("actionlint is not on PATH, so the workflow check is skipped here; CI runs it in its own job.")
+    console.log("actionlint is not on PATH, so the workflow check is skipped here; CI runs it as a step in the one `ci` job.")
     return 0
   }
   return run("actionlint", ["-color"])
