@@ -15,7 +15,8 @@ describe("host guard", () => {
     expect(checkHost(version, false)).toEqual({ version, range: SUPPORTED_HOST, tested: false })
   })
 
-  test.each(["2.4.0", "2.5.0", "2.9.0", "3.0.0", "1.9.9", "2.4.1-beta.1", "0.0.0-dev-1", "unknown", "v2.4.1", "2.4"])(
+  // The range's boundaries: 2.4.1 is the lowest accepted and 2.5.0 the first refused; 2.3.2 sits just below it.
+  test.each(["2.3.2", "2.4.0", "2.5.0", "2.9.0", "3.0.0", "1.9.9", "2.4.1-beta.1", "0.0.0-dev-1", "unknown", "v2.4.1", "2.4"])(
     "refuses %j with the code, the version and the override",
     (version) => {
       expect(isSupportedHost(version)).toBe(false)

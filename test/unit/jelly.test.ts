@@ -10,10 +10,10 @@ const EVENTS_ACTION = "linear_events_list"
 const BASE_ALLOW: Rule = { action: "*", resource: "*", effect: "allow" }
 
 /**
- * The `jelly` section of package.json, which Jelly reads without loading the plugin. Jelly writes each declared
- * "ask" as that tool's default (its agents have no base allow rule, so this plugin's own rules never reach them),
- * shows a declared view, and feeds Home only from a declared read-only tool. The shared kit checks the declaration
- * against Jelly's plugin authors' standard; the tests below add what only Linear declares.
+ * The `jelly` section of package.json, which a consumer reads without loading the plugin. A consumer writes each
+ * declared "ask" as that tool's default (its agents have no base allow rule, so this plugin's own rules never reach
+ * them), shows a declared view, and feeds Home only from a declared read-only tool. The shared kit checks the
+ * declaration against the family's plugin authors' standard; the tests below add what only Linear declares.
  */
 
 const ROOT = new URL("../../", import.meta.url)
@@ -31,11 +31,11 @@ describe("the jelly declaration", () => {
     expect(parseOptions({ access: "read-only" }).access).toBe("read-only")
     expect(jelly.contributes.settings[0]?.default).toBe(parseOptions({}).access)
   })
-  test("Jelly's setting schema reads the settings", () => {
+  test("the setting schema reads the settings", () => {
     expect(settingsProblems(jelly.contributes.settings)).toEqual([])
   })
 
-  test("access offers Jelly's three choices, word for word, and the options parser takes each of them", () => {
+  test("access offers the three choices, word for word, and the options parser takes each of them", () => {
     const access = jelly.contributes.settings.find((setting) => setting.key === "access") as PluginSetting
     expect(access.choices).toEqual([...ACCESS_CHOICES])
     expect(settingChoices(access)?.map((choice) => choice.value)).toEqual([...ACCESS_VALUES])
@@ -56,14 +56,14 @@ describe("the jelly declaration", () => {
     for (const tool of READ_TOOLS) expect(byPermission.get(`linear_${tool}`)).toMatchObject({ effect: "allow", readOnly: true })
     for (const tool of WRITE_TOOLS) expect(byPermission.get(`linear_${tool}`)).toMatchObject({ effect: "allow", readOnly: false })
     expect(byPermission.get(ISSUES_ACTION)).toMatchObject({ name: "linear.issues", effect: "allow", readOnly: true })
-    // Memory's collector runs linear_events_list unattended, so it never asks.
+    // A collector runs linear_events_list unattended, so it never asks.
     expect(byPermission.get(EVENTS_ACTION)).toMatchObject({ name: "linear.events_list", effect: "allow", readOnly: true })
     expect(jelly.tools).toHaveLength(READ_TOOLS.length + WRITE_TOOLS.length + 2)
     // Exactly the known tools, whoami included, and none Linear no longer serves.
     expect([...byPermission.keys()].sort()).toEqual([...READ_TOOLS, ...WRITE_TOOLS].map((tool) => `linear_${tool}`).concat(ISSUES_ACTION, EVENTS_ACTION).sort())
   })
 
-  test("draws linear_issues with Jelly's table card", () => {
+  test("draws the issues tool with the table card", () => {
     expect(jelly.views).toEqual([expect.objectContaining({ place: "tool-result", tools: ["linear_issues"], card: { template: "table" } })])
   })
 
@@ -73,7 +73,7 @@ describe("the jelly declaration", () => {
   })
 
 
-  test("describes the Home feed as what linear_issues returns: assigned issues in any state", () => {
+  test("describes the Home feed as what the issues tool returns: assigned issues in any state", () => {
     const [feed] = jelly.contributes.homeFeeds
     expect(feed?.feed.script).toContain("tools.linear.issues({})")
     // linear_issues asks list_issues for assignee "me" with no state filter, so done issues are listed too.

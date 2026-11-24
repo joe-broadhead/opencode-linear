@@ -4,7 +4,7 @@ Every option is optional. The smallest setup is one entry in `plugins`:
 
 ```json
 {
-  "plugins": ["github:we-the-rebel-alliance/linear-plugin#v0.0.0"]
+  "plugins": ["github:we-the-rebel-alliance/linear-plugin#v<version>"]
 }
 ```
 
@@ -12,7 +12,7 @@ To set options, use the object form:
 
 ```json
 {
-  "plugins": [{ "package": "github:we-the-rebel-alliance/linear-plugin#v0.0.0", "options": { "access": "ask-changes" } }]
+  "plugins": [{ "package": "github:we-the-rebel-alliance/linear-plugin#v<version>", "options": { "access": "ask-changes" } }]
 }
 ```
 
@@ -28,7 +28,7 @@ To set options, use the object form:
 | Server the plugin registers as `linear` | `https://mcp.linear.app/mcp` | `https://mcp.linear.app/mcp` | `https://mcp.linear.app/mcp` |
 | OAuth scope | `read write` | `read write` | `read write` |
 | Default rules | every tool allows, and so does the `linear_*` pattern | reads allow; every other tool asks | reads allow; every other tool is denied |
-| Tools the model sees | Linear's tools, and `linear_issues` | Linear's tools, and `linear_issues` | Linear's read tools, and `linear_issues`: a denied tool is hidden |
+| Tools the model sees | Linear's tools, and `tools.linear.issues` | Linear's tools, and `tools.linear.issues` | Linear's read tools, and `tools.linear.issues`: a denied tool is hidden |
 | Skills | `linear` and `linear-write` | `linear` and `linear-write` | `linear` |
 
 The server and the sign-in are the same for every value, so changing `access` never needs a new sign-in: the generated
@@ -48,11 +48,11 @@ page.
 - Default: `false`.
 
 The plugin supports OpenCode `>=2.4.1 <2.5.0`, the range `opencode.host` in `package.json` declares, and every check
-runs on 2.4.1, the tested releases. Status shows the version, whether it is tested and the supported
+runs on 2.4.1, the tested release. Status shows the version, whether it is tested and the supported
 range in its `OpenCode` row, for example `2.4.1 (tested; supported range >=2.4.1 <2.5.0)`.
 
 - **A tested release:** the plugin starts.
-- **Another release inside the range, such as 2.5.0:** the plugin starts too. Status marks the version `untested`, and
+- **Another release inside the range, such as 2.4.99:** the plugin starts too. Status marks the version `untested`, and
   the status RPC's `host.tested` is `false`. The next step is the same as on a tested release.
 - **Outside the range, including 2.5.0, prereleases and development builds:** the plugin refuses to start, and
   `/plugins` shows:
@@ -376,11 +376,10 @@ hidden from the model:
 ]
 ```
 
-`linear_issues` is the plugin's own read tool, allowed by
+The plugin's own issues read, `tools.linear.issues`, is allowed by
 `{ "action": "linear_issues", "resource": "*", "effect": "allow" }`: it runs the host's `list_issues`, so that tool's
-rules apply to the call it makes. It is a Code Mode tool, `tools.linear.issues`, like the rest of the namespace. The
-`linear_*` pattern also matches tools of any other MCP server whose name starts with `linear_`; those follow the same
-access value.
+rules apply to the call it makes. The `linear_*` pattern also matches tools of any other MCP server whose name starts
+with `linear_`; those follow the same access value.
 
 The last rule is for the plugin's other tool, `linear_events_list`, the source of Linear events ([Events
 list](#events-list)). It only reads, and a consumer's collector runs it with no one there, so it must not ask.
@@ -451,7 +450,7 @@ Copy the full block from your own `/linear-status` output; the lines in quotes a
 
 `linear_events_list` (Code Mode `tools.linear.events_list`, and the tools RPC method `events_list`) is this plugin's
 source under the shared source contract, `@we-the-rebel-alliance/source-contract` v0.3.0 (see [Sources](#sources)),
-which a consumer's collector reads. It is not for answering questions: the model uses `list_issues` or `linear_issues` for
+which a consumer's collector reads. It is not for answering questions: the model uses `list_issues` or `tools.linear.issues` for
 that.
 
 ```text
@@ -542,7 +541,7 @@ sign-in. Another `account` is `ACCOUNT_MISMATCH`.
 ## Sources
 
 `package.json` declares the plugin's sources in its top-level `sources` key, under source-contract version 1, so a
-consumer reads them from the installed package. `linear.activity` is unchanged. `linear.issues` is the assigned-issues read `linear_issues` already makes, as the contract's `list` output, so an app can render it without knowing Linear. It is not editable, and it declares no write.
+consumer reads them from the installed package. `linear.activity` is unchanged. `linear.issues` is the assigned-issues read the issues tool already makes, as the contract's `list` output, so an app can render it without knowing Linear. It is not editable, and it declares no write.
 
 | Key | Value |
 | --- | --- |
@@ -558,7 +557,7 @@ consumer reads them from the installed package. `linear.activity` is unchanged. 
 | `urlHosts` | `linear.app` |
 | `sources.rpc`, `sources.probe.action` | `linear.workspace.tools`, `linear_probe` |
 
-`linear.issues` is a snapshot. Its `tool` is `issues` (the plugin's `linear_issues`), its `output` is `list`, and its `input` is `{ "source": "linear" }`. `permission.tool` is `linear_issues`. `permission.operations` are `get_workspace` and `get_user` (identity, which only `probe` reads) and `list_issues` (the read the tool already makes). `private` is true. `cost` is free. `maxAgeSec` is 900. `maxBytes` is 65,536. `urlHosts` is `linear.app`. A source read returns `{ account?, data: { items, editable: false }, asOf, trust }`. The model tool still returns the table: `source`, `list` and `account` are declared on the tools RPC method only, so no `list` input is ever a model's, and the method declares both answers, the table and the list, because the host validates a method's answer against its declaration.
+`linear.issues` is a snapshot. Its `tool` is `issues` (the plugin's own issues read), its `output` is `list`, and its `input` is `{ "source": "linear" }`. `permission.tool` is `linear_issues`. `permission.operations` are `get_workspace` and `get_user` (identity, which only `probe` reads) and `list_issues` (the read the tool already makes). `private` is true. `cost` is free. `maxAgeSec` is 900. `maxBytes` is 65,536. `urlHosts` is `linear.app`. A source read returns `{ account?, data: { items, editable: false }, asOf, trust }`. The model tool still returns the table: `source`, `list` and `account` are declared on the tools RPC method only, so no `list` input is ever a model's, and the method declares both answers, the table and the list, because the host validates a method's answer against its declaration.
 
 `npm run check` and `npm run conformance` run the contract's conformance kit over the source, on recorded answers
 with no Linear call, and write `reports/conformance-report.json`, which a release attaches; it must say `ok: true`.
@@ -578,10 +577,10 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 | `SKILLS_INVALID` | Setup: a skill file is missing or broken. The plugin still starts; status shows the problem. | Reinstall the plugin. |
 | `SERVER_NOT_REGISTERED` | Setup: the `linear` server could not be registered. Status shows the problem. | Restart OpenCode. |
 | `RULES_NOT_ADDED` | Setup: the default permission rules could not be added, so Linear tools may run without asking. Status shows the problem. | Restart OpenCode. |
-| `AUTH_REQUIRED` | `linear_issues` or `linear_events_list`: the Linear read it needs is unavailable because the `linear` server needs a sign-in. | Run `/connect` and choose Linear, then press `o` or Enter to open the link. |
-| `SERVER_CONFLICT` | `linear_issues` or `linear_events_list`: your own `mcp.servers.linear` points at another URL than your `access` uses, so the tool does not call it. | Point it at the URL status names, or remove it, then restart OpenCode. |
-| `TOOL_UNAVAILABLE` | `linear_issues` or `linear_events_list`: OpenCode does not list the Linear read it needs, because the `linear` server is connecting, disabled, failed or missing, or has not listed its tools yet. The message names the read and the state. | Status's next step for that state; when connected, wait a few seconds and run `/linear-status`. |
-| `UPSTREAM_UNREADABLE` | `linear_issues`: Linear's `list_issues` answered with something other than a list of issues. `linear_events_list`: one of its reads answered in a shape it does not read, or an entry without an id or a time (that feed is held while the other is listed; the call answers this when nothing else is left). | `linear_issues`: call `list_issues` with assignee `me` instead, which returns Linear's answer as it is. `linear_events_list`: call the read the message names directly, and run `/linear-status`. |
+| `AUTH_REQUIRED` | `tools.linear.issues` or `linear_events_list`: the Linear read it needs is unavailable because the `linear` server needs a sign-in. | Run `/connect` and choose Linear, then press `o` or Enter to open the link. |
+| `SERVER_CONFLICT` | `tools.linear.issues` or `linear_events_list`: your own `mcp.servers.linear` points at another URL than your `access` uses, so the tool does not call it. | Point it at the URL status names, or remove it, then restart OpenCode. |
+| `TOOL_UNAVAILABLE` | `tools.linear.issues` or `linear_events_list`: OpenCode does not list the Linear read it needs, because the `linear` server is connecting, disabled, failed or missing, or has not listed its tools yet. The message names the read and the state. | Status's next step for that state; when connected, wait a few seconds and run `/linear-status`. |
+| `UPSTREAM_UNREADABLE` | `tools.linear.issues`: Linear's `list_issues` answered with something other than a list of issues. `linear_events_list`: one of its reads answered in a shape it does not read, or an entry without an id or a time (that feed is held while the other is listed; the call answers this when nothing else is left). | `tools.linear.issues`: call `list_issues` with assignee `me` instead, which returns Linear's answer as it is. `linear_events_list`: call the read the message names directly, and run `/linear-status`. |
 | `UPSTREAM_ERROR` | `linear_events_list`: Linear answered one of its reads with an error. The message holds the first line, at most 300 characters, with tokens and URL query strings removed. | Run `/linear-status`, then call again with the same cursor. |
 | `INPUT_INVALID` | `linear_events_list` or `probe`: the input is not the contract's, such as a `limit` outside 1 to 500, a `since` that is not an ISO date or date-time, or a listing with no `account` or one that is not `<workspace id>/<email>`. | Pass `account`, `since`, `cursor`, `limit` or `source` as the schema describes them. |
 | `SOURCE_UNKNOWN` | `linear_events_list` or `probe`: `source` is not `linear`. | Leave `source` out, or pass `linear`. |
@@ -592,7 +591,7 @@ Every error from the plugin reads `CODE: What happened. Next step: What to do.`
 For example:
 
 ```text
-OPTIONS_INVALID: The option "access" must be "all" (the default), "ask-changes" or "read-only", found "admin". Next step: Fix the plugin options in opencode.json, for example "plugins": [{ "package": "github:we-the-rebel-alliance/linear-plugin#v0.0.0", "options": { "access": "read-only" } }].
+OPTIONS_INVALID: The option "access" must be "all" (the default), "ask-changes" or "read-only", found "admin". Next step: Fix the plugin options in opencode.json, for example "plugins": [{ "package": "github:we-the-rebel-alliance/linear-plugin#v<version>", "options": { "access": "read-only" } }].
 ```
 
 Errors from Linear's server and from OpenCode pass through unchanged, except in the tools RPC for scripts, whose codes

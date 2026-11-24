@@ -8,8 +8,8 @@ import type { Status } from "./status.js"
 /**
  * `linear_issues`: your assigned issues as a table, one row each, read through the host's own `linear_list_issues`
  * executor so that read's permission rules apply and the plugin holds no credential. It runs in Code Mode as
- * `tools.linear.issues` (the review moved it there from the direct tool list), with at most 8 columns and 200
- * characters a cell. The model reads the same rows as text, with a line that says when Linear has more.
+ * `tools.linear.issues`, with at most 8 columns and 200 characters a cell. The model reads the same rows as text, with
+ * a line that says when Linear has more.
  */
 
 export const ISSUES_TOOL = "issues"

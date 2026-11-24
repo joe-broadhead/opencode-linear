@@ -34,13 +34,9 @@ const stages = {
   // The source contract's conformance kit over the declared source, on recorded invented Linear answers; it writes
   // reports/conformance-report.json for a release to attach.
   conformance: () => run("bun", ["test", "./test/conformance"]),
-  // The copied release kit's suite. One test in it checks this repository's ci.yml against the pre-4a matrix (three
-  // runners, macOS on a master push); this repository now has one `ci` job and the org's runner rule, so that case is
-  // skipped here. The copy stays until plugin-kit replaces it.
-  kit: () =>
-    run("node", ["--test", "scripts/release-kit.test.mjs"], {
-      env: { NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --test-skip-pattern=this repository's ci\\.yml`.trim() },
-    }),
+  // The copied release kit's suite. It is pre-4a: its release planner still requires the old three-runner matrix (see
+  // CONTRIBUTING, Releasing), and the copy stays until plugin-kit replaces it. No test is skipped.
+  kit: () => run("node", ["--test", "scripts/release-kit.test.mjs"]),
   build: () => run("node", ["scripts/build.mjs"]),
   icons: () => run("node", ["scripts/check-icons.mjs"]),
   host: host,

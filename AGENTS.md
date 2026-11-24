@@ -2,7 +2,7 @@
 
 `@we-the-rebel-alliance/linear-plugin` is an OpenCode plugin that registers Linear's official MCP server
 (`https://mcp.linear.app/mcp`) as `linear`, adds default permission rules, a status command and dialog, two skills and
-two reads of its own: `linear_issues` and `linear_events_list`. [README.md](README.md) describes what it does for a
+two reads of its own: `tools.linear.issues` and `linear_events_list`. [README.md](README.md) describes what it does for a
 user; [docs/architecture.md](docs/architecture.md) describes the layers, and [CONTRIBUTING.md](CONTRIBUTING.md) the
 checks and the release.
 
@@ -49,13 +49,13 @@ The repository is being rebuilt on plugin-contract v0. The current surface (the 
   `events_list`, with `probe` beside it, under the source contract. It reads only, through the host's own executors,
   and an account it is asked for must be the signed-in one. `package.json`'s `sources` declares it and the list
   snapshot `linear.issues`.
-- **The `jelly` section** of `package.json` is a declaration Jelly reads without loading the plugin. It stays until
+- **The `jelly` section** of `package.json` is a declaration an app reads without loading the plugin. It stays until
   the contract's `capabilities` replaces it; `test/unit/jelly.test.ts` keeps it in step with the known tools and the
   default rules.
 - **Text.** Model-facing text and docs describe what the code does now, in plain language: no process narrative, test
   counts, machine-local paths, secrets or personal data. The plugin names no app.
 - **Tests.** Unit tests use narrow `Pick<Plugin.Context, ...>` fakes. Host tests use the public `@opencode/sdk` with
-  `OpenCode.create({ app: { version } })`, a loopback fake server and the temp root from `test/host/isolate.ts`; the
+  `PromiseSdk.create({ app: { version } })`, a loopback fake server and the temp root from `test/host/isolate.ts`; the
   harness starts the Automation scheduler so Code Mode can run with nobody present, and waits for the plugin to be
   active before the first call. Never sign in to Linear or call its API from a check.
 - **One check command.** `npm run check` passes before every commit. Never skip or weaken a test to get green.

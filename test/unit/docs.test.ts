@@ -31,7 +31,7 @@ describe("docs", () => {
     expect(named.filter((tool) => ![...READ_TOOLS, ...WRITE_TOOLS, "issues", "events_list", "probe"].includes(tool))).toEqual([])
   })
 
-  test.each(FILES)("%s points at the new organisation and has no removed Jelly guide", (file) => {
+  test.each(FILES)("%s points at the new organisation and has no removed app guide", (file) => {
     expect(text(file)).not.toMatch(/joe-broadhead|opencode-linear|docs\/jelly\.md/)
   })
 
@@ -43,7 +43,7 @@ describe("docs", () => {
     const logout = at("opencode mcp logout linear")
     expect(logout).toBeGreaterThanOrEqual(0)
     expect(at('"access"')).toBe(-1)
-    expect(at(`opencode plugin remove github:we-the-rebel-alliance/linear-plugin#v${VERSION}`)).toBeGreaterThan(logout)
+    expect(at("opencode plugin remove github:we-the-rebel-alliance/linear-plugin#v<version>")).toBeGreaterThan(logout)
   })
 
   test("the configuration guide gives linear_issues its allow rule, and both it and the README place it in Code Mode", () => {
@@ -59,9 +59,17 @@ describe("docs", () => {
     expect(guide).toContain("x-opencode-directory")
   })
 
-  test("every install spec names the new package and the one version", () => {
-    const specs = FILES.flatMap((file) => [...text(file).matchAll(/github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)#(v\d+\.\d+\.\d+)/g)].map((match) => ({ file, repo: match[1], tag: match[2] })))
+  test("every install spec names the new package and a release tag, never an untagged repository", () => {
+    const specs = FILES.flatMap((file) =>
+      [...text(file).matchAll(/github:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(#(?:v\d+\.\d+\.\d+|v<(?:old )?version>))?/g)].map((match) => ({ file, repo: match[1]!, tag: match[2] ?? "" })),
+    )
     expect(specs.length).toBeGreaterThan(0)
-    for (const spec of specs) expect(spec).toMatchObject({ repo: "we-the-rebel-alliance/linear-plugin", tag: `v${VERSION}` })
+    // Until v0.0.0 is cut, the install examples use the placeholder; a concrete tag must be the current version.
+    expect(specs.some((spec) => spec.tag === "#v<version>")).toBe(true)
+    for (const spec of specs) {
+      expect({ file: spec.file, repo: spec.repo }).toEqual({ file: spec.file, repo: "we-the-rebel-alliance/linear-plugin" })
+      expect(spec.tag).toMatch(/^#(?:v\d+\.\d+\.\d+|v<(?:old )?version>)$/)
+    }
+    for (const spec of specs.filter((spec) => /^#v\d/.test(spec.tag))) expect(spec.tag).toBe(`#v${VERSION}`)
   })
 })

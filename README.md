@@ -19,20 +19,11 @@ version `0.0.0` is the first release under the new name, and the full documentat
 
 ## Install
 
-```sh
-opencode plugin add github:we-the-rebel-alliance/linear-plugin#v0.0.0
-```
+Install from a release: `opencode plugin add github:we-the-rebel-alliance/linear-plugin#v<version>`, then run
+`opencode reload`.
 
-Or add the plugin to `opencode.json` with the same spec:
-
-```json
-{ "plugins": [{ "package": "github:we-the-rebel-alliance/linear-plugin#v0.0.0" }] }
-```
-
-Run `opencode reload`, or restart OpenCode. Then run `/linear-status`: it shows `sign-in required` until you sign in.
-
-A Git install does not update by itself. To move to a newer release, remove the old entry with
-`opencode plugin remove github:we-the-rebel-alliance/linear-plugin#v<old version>`, then add the new tag.
+The first release on plugin-contract is `v0.0.0` (phase 4b). Until it is cut, there is no release to install:
+the repository carries no `dist/`, and OpenCode runs no build when it installs from Git.
 
 ## Sign in
 
@@ -47,7 +38,7 @@ all: changing `access` keeps it. To change the workspace, run `opencode mcp logo
 The plugin registers Linear's MCP server as `linear`, adds the default permission rules, the `/linear-status` command,
 the `/linear` status view, two skills and two reads of its own:
 
-- `linear_issues` (Code Mode: `tools.linear.issues`) answers the issues assigned to you as a table: identifier, title,
+- `tools.linear.issues`, the plugin's own read in Code Mode, answers the issues assigned to you as a table: identifier, title,
   state, priority and link, in every state, most recently updated first, 25 rows by default and at most 100. It is a
   quick look, not a count; use Linear's `list_issues` for totals and filters. It reads through Linear's own
   `list_issues`, under that tool's sign-in and permission rules, and holds no credential.
@@ -73,7 +64,7 @@ The rules are inserted after each agent's base allow, and `/linear-status` print
 that lacks them.
 
 ```json
-{ "plugins": [{ "package": "github:we-the-rebel-alliance/linear-plugin#v0.0.0", "options": { "access": "read-only" } }] }
+{ "plugins": [{ "package": "github:we-the-rebel-alliance/linear-plugin#v<version>", "options": { "access": "read-only" } }] }
 ```
 
 ## Scripts
@@ -91,7 +82,7 @@ without default rules, the OpenCode version and one next step. Every plugin erro
 ## Uninstall
 
 1. Sign out first, while the plugin is still installed: `opencode mcp logout linear`.
-2. Remove the plugin: `opencode plugin remove github:we-the-rebel-alliance/linear-plugin#v0.0.0`, then `opencode reload`.
+2. Remove the plugin: `opencode plugin remove github:we-the-rebel-alliance/linear-plugin#v<version>`, then `opencode reload`.
 
 ## Links
 

@@ -5,8 +5,8 @@ Read [AGENTS.md](AGENTS.md) first: it lists the rules for this repository and th
 
 ## Set up
 
-You need Node.js 22.18 or later, npm, and [Bun](https://bun.sh). CI and the release use Node.js 24 and Bun 1.4.4,
-the Bun inside stock OpenCode 2.4.1.
+You need Node.js 22.18 or later, npm, and [Bun](https://bun.sh). CI uses Node.js 24 and Bun 1.4.5; the release uses
+Node.js 24 and Bun 1.4.4, the Bun inside stock OpenCode 2.4.1.
 
 ```sh
 npm ci --ignore-scripts
@@ -39,13 +39,17 @@ npm run check
 | Stage | What it does |
 | --- | --- |
 | `typecheck` | `tsc --noEmit` over `src/` and `test/`, strict, with unused names as errors |
-| `unit` | `bun test ./test/unit`: every module in `src/`, the docs' counts and error table, and the Jelly declaration |
+| `unit` | `bun test ./test/unit`: every module in `src/`, the docs' counts and error table, and the `jelly` declaration |
 | `conformance` | `bun test ./test/conformance`: the source contract's conformance kit (`@we-the-rebel-alliance/source-contract`, pinned in `package-lock.json`) over the source `package.json` declares, on recorded invented Linear answers (`test/fixtures/sources.json`) with no Linear call; it writes `reports/conformance-report.json` (git-ignored) for a release to attach |
+| `kit` | `node --test scripts/release-kit.test.mjs`: the copied pre-4a release kit. Its planner still requires the old three-runner CI matrix (see [Releasing](#releasing)), so no release can be planned until 4b's plugin-kit replaces the copy |
 | `build` | `node scripts/build.mjs`: deletes `dist/` and bundles `src/index.ts` and `src/tui.ts` with esbuild into the self-contained `dist/index.js` and `dist/tui.js`. Fails if a bundle imports anything the host does not provide |
+| `icons` | `node scripts/check-icons.mjs`: the icon files against the family's icon contract |
 | `host` | `bun test ./test/host`: the plugin inside an embedded OpenCode host, once on each tested release (`@opencode/sdk` 2.4.1) |
 | `pack` | `bun test ./test/pack`: builds, packs and installs the package, imports both entry points, and loads it in stock OpenCode 2.4.1 |
 | `forbidden` | `node scripts/check-forbidden.mjs`: scans `src/`, `test/`, `scripts/` and `dist/` for forbidden APIs and machine-local paths |
+| `copies` | `node scripts/check-copies.mjs`: fails when a shared module's copy in this plugin differs from the one version every plugin carries |
 | `whitelist` | Checks `package.json` against the approved package shape, and that `dist/` holds exactly `index.js` and `tui.js` |
+| `actionlint` | `actionlint -color` over `.github/workflows/`, when `actionlint` is on `PATH`; otherwise the stage skips, and the `ci` job runs it before the full check |
 
 To run some stages only, name them; they run in the order given:
 
@@ -92,7 +96,8 @@ OPENCODE_BIN_2_4_1=/path/to/opencode-2.4.1 node scripts/check.mjs pack
 Otherwise the stage installs `@opencode/cli` with the binary for your platform (macOS or Linux, arm64 or x64), a few
 hundred megabytes per version, once per run, into a temporary folder that it deletes afterwards.
 
-CI (`.github/workflows/ci.yml`) runs `npm ci --ignore-scripts` and `npm run check` in one `ci` job on Linux, on Node 24.
+CI (`.github/workflows/ci.yml`) runs actionlint, then `npm ci --ignore-scripts` and `npm run check`, in one `ci` job on
+Node 24; see [Releasing](#releasing) for its runner rule.
 
 ## Drift check for Linear's tools
 
@@ -160,17 +165,29 @@ that tag. The release is one commit on top of a `master` head that CI passed, an
 workflow makes both, in GitHub Actions: nobody builds, commits or tags a release on their own machine, and no personal
 key signs it.
 
-While changes land, their notes go under `## [Unreleased]` at the top of `CHANGELOG.md`. Each earlier GitHub release is
-a `## [x.y.z] - YYYY-MM-DD` heading below it, newest first, and the npm history stays last, under
+**The copied pre-4a release kit blocks planning until 4b replaces it.** Its planner still requires the old three-runner
+CI matrix with macOS on a `master` push (`scripts/release-rules.mjs:260`; the check is called at
+`scripts/release-github.mjs:155-156`), so it refuses this repository's one-job `ci.yml` with "no matrix is gated by
+event". Its changelog script only knows `## [Unreleased]` and the released shape, so
+`node scripts/changelog.mjs check` exits 1 on this repository's required `## 0.0.0 (unreleased)` heading. No release
+can be planned until 4b's plugin-kit replaces the copied scripts.
+
+The changelog's first section is `## 0.0.0 (unreleased)` at the top of `CHANGELOG.md`. Each earlier GitHub release is a
+`## [x.y.z] - YYYY-MM-DD` heading below it, newest first, and the npm history stays last, under
 `## Earlier releases on npm`.
 
-1. On `master`, set `version` in `package.json` to the new version, and change every install spec in the README,
-   `CONTRIBUTING.md` and `docs/` to `#v<version>` (`test/docs.test.ts` fails until they match). Then run
-   `node scripts/changelog.mjs release`: it turns `## [Unreleased]` into `## [<version>] - <today>`, above the earlier
-   releases, and refuses a CHANGELOG it cannot shape. Run `npm run check`.
-2. Push that commit to `master`, and wait for CI to pass on it. A pull request's CI runs the Linux runners only; the
-   push to `master` runs every runner, Apple-silicon macOS (`macos-26`) too, and the release stands on that run. An
-   Intel Mac (`macos-26-intel`) is not required.
+1. On `master`, set `version` in `package.json` to the new version, and point every install spec at that tag. The
+   README's Install section and the configuration examples use the `#v<version>` placeholder until the first release is
+   cut; `test/docs.test.ts` checks that every install spec names this package, uses the placeholder or the current
+   concrete version, and never an untagged repository. Run `npm run check`. The changelog script cannot shape this
+   CHANGELOG yet (above); 4b's plugin-kit must accept the heading first.
+2. Push that commit to `master`, and wait for CI to pass on it. CI is the one job `ci` in `.github/workflows/ci.yml`, on
+   a pull request and on a push to `master`: it runs actionlint, then the full `npm run check` on Node 24. Its single
+   `runs-on` line is
+   `${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && (vars.CI_RUNNER_PUBLIC || 'ubuntu-24.04') || 'ubuntu-24.04' }}`,
+   so a push and a pull request from this repository use `vars.CI_RUNNER_PUBLIC` when it is set (default
+   `ubuntu-24.04`), and a fork's pull request always uses `ubuntu-24.04`. There is no matrix and no macOS runner. The
+   copied planner still refuses that shape (above), so no release can be planned until 4b replaces it.
 3. Start the release with that commit's full sha:
    `gh workflow run release.yml --ref master -f sha=<full sha>`, or from Actions → release →
    Run workflow, on `master`.
@@ -207,7 +224,8 @@ plugin without `sources` has no report, and its release is unchanged.
 Before the approval, the workflow:
 - **plans:** refuses a run that is not on `master`, a sha that is not `master`'s head, a sha without a successful
   `ci.yml` push run with a successful job on every runner its push matrix names (macOS included), a `ci.yml` whose
-  matrix runs macOS on a pull request or not on a push (the kit tests check it too), a version that is not `x.y.z`, a
+  matrix runs macOS on a pull request or not on a push (the kit tests check it too), a `ci.yml` with no matrix gated by
+  event (this repository's one-job file, above), a version that is not `x.y.z`, a
   `package.json` that is not `"private": true` or not in its canonical form, a CHANGELOG whose newest release is not
   this version, a plugin that declares sources with no `conformance` script, a release that does not move forward from
   the last published Release, a leftover `release/v<version>` branch, a native run that did not build this sha on
@@ -265,8 +283,8 @@ tag, and restores the ruleset exactly as it was.
 
 **Known limit: a `v*` tag pushed by hand.** No ruleset limits who creates a `v*` tag, so anyone with write access can
 push one by hand, pointing at any commit. Such a tag has no published Release, the forward-only check ignores it, and
-An app that installs only a published Release whose `SHA256SUMS` it verifies is protected. But a user who installs
-`github:we-the-rebel-alliance/linear-plugin#v<x>` directly gets whatever that tag points at. Only the release workflow makes
+an app that installs only a published Release whose `SHA256SUMS` it verifies is protected. But a user who installs
+`github:we-the-rebel-alliance/linear-plugin#v<version>` directly gets whatever that tag points at. Only the release workflow makes
 release tags; never push one by hand.
 
 The release kit is these files, the same in every plugin: `scripts/release-rules.mjs`, `scripts/release-commit.mjs`,
@@ -283,5 +301,5 @@ Each release has its own tag, and a Git install does not update by itself. To mo
 Or add the plugin to `opencode.json` instead, with the same spec:
 
 ```json
-{ "plugins": [{ "package": "github:we-the-rebel-alliance/linear-plugin#v0.0.0" }] }
+{ "plugins": [{ "package": "github:we-the-rebel-alliance/linear-plugin#v<version>" }] }
 ```

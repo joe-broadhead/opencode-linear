@@ -2,7 +2,7 @@
 
 The plugin is a thin layer over Linear's official MCP server. OpenCode owns the MCP transport, OAuth, credentials,
 permission prompts and tool output limits. The plugin registers the server, names its `/connect` entry, adds default
-permission rules, reports status, ships two skills, adds one read of its own, `linear_issues`, and lets scripts call
+permission rules, reports status, ships two skills, adds one read of its own, `tools.linear.issues`, and lets scripts call
 the known tools through a tools RPC. It has no runtime dependencies.
 
 ## Layout
@@ -16,7 +16,7 @@ the known tools through a tools RPC. It has no runtime dependencies.
 | `src/host-version.ts` | The host check: the supported range, and the tested releases |
 | `src/linear-tools.ts` | `READ_TOOLS`, `WRITE_TOOLS` and `classify()`. No runtime imports, so the drift script can load it |
 | `src/permissions.ts` | The default rules, their placement, and detection of agents without them |
-| `src/issues.ts` | `linear_issues`: the issues assigned to you as a table, read through the host's own `linear_list_issues` |
+| `src/issues.ts` | The issues read `tools.linear.issues`: the issues assigned to you as a table, read through the host's own `linear_list_issues` |
 | `src/events.ts` | The source `linear.activity`: `linear_events_list` and the tools RPC methods `events_list` and `probe`: assigned issue changes and notifications as normalised events, read through the host's own executors, on the source contract's `events` and `cursor` |
 | `src/status.ts` | The status model and text, `/linear-status`, and the status RPC method |
 | `src/skills.ts` | Loading and registering the skills |
@@ -44,7 +44,7 @@ typechecks. The package exports `.` (`dist/index.js`) and `./tui` (`dist/tui.js`
    other URL is a conflict: nothing is added, and status reports it.
 5. `ctx.tool.transform` gives the `linear` namespace its Code Mode description, the same line for every access value.
 6. `ctx.agent.transform` inserts the default rules after each agent's base `* * allow`.
-7. `ctx.tool.transform` adds `linear_issues` and `linear_events_list`, Code Mode tools in the `linear` namespace.
+7. `ctx.tool.transform` adds the issues read `tools.linear.issues` and `linear_events_list`, Code Mode tools in the `linear` namespace.
 8. `ctx.skill.transform`, `ctx.command.transform` (`/linear-status`) and `ctx.rpc.register` (`linear.workspace/status`).
 9. `registerToolsRpc` registers the tools RPC, `linear.workspace.tools`, with the owned methods `issues`,
    `events_list` and `probe`, and its `evaluate` hook.
@@ -81,13 +81,13 @@ reason is cut to one line of 160 characters with no URL query.
 - The RPC method returns the model to the terminal UI and to scripts, with the fields every plugin of this family
   shares (`version`, `host`, `state`, `unguardedAgents`, `nextStep`). Its input and output are JSON Schemas that
   OpenCode validates. A status it cannot read is its declared error `unavailable`, with a next step. The UI part needs
-  the RPC because on OpenCode 2.2 and 2.3 it receives no plugin options and cannot see the server part's findings.
+  the RPC because it receives no plugin options on 2.4.1 and cannot see the server part's findings.
 
 ## Tools RPC
 
 `linear.workspace.tools` lets a script call Linear's tools with no model; [Scripting](scripting.md) is the user's
 view. Its methods are `describe`, one per name in `READ_TOOLS` and `WRITE_TOOLS` (each named after the upstream tool,
-with its class), and `issues`, the plugin's own `linear_issues` as a read. The table is an allowlist: a
+with its class), and `issues`, the plugin's own issues read. The table is an allowlist: a
 tool that Linear adds later is never a method. The methods are the same at every access value: the server is always
 named `linear`, every known tool is listed, and the rules decide whether a call runs.
 `events_list` runs `linear_events_list`'s spec, which asserts `linear_events_list` with the call's source id and then

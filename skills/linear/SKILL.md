@@ -8,7 +8,7 @@ If Linear's tools are absent, run `/connect` and choose Linear.
 # Linear
 
 Linear's tools are `linear_<tool>`, or `tools.linear.<tool>(input)` in Code Mode, where `search` with namespace
-`linear` shows each signature. `linear_issues` is the plugin's own read, `tools.linear.issues`. Linear's schemas are
+`linear` shows each signature. `tools.linear.issues` is the plugin's own read. Linear's schemas are
 the reference for every field; this skill covers the choices they don't explain.
 
 ## Pick the tool

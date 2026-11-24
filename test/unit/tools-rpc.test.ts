@@ -10,11 +10,10 @@ import {
   upstreamText,
   type MethodSpec,
   type PluginMethod,
-  type ShapeCall,
   type ToolCall,
   type ToolsRpcOptions,
 } from "@we-the-rebel-alliance/source-contract/tools-rpc"
-import { METHODS, NEXT_STEPS, PLUGIN, PLUGIN_ID, pluginError, shapeInput, shapeResult, TOOLS_RPC_ID } from "../../src/tools-rpc.js"
+import { METHODS, NEXT_STEPS, PLUGIN, PLUGIN_ID, pluginError, TOOLS_RPC_ID } from "../../src/tools-rpc.js"
 
 type Effect = "allow" | "deny" | "ask"
 type Rule = { action: string; resource: string; effect: Effect }
@@ -410,8 +409,7 @@ describe("a script's call", () => {
   test("runs the host executor as the session's agent, with a call id of its own, and returns {output, text}", async () => {
     const h = await setup()
     const output = await call(h, READ, { query: "hello" })
-    const shaped = shapeResult(READ, { output: { echoed: { query: "hello" } }, text: "line one\nline two" }, { sessionID: "ses_1", agent: "build", action: ID })
-    expect(output).toEqual(JSON.parse(JSON.stringify(shaped)))
+    expect(output).toEqual({ output: { echoed: { query: "hello" } }, text: "line one\nline two" })
     expect(h.calls).toHaveLength(1)
     expect(h.calls[0]).toMatchObject({ tool: ID, input: { query: "hello" }, call: { sessionID: "ses_1", agent: "build", messageID: expect.any(String), id: expect.stringMatching(/^script:/) } })
     expect(h.evaluations).toEqual([expect.objectContaining({ action: ID, effect: "allow" })])
@@ -687,10 +685,9 @@ describe("Linear's block", () => {
     for (const method of METHODS) expect(method.kind).toBe("mcp")
     expect(METHODS.map((method) => method.name)).toContain("save_issue")
     expect(METHODS.map((method) => method.name)).not.toContain("shiny_new_tool")
-    // The shapers are the identity: Linear has no execute.before or execute.after hook.
-    const call: ShapeCall = { sessionID: "s", agent: "a", action: "x" }
-    expect(shapeInput("get_issue", { id: "LIN-1" }, call)).toEqual({ id: "LIN-1" })
-    expect(shapeResult("get_issue", { text: "t" }, call)).toEqual({ text: "t" })
+    // No per-request shaping: the block has no shaper.
+    expect(PLUGIN).not.toHaveProperty("shapeInput")
+    expect(PLUGIN).not.toHaveProperty("shapeResult")
   })
 })
 

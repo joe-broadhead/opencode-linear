@@ -64,12 +64,13 @@ describe("tested hosts", () => {
     expect([...new Set(named)].sort()).toEqual([...TESTED_HOSTS].sort())
   })
 
-  // A release inside the range that ships later is the untested example, so it must be one that never ships.
-  test("the untested example is 2.5.0, and no doc names a future release as tested", () => {
+  // Two examples: 2.4.99 is inside the range and never ships, and 2.5.0 is the first release outside it.
+  test("the untested example inside the range is 2.4.99, and 2.5.0 is the example outside it", () => {
     const all = SOURCES.map(([, text]) => text).join("\n")
+    expect(all).toContain("2.4.99")
     expect(all).toContain("2.5.0")
-    // Every 2.4 release a doc names is one the checks run on, apart from the example outside the list.
+    // Every other 2.4 or 2.5 release a doc names is one the checks run on.
     const named = [...new Set([...all.matchAll(/\b2\.[45]\.\d+\b/g)].map((match) => match[0]!))]
-    expect(named.filter((version) => version !== "2.5.0" && !TESTED_HOSTS.includes(version))).toEqual([])
+    expect(named.filter((version) => version !== "2.4.99" && version !== "2.5.0" && !TESTED_HOSTS.includes(version))).toEqual([])
   })
 })
