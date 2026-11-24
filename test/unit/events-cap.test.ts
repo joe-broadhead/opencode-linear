@@ -53,7 +53,7 @@ function linear(data: Data, pageSize: number, midCall?: (tool: string, page: num
   return { tool: { list: list as never }, calls, data }
 }
 
-const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "read-only", host: checkHost("2.2.3", false) }
+const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "read-only", host: checkHost("2.4.1", false) }
 const context = { sessionID: "ses_1", agent: "build", messageID: "msg_1", id: "call_1", signal: new AbortController().signal } as never
 function run(host: ReturnType<typeof linear>) {
   const known = signIns()
