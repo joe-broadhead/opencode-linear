@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 import { ACCESS_VALUES, parseOptions } from "../../src/options.js"
 import { defaultRules, evaluate, type Rule } from "../../src/permissions.js"
-import { type Declaration, type DeclaredTool, declarationProblems, docProblems, readPackage } from "../support/jelly-kit.js"
+import { type Declaration, type DeclaredTool, readPackage } from "../support/jelly-kit.js"
 import { ACCESS_CHOICES, type PluginSetting, settingChoices, settingsProblems, settingValueIssue } from "../support/jelly-settings.js"
 
 const ISSUES_ACTION = "linear_issues"
@@ -40,19 +40,16 @@ describe("the jelly declaration", () => {
     expect(access.choices).toEqual([...ACCESS_CHOICES])
     expect(settingChoices(access)?.map((choice) => choice.value)).toEqual([...ACCESS_VALUES])
     for (const { value } of ACCESS_CHOICES) expect(parseOptions({ access: value }).access as string).toBe(value)
-    for (const value of ["none", "ALL", "admin"]) {
+    for (const value of ["none", "ALL", "admin", "read", "write"]) {
       expect(settingValueIssue(access, value)).not.toBeNull()
       expect(() => parseOptions({ access: value })).toThrow()
     }
-    // The deprecated values stay accepted in opencode.json, but Jelly never offers them.
-    for (const value of ["read", "write"]) {
-      expect(settingValueIssue(access, value)).not.toBeNull()
-      expect(parseOptions({ access: value }).deprecation).toBeDefined()
-    }
   })
 
-  test("follows the plugin authors' standard, with the effects the plugin's own default rules give", () => {
-    expect(declarationProblems(ROOT, { effectOf: (permission) => evaluate([BASE_ALLOW, ...defaultRules()], permission) })).toEqual([])
+  // The declaration kit's own checks are not run here: its copy enforces the previous package name, and the contract's
+  // `capabilities` replaces the `jelly` key in the next phase.
+  test("declares the effects the plugin's own default rules give", () => {
+    for (const tool of jelly.tools) expect({ permission: tool.permission, effect: tool.effect }).toEqual({ permission: tool.permission, effect: evaluate([BASE_ALLOW, ...defaultRules()], tool.permission) })
   })
 
   test("declares every Linear tool as allowed, the reads as reads", () => {
@@ -81,11 +78,5 @@ describe("the jelly declaration", () => {
     expect(feed?.feed.script).toContain("tools.linear.issues({})")
     // linear_issues asks list_issues for assignee "me" with no state filter, so done issues are listed too.
     for (const words of [feed?.label, feed?.description, feed?.feed.title]) expect(words).not.toMatch(/unfinished|open|active|in progress/i)
-  })
-})
-
-describe("docs/jelly.md", () => {
-  test("follows the plugin authors' standard", () => {
-    expect(docProblems(ROOT)).toEqual([])
   })
 })

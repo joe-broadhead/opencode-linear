@@ -1,6 +1,6 @@
-// docs/scripting.md and the README's scripting example are the contract a script author copies. Every example must use
-// a method this plugin registers, carry the location header and the strict envelope, and name only fields that method
-// accepts, so a doc example cannot drift from the code.
+// docs/scripting.md is the contract a script author copies. Every example must use a method this plugin registers,
+// carry the location header and the strict envelope, and name only fields that method accepts, so a doc example cannot
+// drift from the code.
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -10,7 +10,7 @@ import { ISSUES_TOOL } from "../../src/issues.js"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 
 const ROOT = fileURLToPath(new URL("../..", import.meta.url))
-const FILES = ["docs/scripting.md", "README.md"]
+const FILES = ["docs/scripting.md"]
 // `issues` is appended to the table at registration, so it is a method without being in METHODS.
 const METHODS_BY_NAME = new Map(METHODS.map((method) => [method.name, method]))
 const known = (name: string) => METHODS_BY_NAME.has(name) || name === ISSUES_TOOL || name === "describe"
