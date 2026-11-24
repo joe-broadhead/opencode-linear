@@ -71,7 +71,7 @@ interface Setup {
   /** Test-only: false disables the MCP-only next-step shim below, to prove registration still requires them. */
   shim?: boolean
   lookup?: (sessionID: string) => Promise<unknown>
-  /** A host that reports a missing agent as a plain Error, as stock 2.2.3 to 2.2.7 and 2.3.0 do. */
+  /** A host that reports a missing agent as a plain Error. */
   plainAgentError?: boolean
   unavailableDetail?: NonNullable<ToolsRpcOptions["mcp"]>["unavailableDetail"]
   notRegistered?: NonNullable<ToolsRpcOptions["mcp"]>["notRegistered"]
@@ -679,10 +679,11 @@ describe("registration", () => {
 })
 
 describe("Linear's block", () => {
-  test("classifies every known tool: 41 reads and 37 other tools, and leaves unknown tools out", () => {
+  test("classifies every known tool: 41 reads, 32 writes and 5 destructive, and leaves unknown tools out", () => {
     expect(METHODS).toHaveLength(78)
     expect(METHODS.filter((method) => method.class === "read")).toHaveLength(41)
-    expect(METHODS.filter((method) => method.class === "write")).toHaveLength(37)
+    expect(METHODS.filter((method) => method.class === "write")).toHaveLength(32)
+    expect(METHODS.filter((method) => method.class === "destructive")).toHaveLength(5)
     for (const method of METHODS) expect(method.kind).toBe("mcp")
     expect(METHODS.map((method) => method.name)).toContain("save_issue")
     expect(METHODS.map((method) => method.name)).not.toContain("shiny_new_tool")

@@ -92,6 +92,20 @@ export const WRITE_TOOLS: readonly string[] = [
   "whoami",
 ]
 
+/**
+ * The changes Linear cannot undo with another of its tools: the four deletes and a merged diff, whose code is in
+ * Linear's branches and not in a field another tool can restore. They are `destructive` in the tools RPC, so a
+ * consumer asks the person first; the `access` rules, not the class, still decide whether a call runs. `retire_*`
+ * stays `write`, because `restore_*` undoes it.
+ */
+export const DESTRUCTIVE_TOOLS: readonly string[] = [
+  "delete_attachment",
+  "delete_comment",
+  "delete_diff_comment",
+  "delete_status_update",
+  "merge_diff",
+]
+
 type ToolClass = "read" | "write" | "unknown"
 
 export function classify(name: string): ToolClass {

@@ -14,7 +14,7 @@
 import type { Failure, McpResult, MethodSpec, NextSteps, ShapeCall, ToolsRpcPlugin } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 import { toolsRpcId } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 import { PLUGIN_ID as LINEAR_PLUGIN_ID, SERVER_NAME } from "./constants.js"
-import { READ_TOOLS, WRITE_TOOLS } from "./linear-tools.js"
+import { DESTRUCTIVE_TOOLS, READ_TOOLS, WRITE_TOOLS } from "./linear-tools.js"
 
 /** The plugin's id. The RPC id is `<PLUGIN_ID>.tools`. */
 export const PLUGIN_ID = LINEAR_PLUGIN_ID
@@ -23,14 +23,14 @@ export const PLUGIN_ID = LINEAR_PLUGIN_ID
 export const TOOLS_RPC_ID = toolsRpcId(PLUGIN_ID)
 
 /**
- * Every known Linear tool, by its upstream name and with its class: the 41 reads as `read` and the 36 writes as
- * `write`. The class is what `describe` reports and what an approval shows; the rules, not the class, decide whether a
- * call runs. A tool Linear adds later is not a method. The plugin's own `issues`, `events_list` and `probe` are
- * `kind: "plugin"` methods, built in setup.
+ * Every known Linear tool, by its upstream name and with its class: the 41 reads as `read`, the five changes that
+ * cannot be undone as `destructive`, and the other 32 changes as `write`. The class is what `describe` reports and
+ * what an approval shows; the rules, not the class, decide whether a call runs. A tool Linear adds later is not a
+ * method. The plugin's own `issues`, `events_list` and `probe` are `kind: "plugin"` methods, built in setup.
  */
 export const METHODS: readonly MethodSpec[] = [
   ...READ_TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: "read" })),
-  ...WRITE_TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: "write" })),
+  ...WRITE_TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: DESTRUCTIVE_TOOLS.includes(name) ? "destructive" : "write" })),
 ]
 
 /** What the model path's `execute.before` hooks do to an MCP call's arguments, which the executor skips. Linear has none. */

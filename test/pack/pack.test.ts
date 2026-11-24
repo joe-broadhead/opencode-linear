@@ -1,8 +1,7 @@
 // Pack, install and load the published shape. The tarball holds exactly the files whitelist and installs with
 // lifecycle scripts disabled. Installed alone, it loads in each stock OpenCode release it is tested on, which provides
 // @opencode/plugin, OpenTUI and Solid itself; next to those packages, both entry points also import under Bun.
-// OPENCODE_BIN_2_2_3, OPENCODE_BIN_2_2_4 and OPENCODE_BIN_2_2_5 name stock binaries; otherwise each release is
-// installed with npm, once per run. Every temp folder is a git repository under the system's /tmp, never under TMPDIR
+// OPENCODE_BIN_2_4_1 names a stock binary; otherwise the tested release is installed with npm, once per run. Every temp folder is a git repository under the system's /tmp, never under TMPDIR
 // or HOME, so OpenCode's upward search for `.opencode` folders never reaches the agents of whoever runs the test.
 // PACK_TARBALL names a tarball that was already packed, such as the one the release publishes, to test it instead.
 // On each release a script also calls Linear's known reads through the tools RPC, in read and in write access, against
@@ -17,7 +16,7 @@ import { basename, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 import { ENDPOINT, SUPPORTED_HOST, TESTED_HOSTS } from "../../src/constants.js"
 import { TOOLS_RPC_ID } from "../../src/tools-rpc.js"
-import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
+import { DESTRUCTIVE_TOOLS, READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 import { defaultRules, type Rule } from "../../src/permissions.js"
 import { NEW_TOOL, startFakeMcp, UPSTREAM_FAILURE, type FakeMcp } from "../host/fake-mcp.js"
 
@@ -46,7 +45,7 @@ const DIST = ["dist/index.js", "dist/tui.js"]
 // Modules the host serves to plugins at runtime. Everything else must be inlined in the bundle.
 const SERVER_HOST_MODULES = [/^node:/, /^@opencode\/plugin(?:\/|$)/]
 const TUI_HOST_MODULES = [/^node:/, /^@opencode\/plugin(?:\/|$)/, /^@opentui\//, /^solid-js(?:\/|$)/]
-// The host packages OpenCode 2.2.3 ships; the versions come from devDependencies.
+// The host packages OpenCode 2.4.1 ships; the versions come from devDependencies.
 const HOST_PACKAGES = ["@opencode/plugin", "@opentui/core", "@opentui/solid", "solid-js"]
 // The stock OpenCode releases the package is tested on: the one list in src/constants.ts.
 const HOST_VERSIONS = TESTED_HOSTS
@@ -315,7 +314,7 @@ describe.each(HOST_VERSIONS)("the tools RPC on stock OpenCode %s", (version) => 
         action: `linear_${name}`,
         available: listed.has(name),
       })
-      expect(method.class).toBe((READ_TOOLS as readonly string[]).includes(name) ? "read" : "write")
+      expect(method.class).toBe((READ_TOOLS as readonly string[]).includes(name) ? "read" : DESTRUCTIVE_TOOLS.includes(name) ? "destructive" : "write")
       if (listed.has(name)) expect(method.input).toEqual({ type: "object", properties: { query: { type: "string" } } })
     }
     // The plugin's own reads are methods in both access modes: linear_issues, linear_events_list, then probe.
