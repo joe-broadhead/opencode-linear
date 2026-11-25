@@ -24,7 +24,7 @@ const classes = (): Record<string, number> => {
 test("the package and the manifest share one name, version and hash", () => {
   assert.equal(manifest.plugin.name, "linear")
   assert.equal(packageName, "@we-the-rebel-alliance/linear-plugin")
-  assert.equal(version, "0.0.10")
+  assert.equal(version, "0.0.0")
   assert.equal(checkManifest(manifest).ok, true)
   assert.match(manifestHash(manifest), /^sha256:[0-9a-f]{64}$/)
   assert.deepEqual(manifest.plugin.host, { opencode: ">=2.4.1 <2.5.0", tested: ["2.4.1"] })

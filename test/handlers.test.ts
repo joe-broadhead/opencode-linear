@@ -20,7 +20,7 @@ function codeOf(action: () => Promise<unknown>): Promise<string | undefined> {
 test("status names the plugin, its host, both accounts and the access rules' agents", async () => {
   const answer = (await run(runtime, "status", {})) as Record<string, unknown>
   assert.equal(answer["name"], "linear")
-  assert.equal(answer["version"], "0.0.10")
+  assert.equal(answer["version"], "0.0.0")
   assert.equal(answer["state"], "ready")
   assert.equal(answer["nextStep"], null)
   assert.deepEqual(answer["host"], { version: "2.4.1", range: ">=2.4.1 <2.5.0", tested: ["2.4.1"] })

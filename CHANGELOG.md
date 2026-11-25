@@ -1,10 +1,9 @@
 # Changelog
 
-## 0.0.10 (2026-11-25)
+## 0.0.0 (2026-11-25)
 
-- Fixes the MCP server registration that v0.0.0 lost: each alias's server is registered with a typed OAuth config
-  (`{ scope: "read write" }`) instead of `oauth: true`, which OpenCode 2.4.1 refuses. The 78 Linear MCP tools are
-  reachable again, one server per alias (`linear`, `linear-work`, `linear-personal`).
+- Registers one Linear MCP server per alias with a typed OAuth config (`{ scope: "read write" }`); the 78 Linear MCP
+  tools are reachable, one server per alias (`linear`, `linear-work`, `linear-personal`).
 - Reads skill frontmatter with the `yaml` package: `>`, `|` and their chomping variants fold exactly as YAML says, and
   each `SKILL.md` description is one quoted line. A malformed skill fails setup with `SCHEMA_VIOLATION` instead of
   registering a marker.

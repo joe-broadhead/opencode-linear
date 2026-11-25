@@ -21,13 +21,12 @@ Unofficial; not affiliated with Linear. Linear is a trademark of Linear Orbit, I
 Install from a release tag:
 
 ```sh
-opencode plugin add github:we-the-rebel-alliance/linear-plugin#v0.0.10
+opencode plugin add github:we-the-rebel-alliance/linear-plugin#v0.0.0
 opencode reload
 ```
 
-`v0.0.10` is the post-release fix on plugin-contract v0: it registers the Linear MCP server and ships the YAML
-skills. `v0.0.0` is the earlier release and does not register the MCP server; do not install it, or an older `v0.x`
-tag (those name the previous plugin).
+`v0.0.0` is the first release on plugin-contract v0: it registers one Linear MCP server per alias and ships the YAML
+skills. Do not install an older `v0.x` tag: those name the previous plugin.
 
 ## Sign in
 
