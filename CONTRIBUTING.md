@@ -21,7 +21,7 @@ npm run check
 |---|---|
 | `npm run lint` | Biome's recommended lint rules pass |
 | `npm run typecheck` | the sources and tests typecheck under strict settings |
-| `npm run build` | `dist/index.js` is built from `src/index.ts` with esbuild |
+| `npm run bundle` | `dist/index.js` is built from `src/index.ts` with esbuild |
 | `npm test` | the account wiring, provider, handlers, manifest and fixture tests pass |
 | `npm run pack` | the tarball holds the built server, skills, assets, README and licence, and nothing else |
 | `plugin-kit check` | conformance T0 and T1, the doc file set, the forbidden patterns and no bundled kit |

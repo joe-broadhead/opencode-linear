@@ -3,7 +3,7 @@
 //   npm run pack
 //
 // `npm pack` reads package.json `files`; this check proves the tarball holds the manifest, the built server entry, the
-// skill, the assets, the README and the licence, and nothing else. It runs after `npm run build`, because
+// skill, the assets, the README and the licence, and nothing else. It runs after `npm run bundle`, because
 // `dist/index.js` is generated.
 import { execFileSync } from "node:child_process"
 import { readFileSync, rmSync, mkdtempSync } from "node:fs"

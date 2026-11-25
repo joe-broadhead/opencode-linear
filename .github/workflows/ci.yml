@@ -40,7 +40,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm run build
+      - run: npm run bundle
+      - run: npm run bundle && git diff --exit-code dist/
       - run: npm test
       - run: npm run pack
       - run: npx plugin-kit check
