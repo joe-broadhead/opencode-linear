@@ -1,0 +1,319 @@
+{
+  "$comment": "The tools Linear's MCP server listed on 2026-11-14, with each tool's contract \u00a76 class. The class is not Linear's readOnlyHint: whoami is a read, save_comment, save_diff_comment, save_status_update and submit_diff_review are sends, and the four delete_* names are deletes. A class change here is a manifest change, not a host claim.",
+  "listedAt": "2026-11-14",
+  "count": 78,
+  "tools": [
+    {
+      "name": "create_attachment",
+      "class": "write"
+    },
+    {
+      "name": "create_attachment_from_upload",
+      "class": "write"
+    },
+    {
+      "name": "create_initiative_label",
+      "class": "write"
+    },
+    {
+      "name": "create_issue_label",
+      "class": "write"
+    },
+    {
+      "name": "delete_attachment",
+      "class": "delete"
+    },
+    {
+      "name": "delete_comment",
+      "class": "delete"
+    },
+    {
+      "name": "delete_diff_comment",
+      "class": "delete"
+    },
+    {
+      "name": "delete_status_update",
+      "class": "delete"
+    },
+    {
+      "name": "extract_images",
+      "class": "read"
+    },
+    {
+      "name": "get_agent_skill",
+      "class": "read"
+    },
+    {
+      "name": "get_attachment",
+      "class": "read"
+    },
+    {
+      "name": "get_diff",
+      "class": "read"
+    },
+    {
+      "name": "get_diff_threads",
+      "class": "read"
+    },
+    {
+      "name": "get_document",
+      "class": "read"
+    },
+    {
+      "name": "get_initiative",
+      "class": "read"
+    },
+    {
+      "name": "get_issue",
+      "class": "read"
+    },
+    {
+      "name": "get_issue_status",
+      "class": "read"
+    },
+    {
+      "name": "get_milestone",
+      "class": "read"
+    },
+    {
+      "name": "get_notifications",
+      "class": "read"
+    },
+    {
+      "name": "get_project",
+      "class": "read"
+    },
+    {
+      "name": "get_release",
+      "class": "read"
+    },
+    {
+      "name": "get_release_note",
+      "class": "read"
+    },
+    {
+      "name": "get_status_updates",
+      "class": "read"
+    },
+    {
+      "name": "get_team",
+      "class": "read"
+    },
+    {
+      "name": "get_template",
+      "class": "read"
+    },
+    {
+      "name": "get_triage_responsibility",
+      "class": "read"
+    },
+    {
+      "name": "get_user",
+      "class": "read"
+    },
+    {
+      "name": "get_workspace",
+      "class": "read"
+    },
+    {
+      "name": "list_agent_skills",
+      "class": "read"
+    },
+    {
+      "name": "list_comments",
+      "class": "read"
+    },
+    {
+      "name": "list_custom_views",
+      "class": "read"
+    },
+    {
+      "name": "list_cycles",
+      "class": "read"
+    },
+    {
+      "name": "list_diffs",
+      "class": "read"
+    },
+    {
+      "name": "list_documents",
+      "class": "read"
+    },
+    {
+      "name": "list_initiative_labels",
+      "class": "read"
+    },
+    {
+      "name": "list_initiatives",
+      "class": "read"
+    },
+    {
+      "name": "list_issue_labels",
+      "class": "read"
+    },
+    {
+      "name": "list_issue_statuses",
+      "class": "read"
+    },
+    {
+      "name": "list_issues",
+      "class": "read"
+    },
+    {
+      "name": "list_milestones",
+      "class": "read"
+    },
+    {
+      "name": "list_project_labels",
+      "class": "read"
+    },
+    {
+      "name": "list_projects",
+      "class": "read"
+    },
+    {
+      "name": "list_release_notes",
+      "class": "read"
+    },
+    {
+      "name": "list_release_pipelines",
+      "class": "read"
+    },
+    {
+      "name": "list_releases",
+      "class": "read"
+    },
+    {
+      "name": "list_teams",
+      "class": "read"
+    },
+    {
+      "name": "list_templates",
+      "class": "read"
+    },
+    {
+      "name": "list_users",
+      "class": "read"
+    },
+    {
+      "name": "mark_notification",
+      "class": "write"
+    },
+    {
+      "name": "merge_diff",
+      "class": "write"
+    },
+    {
+      "name": "prepare_attachment_upload",
+      "class": "write"
+    },
+    {
+      "name": "prepare_file_upload",
+      "class": "write"
+    },
+    {
+      "name": "resolve_diff_thread",
+      "class": "write"
+    },
+    {
+      "name": "restore_initiative_label",
+      "class": "write"
+    },
+    {
+      "name": "restore_issue_label",
+      "class": "write"
+    },
+    {
+      "name": "restore_project_label",
+      "class": "write"
+    },
+    {
+      "name": "retire_initiative_label",
+      "class": "write"
+    },
+    {
+      "name": "retire_issue_label",
+      "class": "write"
+    },
+    {
+      "name": "retire_project_label",
+      "class": "write"
+    },
+    {
+      "name": "save_comment",
+      "class": "send"
+    },
+    {
+      "name": "save_diff_comment",
+      "class": "send"
+    },
+    {
+      "name": "save_document",
+      "class": "write"
+    },
+    {
+      "name": "save_initiative",
+      "class": "write"
+    },
+    {
+      "name": "save_initiative_label",
+      "class": "write"
+    },
+    {
+      "name": "save_issue",
+      "class": "write"
+    },
+    {
+      "name": "save_issue_label",
+      "class": "write"
+    },
+    {
+      "name": "save_milestone",
+      "class": "write"
+    },
+    {
+      "name": "save_project",
+      "class": "write"
+    },
+    {
+      "name": "save_project_label",
+      "class": "write"
+    },
+    {
+      "name": "save_release",
+      "class": "write"
+    },
+    {
+      "name": "save_release_note",
+      "class": "write"
+    },
+    {
+      "name": "save_status_update",
+      "class": "send"
+    },
+    {
+      "name": "search_documentation",
+      "class": "read"
+    },
+    {
+      "name": "share_issue",
+      "class": "share"
+    },
+    {
+      "name": "submit_diff_review",
+      "class": "send"
+    },
+    {
+      "name": "unshare_issue",
+      "class": "share"
+    },
+    {
+      "name": "update_diff",
+      "class": "write"
+    },
+    {
+      "name": "whoami",
+      "class": "read"
+    }
+  ]
+}
