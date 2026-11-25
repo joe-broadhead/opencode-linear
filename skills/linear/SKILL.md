@@ -28,9 +28,8 @@ workspace an alias reads, and `tools.linear.status` for each alias's sign-in sta
 ## Pick the tool
 
 - **A quick look at the user's issues** ("show my issues"): `tools.linear.issues`. It is a sample, not the list: every
-  state, done and canceled included, the most recently updated first, 25 rows by default (at most 100). Its last line
-  says whether Linear has more. Say the rows are the most recently updated, never give their number as a total, and
-  never call a done row open.
+  state, done and canceled included, the most recently updated first, up to fifty rows. Say the rows are the most
+  recently updated, never give their number as a total, and never call a done row open.
 - **Anything filtered, counted or complete** ("in progress", "done this week", "how many", one project or team): the
   alias's `list_issues` with filters, paged to the end.
 - **An identifier or a linear.app link**: straight to `get_issue` with `id` (for example `"ENG-123"`); no list call
