@@ -1,127 +1,141 @@
-/**
- * The skills loader: the package's two skills, the frontmatter rules, and the promise that a broken file becomes a
- * `status` problem instead of a setup failure.
- */
 import assert from "node:assert/strict"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { after, test } from "node:test"
-import { parse as parseYaml } from "yaml"
-import { frontmatter, loadSkills, parseSkill, registerSkills, SKILLS_DIR, skillNames } from "../src/skills.ts"
+import { test } from "node:test"
+import type { Plugin } from "@opencode/plugin"
+import { fileURLToPath } from "node:url"
+import { readSkills, registerSkills } from "../src/skills.ts"
 
-const root = mkdtempSync(join(tmpdir(), "linear-skills-"))
-after(() => rmSync(root, { recursive: true, force: true }))
+const root = fileURLToPath(new URL("..", import.meta.url))
 
-/** A temp `skills/` folder holding one folder per entry. */
-function skills(files: Readonly<Record<string, string>>, extra: readonly string[] = []): string {
-  const directory = mkdtempSync(join(root, "skills-"))
+/** A temporary `skills/` directory holding one file per entry. */
+function fixture(files: Readonly<Record<string, string>>): string {
+  const directory = mkdtempSync(join(tmpdir(), "plugin-skills-"))
   for (const [name, text] of Object.entries(files)) {
-    mkdirSync(join(directory, name))
+    mkdirSync(join(directory, name), { recursive: true })
     writeFileSync(join(directory, name, "SKILL.md"), text)
   }
-  for (const name of extra) writeFileSync(join(directory, name), "")
   return directory
 }
 
-const skillText = (name: string) => `---\nname: ${name}\ndescription: ${name} skill\n---\n\n# ${name}\n\nBody.\n`
-
-test("the package ships linear and linear-write, each with a description and content", async () => {
-  const loaded = await loadSkills()
-  assert.deepEqual(loaded.problems, [])
+test("the plugin's two skills are checked, with their frontmatter names, descriptions and bodies", () => {
+  const skills = readSkills()
   assert.deepEqual(
-    loaded.skills.map((skill) => skill.id),
+    skills.map((skill) => skill.id),
     ["linear", "linear-write"],
   )
-  for (const skill of loaded.skills) {
-    assert.equal(skill.name, skill.id)
-    assert.equal(skill.path, join(SKILLS_DIR, String(skill.id), "SKILL.md"))
-    assert.ok((skill.description ?? "").length > 40, `${skill.id} has a short description`)
-    assert.ok((skill.description ?? "").length <= 300, `${skill.id} has a description over the 300-character budget`)
-    assert.ok(skill.content.length > 0, `${skill.id} has no content`)
-    assert.notEqual(skill.description, ">")
-    assert.notEqual(skill.description, "|")
-  }
+  const linear = skills[0]
+  assert.ok(linear !== undefined)
+  assert.equal(linear.name, "linear")
+  assert.match(linear.description, /^The user's Linear work:/)
+  assert.match(linear.description, /picking a workspace\.$/)
+  assert.ok(linear.content.includes("# Linear\n"))
+  assert.equal(linear.content.includes("---"), false)
+  assert.equal(linear.path, join(root, "skills", "linear", "SKILL.md"))
+  const write = skills[1]
+  assert.ok(write !== undefined)
+  assert.equal(write.name, "linear-write")
+  assert.match(write.description, /^Before any Linear change:/)
+  assert.ok(write.content.includes("# Changing Linear\n"))
 })
 
-test("parses LF and CRLF frontmatter, a folded description and a literal block", () => {
-  for (const newline of ["\n", "\r\n"]) {
-    const front = ["name: linear", "description: >", "  Use Linear: find,", "  read and cite issues."].join(newline)
-    const text = ["---", front, "---", "", "# Linear", "Body."].join(newline)
-    const skill = parseSkill("linear", "/pkg/skills/linear/SKILL.md", text)
-    assert.equal(skill.id, "linear")
-    assert.equal(skill.name, "linear")
-    assert.equal(skill.description, parseYaml(front.replace(/\r\n/g, "\n")).description)
-    assert.equal(skill.content, "# Linear\nBody.")
-  }
-  const literal = parseSkill("linear", "/x", "---\nname: linear\ndescription: |\n  one\n  two\n---\nBody\n")
-  assert.equal(literal.description, "one\ntwo\n")
-})
-
-test("block scalars match YAML.parse: folded, literal and a folded blank-line paragraph", () => {
-  const cases = [
-    "description: >\n  line one\n  line two\n",
-    "description: >\n  line one\n  line two\n\n  paragraph two\n",
-    "description: >\n  one\n\n  two\n\n\n  three\n",
-    "description: |\n  one\n  two\n",
+test("YAML block scalars are folded, literal or stripped as YAML specifies", () => {
+  const cases: readonly [string, string, string][] = [
+    ["folded", ">", "first line second line\n"],
+    ["literal", "|", "first line\nsecond line\n"],
+    ["folded-strip", ">-", "first line second line"],
+    ["literal-strip", "|-", "first line\nsecond line"],
+    ["folded-keep", ">+", "first line second line\n"],
+    ["literal-keep", "|+", "first line\nsecond line\n"],
   ]
-  for (const source of cases) assert.equal(frontmatter(source).get("description"), parseYaml(source).description)
-  const source = "description: >\n  line one\n  line two\n\n  paragraph two\n"
-  const text = `---\nname: linear\n${source}---\nBody\n`
-  assert.equal(parseSkill("linear", "/x", text).description, parseYaml(source).description)
+  for (const [name, marker, expected] of cases) {
+    const directory = fixture({ [name]: `---\nname: ${name}\ndescription: ${marker}\n  first line\n  second line\n---\n\n# Body\n` })
+    try {
+      assert.equal(readSkills(directory)[0]?.description, expected, name)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  }
+  const empty = fixture({ empty: "---\nname: empty\ndescription: >\n---\n\n# Body\n" })
+  try {
+    assert.throws(() => readSkills(empty), /has no frontmatter description/)
+  } finally {
+    rmSync(empty, { recursive: true, force: true })
+  }
+  const marker = fixture({ marker: "---\nname: marker\ndescription: '>'\n---\n\n# Body\n" })
+  try {
+    assert.throws(() => readSkills(marker), /only a block marker/)
+  } finally {
+    rmSync(marker, { recursive: true, force: true })
+  }
+  const broken = fixture({ broken: "---\nname: broken\ndescription: [unclosed\n---\n\n# Body\n" })
+  try {
+    assert.throws(() => readSkills(broken), /has frontmatter that is not valid YAML/)
+  } finally {
+    rmSync(broken, { recursive: true, force: true })
+  }
 })
 
-test("quoted frontmatter values are unquoted", () => {
-  assert.equal(parseSkill("linear", "/x", '---\nname: "linear"\ndescription: "A description."\n---\nBody\n').description, "A description.")
+test("a skill file must have the frontmatter shape the plugin registers", () => {
+  const cases: readonly [string, Readonly<Record<string, string>>, RegExp][] = [
+    ["no frontmatter", { broken: "# Broken\n" }, /SCHEMA_VIOLATION: skills\/broken\/SKILL.md has no frontmatter\. Next step: /],
+    ["no name", { broken: "---\ndescription: A description.\n---\n\n# Body\n" }, /has no frontmatter name/],
+    ["another name", { broken: "---\nname: other\ndescription: A description.\n---\n\n# Body\n" }, /names "other", not its directory "broken"/],
+    ["no description", { broken: "---\nname: broken\n---\n\n# Body\n" }, /has no frontmatter description/],
+    ["empty content", { broken: "---\nname: broken\ndescription: A description.\n---\n\n" }, /has no content below its frontmatter/],
+  ]
+  for (const [name, files, expected] of cases) {
+    const directory = fixture(files)
+    try {
+      assert.throws(() => readSkills(directory), expected, name)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  }
+  const missing = mkdtempSync(join(tmpdir(), "plugin-skills-"))
+  try {
+    mkdirSync(join(missing, "empty"), { recursive: true })
+    assert.throws(() => readSkills(missing), /skills\/empty\/SKILL\.md is missing/)
+  } finally {
+    rmSync(missing, { recursive: true, force: true })
+  }
+  const none = mkdtempSync(join(tmpdir(), "plugin-skills-"))
+  try {
+    assert.throws(() => readSkills(none), /skills\/ holds no <name>\/SKILL\.md/)
+  } finally {
+    rmSync(none, { recursive: true, force: true })
+  }
 })
 
-test("rejects a wrong name, a missing description and empty content with SKILLS_INVALID", () => {
-  assert.throws(() => parseSkill("linear", "/x", "# Linear"), /SKILLS_INVALID: The "linear" skill was not loaded: skills\/linear\/SKILL\.md has no frontmatter\. Next step:/)
-  assert.throws(() => parseSkill("linear", "/x", "---\nname: other\ndescription: d\n---\nBody\n"), /must be named "linear" in its frontmatter/)
-  assert.throws(() => parseSkill("linear", "/x", "---\nname: linear\n---\nBody\n"), /has no description/)
-  assert.throws(() => parseSkill("linear", "/x", "---\nname: linear\ndescription: d\n---\n"), /has no content/)
-})
-
-test("skips folders without a SKILL.md and a stray file, and lists the rest sorted", async () => {
-  const directory = skills({ beta: skillText("beta"), alpha: skillText("alpha") }, ["README.md"])
-  mkdirSync(join(directory, "empty"))
-  assert.deepEqual((await loadSkills(directory)).skills.map((skill) => skill.id), ["alpha", "beta"])
-  assert.deepEqual(await skillNames(directory), ["alpha", "beta"])
-})
-
-test("a broken or missing skill is a problem for status, not a failed load", async () => {
-  const directory = skills({ linear: "---\nname: linear\n---\n", "linear-write": skillText("linear-write") })
-  const loaded = await loadSkills(directory)
-  assert.deepEqual(
-    loaded.skills.map((skill) => skill.id),
-    ["linear-write"],
-  )
-  assert.deepEqual(loaded.problems, ['SKILLS_INVALID: The "linear" skill was not loaded: skills/linear/SKILL.md has no description. Next step: Reinstall the plugin from its release tag, or reinstall the version tag you installed.'])
-})
-
-test("a missing skills folder is one status problem, not a throw", async () => {
-  const loaded = await loadSkills(join(root, "absent"))
-  assert.deepEqual(loaded.skills, [])
-  assert.equal(loaded.problems.length, 1)
-  assert.match(loaded.problems[0] ?? "", /^SKILLS_INVALID: The plugin's skills were not loaded: the skills\/ folder is missing\. Next step: /)
-})
-
-test("registerSkills adds every loaded skill and returns the transform registration", async () => {
-  const added: string[] = []
-  let disposed = 0
-  const registration = await registerSkills(
-    {
-      transform: async (callback: (editor: { add(skill: { id: string }): void }) => void) => {
-        callback({ add: (skill) => void added.push(skill.id) })
-        return { dispose: async () => void disposed++ }
+test("registerSkills adds every checked skill and returns a disposer", async () => {
+  const added: { id: string; name: string; description?: string; path: string; content: string }[] = []
+  let disposed = false
+  const context = {
+    skill: {
+      async transform(callback: (editor: { add: (skill: (typeof added)[number]) => void }) => void) {
+        callback({ add: (skill) => added.push(skill) })
+        return {
+          async dispose() {
+            disposed = true
+          },
+        }
       },
-    } as never,
-    [
-      parseSkill("linear", "/x", skillText("linear")),
-      parseSkill("linear-write", "/x", skillText("linear-write")),
-    ],
-  )
-  assert.deepEqual(added, ["linear", "linear-write"])
+    },
+  } as unknown as Plugin.Context
+  const registration = await registerSkills(context)
+  assert.equal(added.length, 2)
+  const linear = added[0]
+  assert.ok(linear !== undefined)
+  assert.equal(linear.id, "linear")
+  assert.equal(linear.name, "linear")
+  assert.match(linear.description ?? "", /^The user's Linear work:/)
+  assert.equal(linear.path, join(root, "skills", "linear", "SKILL.md"))
+  assert.ok(linear.content.includes("# Linear\n"))
+  const write = added[1]
+  assert.ok(write !== undefined)
+  assert.equal(write.id, "linear-write")
+  assert.match(write.description ?? "", /^Before any Linear change:/)
   await registration.dispose()
-  assert.equal(disposed, 1)
+  assert.equal(disposed, true)
 })

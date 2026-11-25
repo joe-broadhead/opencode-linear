@@ -15,10 +15,12 @@
 - Bus events `rpc.linear.status` and `rpc.linear.account`. A read emits nothing: the plugin owns no write, and the
   vendor's tools are the changes.
 - Two skills, `linear` and `linear-write`, read from the package's `skills/` folder at setup and registered with
-  `ctx.skill.transform`. The contract's `register` does not load skills, so the plugin registers them itself; a broken
-  file is a `status` problem, not a setup failure. Both skills are always registered, and the `access` rules decide
-  what a change may do. Each description is one quoted line; the loader's folded `>` and literal `|` support is
-  compared with `YAML.parse` in the tests, and the real-host test compares each registered description with the file.
+  `ctx.skill.transform`. The contract's `register` does not load skills, so the plugin reads and registers them itself.
+  The frontmatter is parsed with the `yaml` package, which is bundled into `dist/index.js`; a malformed file throws
+  `SCHEMA_VIOLATION` and fails setup instead of registering a marker. Both skills are always registered, and the
+  `access` rules decide what a change may do. Each description is one quoted line; the tests compare the loader's
+  `>`, `|`, `>-`, `|-`, `>+` and `|+` output with YAML, and the real-host test compares each registered description with
+  the file.
 - Fresh documentation, `AGENTS.md`, and the two skills, with generated sections from the manifest and a conformance
   fixture for two synthetic aliases.
 
