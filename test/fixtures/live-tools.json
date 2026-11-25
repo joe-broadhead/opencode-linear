@@ -1,7 +1,7 @@
 {
   "schema": "opencode-family/live-tools@1",
   "evidence": "live-observed",
-  "note": "Captured by scripts/capture-tools.mjs from the server's own tools/list. Descriptions are public tool metadata, recorded in full. No tool was called. No token, header, account id, server instructions or result text is recorded.",
+  "note": "Captured by scripts/capture-tools.mjs from the server's own tools/list. Descriptions are public tool metadata, recorded in full. No tool was called. No token, header, account id, server instructions or result text is recorded. The `host` field is the OpenCode release this capture was taken under, not a supported-host claim.",
   "listedAt": "2026-11-14",
   "server": "linear",
   "namespace": "linear",
@@ -305,7 +305,7 @@
       "description": {
         "sha256": "1709e33954d109999f874c793ca15534e035ab8f11461ac1d7e2a5d26fbb4ee2",
         "length": 213,
-        "text": "Delete a Linear comment. Inline description comments (those with non-null `quotedText`) anchor a mark in the editor, so their root cannot be deleted — delete the replies individually or resolve the thread instead."
+        "text": "Delete a Linear comment. Inline description comments (those with non-null `quotedText`) anchor a mark in the editor, so their root cannot be deleted \u2014 delete the replies individually or resolve the thread instead."
       }
     },
     {
@@ -3282,7 +3282,7 @@
           },
           "body": {
             "type": "string",
-            "description": "Content as Markdown. Do not escape the string — use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe). To embed an image or file, upload it with prepare_file_upload and insert the returned markdown"
+            "description": "Content as Markdown. Do not escape the string \u2014 use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe). To embed an image or file, upload it with prepare_file_upload and insert the returned markdown"
           }
         },
         "required": [
@@ -3293,7 +3293,7 @@
       "description": {
         "sha256": "c395d209505c6eb6fee6e8445b830ae970feb8d617b748a3a89b09f6f261971d",
         "length": 1717,
-        "text": "Create or update a comment on a Linear issue, project, initiative, document, project milestone, or project/initiative status update. If `id` is provided, updates the existing comment; otherwise creates a new one. To start a new thread, pass `body` and exactly one of `issueId`, `projectId`, `initiativeId`, `documentId`, `milestoneId`, or `statusUpdateId` (`statusUpdateType` applies only to `statusUpdateId`; omit it for every other parent) — comments on issues/projects/initiatives become top-level discussion threads; comments on documents/milestones become description comments. A status update holds a single thread, so a comment on an update that already has one is added to it as a reply. To reply to an existing thread, pass `parentId` and `body`; the reply inherits the parent's thread type, so no entity reference is needed. Parent reference fields are ignored when `id` or `parentId` is provided (`statusUpdateType` is rejected instead). A new top-level comment starts a separate Linear thread and is not posted to a synced external thread. To post in a thread synced with Jira, Slack, or another service (for example, when asked to comment on the Jira thread), call `list_comments` on the issue, project, initiative, or status update that owns the thread. For project or initiative status updates, use `statusUpdateId`. Find the root comment (null `parentId`) whose body says the thread is synced with that service, and pass that root's `id` as `parentId`. When several threads match, such as an issue synced with more than one Jira issue, choose by the external link in the root's body. If no matching synced thread exists, do not post a top-level comment instead; report that no synced thread was found."
+        "text": "Create or update a comment on a Linear issue, project, initiative, document, project milestone, or project/initiative status update. If `id` is provided, updates the existing comment; otherwise creates a new one. To start a new thread, pass `body` and exactly one of `issueId`, `projectId`, `initiativeId`, `documentId`, `milestoneId`, or `statusUpdateId` (`statusUpdateType` applies only to `statusUpdateId`; omit it for every other parent) \u2014 comments on issues/projects/initiatives become top-level discussion threads; comments on documents/milestones become description comments. A status update holds a single thread, so a comment on an update that already has one is added to it as a reply. To reply to an existing thread, pass `parentId` and `body`; the reply inherits the parent's thread type, so no entity reference is needed. Parent reference fields are ignored when `id` or `parentId` is provided (`statusUpdateType` is rejected instead). A new top-level comment starts a separate Linear thread and is not posted to a synced external thread. To post in a thread synced with Jira, Slack, or another service (for example, when asked to comment on the Jira thread), call `list_comments` on the issue, project, initiative, or status update that owns the thread. For project or initiative status updates, use `statusUpdateId`. Find the root comment (null `parentId`) whose body says the thread is synced with that service, and pass that root's `id` as `parentId`. When several threads match, such as an issue synced with more than one Jira issue, choose by the external link in the root's body. If no matching synced thread exists, do not post a top-level comment instead; report that no synced thread was found."
       }
     },
     {
@@ -3338,7 +3338,7 @@
           "body": {
             "type": "string",
             "minLength": 1,
-            "description": "Content as Markdown. Do not escape the string — use literal newlines and special characters, not escape sequences. To embed an image or file, upload it with prepare_file_upload and insert the returned markdown"
+            "description": "Content as Markdown. Do not escape the string \u2014 use literal newlines and special characters, not escape sequences. To embed an image or file, upload it with prepare_file_upload and insert the returned markdown"
           },
           "anchor": {
             "description": "Optional comment anchor copied from a diff thread or built for a file or diff hunk",
@@ -3390,7 +3390,7 @@
             "type": "string"
           },
           "content": {
-            "description": "Content as Markdown. Do not escape the string — use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe). To embed an image or file, upload it with prepare_file_upload and insert the returned markdown",
+            "description": "Content as Markdown. Do not escape the string \u2014 use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe). To embed an image or file, upload it with prepare_file_upload and insert the returned markdown",
             "type": "string"
           },
           "patch": {
@@ -3610,7 +3610,7 @@
             "type": "string"
           },
           "description": {
-            "description": "Content as Markdown. Do not escape the string — use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe)",
+            "description": "Content as Markdown. Do not escape the string \u2014 use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe)",
             "type": "string"
           },
           "patch": {
@@ -3915,7 +3915,7 @@
             "type": "string"
           },
           "description": {
-            "description": "Content as Markdown. Do not escape the string — use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe)",
+            "description": "Content as Markdown. Do not escape the string \u2014 use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe)",
             "type": "string"
           },
           "patch": {
@@ -4283,7 +4283,7 @@
       "description": {
         "sha256": "4af3f42e32ac83525da22401f623a265fbf09b04152dfc827f14349b73d2b909",
         "length": 301,
-        "text": "Create or update a Linear issue. If `id` is provided, updates the existing issue; otherwise creates a new one. When creating, `team` is required, and `title` is required unless `template` is set. Note: use `assignee` (not `assigneeId`) to set the assignee — it accepts a user ID, name, email, or \"me\"."
+        "text": "Create or update a Linear issue. If `id` is provided, updates the existing issue; otherwise creates a new one. When creating, `team` is required, and `title` is required unless `template` is set. Note: use `assignee` (not `assigneeId`) to set the assignee \u2014 it accepts a user ID, name, email, or \"me\"."
       }
     },
     {
@@ -4448,7 +4448,7 @@
             "type": "string"
           },
           "description": {
-            "description": "Content as Markdown. Do not escape the string — use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe). To embed an image or file, upload it with prepare_file_upload and insert the returned markdown",
+            "description": "Content as Markdown. Do not escape the string \u2014 use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe). To embed an image or file, upload it with prepare_file_upload and insert the returned markdown",
             "type": "string"
           },
           "patch": {
@@ -4933,7 +4933,7 @@
             "type": "string"
           },
           "content": {
-            "description": "Content as Markdown. Do not escape the string — use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe)",
+            "description": "Content as Markdown. Do not escape the string \u2014 use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe)",
             "type": "string"
           },
           "patch": {
@@ -5148,7 +5148,7 @@
             "type": "string"
           },
           "body": {
-            "description": "Content as Markdown. Do not escape the string — use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe). Required on create; replaces the body on update. Omit on update to leave the body unchanged",
+            "description": "Content as Markdown. Do not escape the string \u2014 use literal newlines and special characters, not escape sequences. To mention a user, use @displayName (e.g., @johndoe). Required on create; replaces the body on update. Omit on update to leave the body unchanged",
             "type": "string"
           },
           "health": {
@@ -5284,7 +5284,7 @@
             "description": "Review decision: approved, changesRequested, or commented"
           },
           "body": {
-            "description": "Content as Markdown. Do not escape the string — use literal newlines and special characters, not escape sequences. To embed an image or file, upload it with prepare_file_upload and insert the returned markdown. Required when requesting changes or commenting",
+            "description": "Content as Markdown. Do not escape the string \u2014 use literal newlines and special characters, not escape sequences. To embed an image or file, upload it with prepare_file_upload and insert the returned markdown. Required when requesting changes or commenting",
             "type": "string",
             "minLength": 1
           }

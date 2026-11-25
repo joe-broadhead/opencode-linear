@@ -40,8 +40,8 @@ export function displayUrl(url: string) {
 
 /**
  * Registers `linear`, or adopts the user's own `mcp.servers.linear` unchanged when it points at Linear's server: user
- * config is applied first, and a later `set` would replace it. Any other URL, Linear's read-only server included, is a
- * conflict, and nothing is added. Synchronous and never throws.
+ * config is applied first, and a later `set` would replace it. Any other URL is a conflict, and nothing is added.
+ * Synchronous and never throws.
  */
 export function registerServer(
   mcp: Pick<Plugin.Context["mcp"], "transform">,
@@ -82,13 +82,12 @@ export function createLinearPlugin(seam: LinearSeam) {
         report("server")(problem)
       })
       // Code Mode's catalog describes the server's namespace with this text.
-      await ctx.tool.transform((editor) => editor.namespace({ name: SERVER_NAME, description: NAMESPACE_DESCRIPTION[options.access] }))
+      await ctx.tool.transform((editor) => editor.namespace({ name: SERVER_NAME, description: NAMESPACE_DESCRIPTION }))
       await registerDefaultRules(ctx.agent, defaultRules(options.access), report("rules"))
       const read = () =>
         readStatus(ctx, {
           ...(source ? { source } : {}),
           access: options.access,
-          ...(options.deprecation ? { deprecation: options.deprecation } : {}),
           host,
           problems: [...problems.values()],
         })

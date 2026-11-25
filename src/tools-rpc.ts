@@ -11,10 +11,10 @@
  * `linear_<tool>` against the same rules and sends OpenCode's own credential; `issues`, `events_list` and `probe` run
  * their own specs. `docs/scripting.md` describes the calls.
  */
-import type { Failure, McpResult, MethodSpec, NextSteps, ShapeCall, ToolsRpcPlugin } from "@we-the-rebel-alliance/source-contract/tools-rpc"
+import type { Failure, MethodSpec, NextSteps, ToolsRpcPlugin } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 import { toolsRpcId } from "@we-the-rebel-alliance/source-contract/tools-rpc"
 import { PLUGIN_ID as LINEAR_PLUGIN_ID, SERVER_NAME } from "./constants.js"
-import { READ_TOOLS, WRITE_TOOLS } from "./linear-tools.js"
+import { DESTRUCTIVE_TOOLS, READ_TOOLS, WRITE_TOOLS } from "./linear-tools.js"
 
 /** The plugin's id. The RPC id is `<PLUGIN_ID>.tools`. */
 export const PLUGIN_ID = LINEAR_PLUGIN_ID
@@ -23,25 +23,15 @@ export const PLUGIN_ID = LINEAR_PLUGIN_ID
 export const TOOLS_RPC_ID = toolsRpcId(PLUGIN_ID)
 
 /**
- * Every known Linear tool, by its upstream name and with its class: the 41 reads as `read` and the 36 writes as
- * `write`. The class is what `describe` reports and what an approval shows; the rules, not the class, decide whether a
- * call runs. A tool Linear adds later is not a method. The plugin's own `issues`, `events_list` and `probe` are
- * `kind: "plugin"` methods, built in setup.
+ * Every known Linear tool, by its upstream name and with its class: the 41 reads as `read`, the five changes that
+ * cannot be undone as `destructive`, and the other 32 changes as `write`. The class is what `describe` reports and
+ * what an approval shows; the rules, not the class, decide whether a call runs. A tool Linear adds later is not a
+ * method. The plugin's own `issues`, `events_list` and `probe` are `kind: "plugin"` methods, built in setup.
  */
 export const METHODS: readonly MethodSpec[] = [
   ...READ_TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: "read" })),
-  ...WRITE_TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: "write" })),
+  ...WRITE_TOOLS.map((name): MethodSpec => ({ kind: "mcp", name, class: DESTRUCTIVE_TOOLS.includes(name) ? "destructive" : "write" })),
 ]
-
-/** What the model path's `execute.before` hooks do to an MCP call's arguments, which the executor skips. Linear has none. */
-export function shapeInput(_method: string, input: unknown, _call: ShapeCall): unknown {
-  return input
-}
-
-/** What the model path's `execute.after` hooks do to a result, which the executor skips. Linear has no such hook. */
-export function shapeResult(_method: string, result: McpResult, _call: ShapeCall): McpResult {
-  return result
-}
 
 /** The next step for each code. Each is one sentence that ends with a full stop. */
 export const NEXT_STEPS: NextSteps = {
@@ -69,5 +59,5 @@ export function pluginError(error: unknown): Failure | undefined {
   return typeof code === "string" && typeof detail === "string" && typeof nextStep === "string" ? { code, what: detail, next: nextStep } : undefined
 }
 
-/** Linear's plugin value for the tools RPC. */
-export const PLUGIN: ToolsRpcPlugin = { id: PLUGIN_ID, nextSteps: NEXT_STEPS, shapeInput, shapeResult, pluginError }
+/** Linear's plugin value for the tools RPC. It shapes no call and maps only its own errors. */
+export const PLUGIN: ToolsRpcPlugin = { id: PLUGIN_ID, nextSteps: NEXT_STEPS, pluginError }

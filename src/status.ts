@@ -25,7 +25,6 @@ export interface StatusFacts {
   readonly source?: ServerSource
   readonly account?: string
   readonly access: Access
-  readonly deprecation?: string
   readonly host: HostCheck
   /** The names of the tools the `linear` server serves, without the `linear_` prefix. */
   readonly tools?: readonly string[]
@@ -45,8 +44,6 @@ export interface Status {
   readonly error?: string
   readonly account?: string
   readonly access: Access
-  /** Present when the deprecated `read` or `write` value set the access: what to write instead. */
-  readonly deprecation?: string
   readonly source?: ServerSource
   /** How many Linear tools OpenCode lists. */
   readonly tools: number
@@ -76,7 +73,7 @@ const AGENTS_NEXT_STEP =
 
 const NOTHING_TO_DO = "Nothing to do."
 
-const TESTED_TEXT = `${TESTED_HOSTS.slice(0, -1).join(", ")} or ${TESTED_HOSTS.at(-1)}`
+const TESTED_TEXT = TESTED_HOSTS.length === 1 ? TESTED_HOSTS[0]! : `${TESTED_HOSTS.slice(0, -1).join(", ")} or ${TESTED_HOSTS.at(-1)}`
 const LISTED_UNKNOWN = 20
 // A tool name comes from the server; list only plain names.
 const SAFE_NAME = /^[a-z][a-z0-9_]{0,63}$/
@@ -108,7 +105,6 @@ export function buildStatus(facts: StatusFacts): Status {
     ...(error ? { error } : {}),
     ...(facts.account ? { account: facts.account } : {}),
     access: facts.access,
-    ...(facts.deprecation ? { deprecation: facts.deprecation } : {}),
     ...(facts.source ? { source: facts.source } : {}),
     tools: facts.tools?.length ?? 0,
     unknownCount: unknown.length,
@@ -158,7 +154,7 @@ const STATE_TEXT: Record<State, string> = {
 const ACCESS_TEXT: Record<Access, string> = {
   all: "every tool runs without asking, reads, changes and new tools included",
   "ask-changes": "reads run without asking; every change and every new tool asks first",
-  "read-only": "read-only (Linear's read-only server; changes are not available)",
+  "read-only": "read-only (every change is denied)",
 }
 
 /** The server's address and owner, after the state label. */
@@ -194,7 +190,7 @@ export function formatStatus(status: Status) {
     "Linear status",
     `- Connection: ${STATE_TEXT[status.state]}${details ? ` (${details})` : ""}`,
     `- Account: ${status.account ?? "account name not reported by Linear's MCP"}`,
-    `- Access: ${ACCESS_TEXT[status.access]}${status.deprecation ? ` (${status.deprecation})` : ""}`,
+    `- Access: ${ACCESS_TEXT[status.access]}`,
     `- Tools: ${toolsText(status)}`,
     `- Agents without default rules: ${agents.length ? `${agents.join(", ")}\n${agentRulesText(status.access)}` : "none"}`,
     `- OpenCode: ${hostText(status)}`,
@@ -210,7 +206,7 @@ export interface StatusContext {
 }
 
 /** Reads the live facts through public host APIs. Optional lookups that fail leave their field empty. */
-export async function readStatus(ctx: StatusContext, facts: Pick<StatusFacts, "source" | "access" | "deprecation" | "host" | "problems">) {
+export async function readStatus(ctx: StatusContext, facts: Pick<StatusFacts, "source" | "access" | "host" | "problems">) {
   const [servers, agents, tools] = await Promise.all([ctx.mcp.list(), ctx.agent.list(), ctx.tool.list()])
   const server = servers.data.find((entry) => entry.name === SERVER_NAME)
   const connection = server?.integrationID ? await ctx.integration.connection.active(server.integrationID).catch(() => undefined) : undefined
@@ -236,8 +232,8 @@ const strings = { type: "array", items: { type: "string" } }
 const count = { type: "integer", minimum: 0 }
 
 /**
- * One read-only method for the TUI view and scripts. The TUI part does not receive the plugin options on 2.2 or 2.3, and
- * cannot see the server's own findings, so it asks the server for the same status /linear-status reports.
+ * One read-only method for the TUI view and scripts. The TUI part receives no plugin options on 2.4.1, and cannot see
+ * the server's own findings, so it asks the server for the same status /linear-status reports.
  */
 export const StatusRpc = {
   id: PLUGIN_ID,
@@ -253,7 +249,6 @@ export const StatusRpc = {
           error: { type: "string" },
           account: { type: "string" },
           access: { enum: [...ACCESS_VALUES] },
-          deprecation: { type: "string" },
           source: {
             type: "object",
             required: ["type", "url"],

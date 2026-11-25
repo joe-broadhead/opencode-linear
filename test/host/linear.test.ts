@@ -392,16 +392,9 @@ describe(`access on OpenCode ${HOST_VERSION}`, () => {
     })
   }
 
-  // The deprecated values are the same switch, with a note in status.
-  test("the deprecated read and write values map onto access, and status says so", async () => {
-    const host = await startHost({ options: { access: "read" } })
-    try {
-      const { data } = await host.client.rpc.call({ rpcID: "linear.workspace", method: "status", input: {}, location: host.location }).then((result) => ({ data: result.output as Record<string, unknown> }))
-      expect(data).toMatchObject({ access: "read-only" })
-      expect(String(data.deprecation)).toContain('The access value "read" is deprecated: it means "read-only".')
-    } finally {
-      await host.close()
-    }
+  // The removed values are not accepted: the plugin refuses with the values it takes.
+  test("the removed read and write values are refused, and the plugin does not start", async () => {
+    await expect(startHost({ options: { access: "read" } })).rejects.toThrow(/OPTIONS_INVALID: The option "access" must be "all" \(the default\), "ask-changes" or "read-only", found "read"/)
   })
 })
 

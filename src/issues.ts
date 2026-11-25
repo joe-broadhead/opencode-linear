@@ -7,10 +7,9 @@ import type { Status } from "./status.js"
 
 /**
  * `linear_issues`: your assigned issues as a table, one row each, read through the host's own `linear_list_issues`
- * executor so that read's permission rules apply and the plugin holds no credential. The answer is shaped as Jelly's
- * `table` result template (at most 8 columns, 100 rows, 200 characters a cell), so Jelly draws it natively, and it
- * is a direct tool: Jelly sees a direct call's result, not one made inside Code Mode. The model reads the same rows
- * as text, with a line that says when Linear has more.
+ * executor so that read's permission rules apply and the plugin holds no credential. It runs in Code Mode as
+ * `tools.linear.issues`, with at most 8 columns and 200 characters a cell. The model reads the same rows as text, with
+ * a line that says when Linear has more.
  */
 
 export const ISSUES_TOOL = "issues"
@@ -72,7 +71,7 @@ export function issueRows(output: unknown): { rows: IssueRow[]; more: boolean } 
   return { rows, more: isRecord(output) && output["hasNextPage"] === true }
 }
 
-/** What the model reads: one line per row, and whether this is all of them. Jelly draws the structured output. */
+/** What the model reads: one line per row, and whether this is all of them. The structured output is the table. */
 function issuesText(rows: readonly IssueRow[], more: boolean) {
   const lines = rows.map((row) => [row.identifier, row.title, row.state ?? "no state", row.priority ?? "no priority", row.url ?? "no link"].join(" | "))
   const tail = more
@@ -168,7 +167,7 @@ export function issuesTool({ tool, owned, status }: IssuesToolOptions) {
       required: ["columns", "rows"],
       properties: { columns: { type: "array" }, rows: { type: "array", maxItems: MAX_LIMIT } },
     },
-    options: { namespace: SERVER_NAME, codemode: false },
+    options: { namespace: SERVER_NAME },
     // A JSON Schema input arrives unchecked by type, so the limit is read here.
     execute: async (input: unknown, context: Context) => {
       const asked = isRecord(input) && typeof input["limit"] === "number" && Number.isFinite(input["limit"]) ? input["limit"] : DEFAULT_LIMIT
@@ -185,7 +184,7 @@ export function issuesTool({ tool, owned, status }: IssuesToolOptions) {
 
 /**
  * `linear_issues` as a tools RPC method, `issues`: the tool's own spec, so the same table and the same read through the
- * host's `list_issues` executor. It is a direct-only read, as on the model path.
+ * host's `list_issues` executor.
  */
 /** The registry's `list` output, as a consumer validates it. */
 const LIST_DATA = {
@@ -229,7 +228,6 @@ export function issuesMethod(options: IssuesToolOptions): PluginMethod {
   return {
     kind: "plugin",
     class: "read",
-    directOnly: true,
     name: ISSUES_TOOL,
     action: `${SERVER_NAME}_${ISSUES_TOOL}`,
     description: tool.description,

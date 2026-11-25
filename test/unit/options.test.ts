@@ -12,9 +12,10 @@ describe("parseOptions", () => {
     expect(parseOptions({ access: "read-only", allowUntestedHost: true })).toEqual({ access: "read-only", allowUntestedHost: true })
   })
 
-  test("maps the deprecated values onto the family's, and keeps the sign-in", () => {
-    expect(parseOptions({ access: "read" })).toMatchObject({ access: "read-only", deprecation: 'The access value "read" is deprecated: it means "read-only". Set "read-only".' })
-    expect(parseOptions({ access: "write" })).toMatchObject({ access: "all" })
+  test("refuses the removed read and write values, with the values it takes", () => {
+    for (const access of ["read", "write"]) {
+      expect(() => parseOptions({ access })).toThrow(`The option "access" must be "all" (the default), "ask-changes" or "read-only", found "${access}"`)
+    }
   })
 
   test.each(["constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"])("refuses %j, an inherited name and not an access value", (access) => {
@@ -39,6 +40,9 @@ describe("parseOptions", () => {
       expect(code).toBe("OPTIONS_INVALID")
       expect(message.startsWith("OPTIONS_INVALID: ")).toBe(true)
       expect(nextStep).toContain(`"options": { "access": "read-only" }`)
+      // A release-tag placeholder, never a concrete tag: the only released tag is the pre-transfer one.
+      expect(nextStep).toContain("linear-plugin#v<version>")
+      expect(nextStep).not.toMatch(/linear-plugin#v\d/)
       expect(message.endsWith(`. Next step: ${nextStep}`)).toBe(true)
       expect(nextStep.endsWith(".")).toBe(true)
     }

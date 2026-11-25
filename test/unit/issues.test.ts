@@ -41,7 +41,7 @@ function host(answer: unknown, options: { readonly identity?: "fail" } = {}) {
   return { tool: { list }, calls, reads }
 }
 
-const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "all", host: checkHost("2.2.3", false) }
+const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "all", host: checkHost("2.4.1", false) }
 const status = (more: Partial<StatusFacts> = {}) => async () => buildStatus({ ...facts, ...more })
 const owned = () => true
 const SIGN_IN = "Run /connect and choose Linear, then press o or Enter to open the link (in a terminal, opencode mcp auth linear opens it automatically)."
@@ -140,14 +140,14 @@ describe("linear.issues list rules", () => {
 })
 
 describe("linear_issues", () => {
-  test("asks Linear only for the fields the table shows, and answers Jelly's table from Linear's live shape", async () => {
+  test("asks Linear only for the fields the table shows, and answers the table from Linear's live shape", async () => {
     const { tool, calls } = host({
       issues: [issue(1), issue(2, { status: "Todo", priority: { value: 0, name: "No priority" }, url: "http://insecure" }), { title: "No id, skipped" }],
       hasNextPage: false,
     })
     const result = await issuesTool({ tool, owned, status: status() }).execute({ limit: 10 }, context)
     expect(calls).toEqual([{ assignee: "me", limit: 10, fields: ["id", "title", "status", "priority", "url"] }])
-    // Jelly's table template is strict: exactly these two keys, at most 8 columns.
+    // The table is strict: exactly these two keys, at most 8 columns.
     expect(Object.keys(result.output)).toEqual(["columns", "rows"])
     expect(result.output.columns).toEqual([
       { key: "identifier", label: "Issue" },
@@ -226,11 +226,11 @@ describe("linear_issues", () => {
     }
   })
 
-  test("cuts a long cell to Jelly's 200 characters", () => {
+  test("cuts a long cell to 200 characters", () => {
     expect(issueRows({ issues: [issue(3, { title: "t".repeat(400) })] }).rows[0]?.title.length).toBe(200)
   })
 
-  test("is a direct tool in the linear namespace, and runs without asking like Linear's reads", async () => {
+  test("is a Code Mode tool in the linear namespace, and runs without asking like Linear's reads", async () => {
     const added: { name: string; options: unknown; description: string }[] = []
     await registerIssuesTool({
       tool: {
@@ -243,7 +243,7 @@ describe("linear_issues", () => {
       owned,
       status: status(),
     })
-    expect(added.map((tool) => [tool.name, tool.options])).toEqual([["issues", { namespace: "linear", codemode: false }]])
+    expect(added.map((tool) => [tool.name, tool.options])).toEqual([["issues", { namespace: "linear" }]])
     // Its description says it is a sample, and where totals and filters come from.
     expect(added[0]!.description).toMatch(/not a count: every state .* most recently updated first, 25 rows by default and at most 100/)
     expect(added[0]!.description).toContain('use list_issues with assignee "me" and page until hasNextPage is false')

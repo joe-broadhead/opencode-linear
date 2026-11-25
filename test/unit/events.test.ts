@@ -1,4 +1,4 @@
-// linear_events_list, Memory's source of Linear events, and probe, against a synthetic Linear: the source contract's
+// linear_events_list, the collector's source of Linear events, and probe, against a synthetic Linear: the source contract's
 // events checks through the tool and through the tools RPC method, the events an issue change and a notification make,
 // the paged reads, the account a listing names, and the refusals. Every name, issue and id below is invented.
 import { describe, expect, test } from "bun:test"
@@ -31,7 +31,7 @@ import { PLUGIN } from "../../src/tools-rpc.js"
 
 const NOW = Date.parse("2026-11-08T12:00:00Z")
 const SINCE = "2026-11-01T00:00:00Z"
-/** This package, whose `sources` declaration the kind below is read from, as Memory reads it. */
+/** This package, whose `sources` declaration the kind below is read from, as a consumer reads it. */
 const ROOT = fileURLToPath(new URL("../..", import.meta.url))
 const ME = "4f1c2e9a-0000-4000-8000-000000000001"
 const AMA = "4f1c2e9a-0000-4000-8000-000000000002"
@@ -143,7 +143,7 @@ const replacing = (host: ReturnType<typeof linear>, id: string, execute: (origin
   list: async () => ((await (host.tool.list as unknown as () => Promise<Executor[]>)()).map((entry) => (entry.id === id ? { ...entry, execute: (input: Record<string, unknown>) => execute(entry.execute, input) } : entry))) as never,
 })
 
-const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "read-only", host: checkHost("2.2.3", false) }
+const facts: StatusFacts = { server: { status: "connected" }, source: { type: "plugin", url: "https://mcp.linear.app/mcp" }, access: "read-only", host: checkHost("2.4.1", false) }
 const status = async () => buildStatus(facts)
 const context = { sessionID: "ses_1", agent: "build", messageID: "msg_1", id: "call_1", signal: new AbortController().signal } as never
 
@@ -419,7 +419,7 @@ describe("linear_events_list", () => {
     const first = await run(linear(data))({ since: SINCE, limit: 2 })
     expect(first.refused).toEqual([expect.objectContaining({ external_id: "ENG-2@2026-11-02T09:00:00.000Z", reason: "secret" })])
     expect(first.events.map((event: { external_id: string }) => event.external_id)).toEqual(LISTED.slice(1, 3))
-    expect(first).toMatchObject({ plugin: "@joe-broadhead/opencode-linear", asOf: new Date(NOW).toISOString() })
+    expect(first).toMatchObject({ plugin: "@we-the-rebel-alliance/linear-plugin", asOf: new Date(NOW).toISOString() })
     const rest = await run(linear(data))({ cursor: first.cursor, limit: 500 })
     expect(rest.events.map((event: { external_id: string }) => event.external_id)).toEqual(LISTED.slice(3))
   })
@@ -456,7 +456,7 @@ describe("linear_events_list", () => {
       expect(listing, `no listing in this test runs ${item.tool} for ${item.id}`).toBeDefined()
       const events = (await listing!()).flatMap((page) => page.events)
       listed.set(item.id, events)
-      // Memory confirms one kind per source and refuses every event of another: an event listed as a kind its source does
+      // A consumer confirms one kind per source and refuses every event of another: an event listed as a kind its source does
       // not read would be refused on ingest, and the cursor would move past it.
       expect([...new Set<string>(events.map((event) => event.kind))], `${item.id} declares reads: ${item.reads}`).toEqual([item.reads])
     }

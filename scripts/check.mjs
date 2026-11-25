@@ -1,7 +1,7 @@
 // The one local entry point: `npm run check` runs every stage in order and stops at the first failure.
 // `node scripts/check.mjs <stage>...` runs only the named stages, in the order given.
 import { spawnSync } from "node:child_process"
-import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { delimiter, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -23,8 +23,8 @@ const EXPORTS = {
 // dist/ holds one self-contained bundle per entry, and nothing else (scripts/build.mjs).
 const DIST = ["index.js", "tui.js"]
 // The tested OpenCode line. The host provides @opencode/plugin, OpenTUI and Solid, so the package declares no peers.
-const HOST_RANGE = ">=2.2.3 <2.4.0"
-const HOST_DEV_PIN = "2.2.3"
+const HOST_RANGE = ">=2.4.1 <2.5.0"
+const HOST_DEV_PIN = "2.4.1"
 const ABSENT_FIELDS = ["dependencies", "optionalDependencies", "bundleDependencies", "bundledDependencies", "peerDependencies", "peerDependenciesMeta", "engines", "overrides"]
 const LIFECYCLE_SCRIPTS = ["preinstall", "install", "postinstall", "preprepare", "prepare", "postprepare", "prepublish", "prepublishOnly", "prepack", "postpack", "publish", "postpublish"]
 
@@ -34,6 +34,8 @@ const stages = {
   // The source contract's conformance kit over the declared source, on recorded invented Linear answers; it writes
   // reports/conformance-report.json for a release to attach.
   conformance: () => run("bun", ["test", "./test/conformance"]),
+  // The copied release kit's suite. It is pre-4a: its release planner still requires the old three-runner matrix (see
+  // CONTRIBUTING, Releasing), and the copy stays until plugin-kit replaces it. No test is skipped.
   kit: () => run("node", ["--test", "scripts/release-kit.test.mjs"]),
   build: () => run("node", ["scripts/build.mjs"]),
   icons: () => run("node", ["scripts/check-icons.mjs"]),
@@ -73,41 +75,21 @@ function run(command, args, options = {}) {
 }
 
 /**
- * The host suite on each tested release: the locked @opencode/sdk for HOST_DEV_PIN, and the others installed from npm
- * into a temp folder under the system's /tmp, outside the lockfile, once per run. HOST_SDK_DIR runs only that SDK.
+ * The host suite on the locked @opencode/sdk, which is the one tested release.
  */
 function host() {
-  if (process.env.HOST_SDK_DIR) return run("bun", ["test", "./test/host"])
-  for (const version of TESTED_HOSTS) {
-    console.log(`\n[check] host on @opencode/sdk ${version}`)
-    if (version === HOST_DEV_PIN) {
-      const code = run("bun", ["test", "./test/host"])
-      if (code !== 0) return code
-      continue
-    }
-    const dir = mkdtempSync(join(realpathSync("/tmp"), `linear-sdk-${version}-`))
-    try {
-      // Its own package.json, so npm never walks up to another one.
-      writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "linear-host-sdk", private: true }))
-      const code = run("npm", ["install", `@opencode/sdk@${version}`, "--ignore-scripts", "--no-audit", "--no-fund", "--prefer-offline"], { cwd: dir })
-        || run("bun", ["test", "./test/host"], { env: { HOST_SDK_DIR: dir } })
-      if (code !== 0) return code
-    } finally {
-      rmSync(dir, { recursive: true, force: true })
-    }
-  }
-  return 0
+  return run("bun", ["test", "./test/host"])
 }
 
 /**
  * The workflows are parsed as workflows, not as YAML: `actionlint` catches a `${{ }}` that only exists in some
- * contexts, which makes GitHub reject the whole file and run nothing. CI runs it in its own job; here it runs when the
- * tool is on PATH.
+ * contexts, which makes GitHub reject the whole file and run nothing. CI runs it as a step in the one `ci` job; here it
+ * runs when the tool is on PATH.
  */
 function actionlint() {
   const probe = spawnSync("actionlint", ["-version"], { encoding: "utf8" })
   if (probe.error?.code === "ENOENT") {
-    console.log("actionlint is not on PATH, so the workflow check is skipped here; CI runs it in its own job.")
+    console.log("actionlint is not on PATH, so the workflow check is skipped here; CI runs it as a step in the one `ci` job.")
     return 0
   }
   return run("actionlint", ["-color"])
@@ -121,6 +103,7 @@ function whitelist() {
   for (const field of ABSENT_FIELDS) if (field in pkg) problems.push(`Remove "${field}": the package ships no runtime dependencies, no host peers and no engine pins.`)
   for (const script of LIFECYCLE_SCRIPTS) if (pkg.scripts?.[script] !== undefined) problems.push(`Remove the "${script}" script: OpenCode installs with lifecycle scripts disabled.`)
   if (pkg.opencode?.host !== HOST_RANGE) problems.push(`"opencode.host" must be "${HOST_RANGE}", the tested OpenCode line.`)
+  if (TESTED_HOSTS.length !== 1 || TESTED_HOSTS[0] !== HOST_DEV_PIN) problems.push(`TESTED_HOSTS must be exactly ${JSON.stringify([HOST_DEV_PIN])}, the one tested release.`)
   for (const name of ["@opencode/client", "@opencode/plugin", "@opencode/sdk"]) {
     if (pkg.devDependencies?.[name] !== HOST_DEV_PIN) problems.push(`devDependency "${name}" must be exactly ${HOST_DEV_PIN}, the tested host.`)
   }

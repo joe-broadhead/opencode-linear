@@ -10,11 +10,10 @@ import {
   upstreamText,
   type MethodSpec,
   type PluginMethod,
-  type ShapeCall,
   type ToolCall,
   type ToolsRpcOptions,
 } from "@we-the-rebel-alliance/source-contract/tools-rpc"
-import { METHODS, NEXT_STEPS, PLUGIN, PLUGIN_ID, pluginError, shapeInput, shapeResult, TOOLS_RPC_ID } from "../../src/tools-rpc.js"
+import { METHODS, NEXT_STEPS, PLUGIN, PLUGIN_ID, pluginError, TOOLS_RPC_ID } from "../../src/tools-rpc.js"
 
 type Effect = "allow" | "deny" | "ask"
 type Rule = { action: string; resource: string; effect: Effect }
@@ -71,7 +70,7 @@ interface Setup {
   /** Test-only: false disables the MCP-only next-step shim below, to prove registration still requires them. */
   shim?: boolean
   lookup?: (sessionID: string) => Promise<unknown>
-  /** A host that reports a missing agent as a plain Error, as stock 2.2.3 to 2.2.7 and 2.3.0 do. */
+  /** A host that reports a missing agent as a plain Error. */
   plainAgentError?: boolean
   unavailableDetail?: NonNullable<ToolsRpcOptions["mcp"]>["unavailableDetail"]
   notRegistered?: NonNullable<ToolsRpcOptions["mcp"]>["notRegistered"]
@@ -410,8 +409,7 @@ describe("a script's call", () => {
   test("runs the host executor as the session's agent, with a call id of its own, and returns {output, text}", async () => {
     const h = await setup()
     const output = await call(h, READ, { query: "hello" })
-    const shaped = shapeResult(READ, { output: { echoed: { query: "hello" } }, text: "line one\nline two" }, { sessionID: "ses_1", agent: "build", action: ID })
-    expect(output).toEqual(JSON.parse(JSON.stringify(shaped)))
+    expect(output).toEqual({ output: { echoed: { query: "hello" } }, text: "line one\nline two" })
     expect(h.calls).toHaveLength(1)
     expect(h.calls[0]).toMatchObject({ tool: ID, input: { query: "hello" }, call: { sessionID: "ses_1", agent: "build", messageID: expect.any(String), id: expect.stringMatching(/^script:/) } })
     expect(h.evaluations).toEqual([expect.objectContaining({ action: ID, effect: "allow" })])
@@ -679,17 +677,17 @@ describe("registration", () => {
 })
 
 describe("Linear's block", () => {
-  test("classifies every known tool: 41 reads and 37 other tools, and leaves unknown tools out", () => {
+  test("classifies every known tool: 41 reads, 32 writes and 5 destructive, and leaves unknown tools out", () => {
     expect(METHODS).toHaveLength(78)
     expect(METHODS.filter((method) => method.class === "read")).toHaveLength(41)
-    expect(METHODS.filter((method) => method.class === "write")).toHaveLength(37)
+    expect(METHODS.filter((method) => method.class === "write")).toHaveLength(32)
+    expect(METHODS.filter((method) => method.class === "destructive")).toHaveLength(5)
     for (const method of METHODS) expect(method.kind).toBe("mcp")
     expect(METHODS.map((method) => method.name)).toContain("save_issue")
     expect(METHODS.map((method) => method.name)).not.toContain("shiny_new_tool")
-    // The shapers are the identity: Linear has no execute.before or execute.after hook.
-    const call: ShapeCall = { sessionID: "s", agent: "a", action: "x" }
-    expect(shapeInput("get_issue", { id: "LIN-1" }, call)).toEqual({ id: "LIN-1" })
-    expect(shapeResult("get_issue", { text: "t" }, call)).toEqual({ text: "t" })
+    // No per-request shaping: the block has no shaper.
+    expect(PLUGIN).not.toHaveProperty("shapeInput")
+    expect(PLUGIN).not.toHaveProperty("shapeResult")
   })
 })
 

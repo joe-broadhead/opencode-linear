@@ -1,6 +1,6 @@
 // One typed code table, and the docs that must match it exactly. A code that is thrown or returned anywhere must be
-// in the table, and the README's Troubleshooting table, the configuration guide's Errors table and the scripting doc's
-// refusal table must not drift from it in either direction.
+// in the table, and the configuration guide's Errors table and the scripting doc's refusal table must not drift from it
+// in either direction. The README stays short until the full documentation is written.
 import { describe, expect, test } from "bun:test"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -42,7 +42,6 @@ function tableCodes(markdown: string): string[] {
     .flatMap((cell) => [...cell.matchAll(/`([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)`/g)].map((code) => code[1]!))
 }
 
-const TROUBLESHOOTING = /## Troubleshooting([\s\S]*?)## Uninstall/.exec(read("README.md"))?.[1] ?? ""
 const CONFIGURATION_ERRORS = /## Errors([\s\S]*?)## /.exec(read("docs/configuration.md"))?.[1] ?? ""
 const SCRIPTING = read("docs/scripting.md")
 
@@ -61,10 +60,6 @@ describe("codes", () => {
 
   test("no plugin code carries a service prefix", () => {
     for (const code of PLUGIN_CODES) expect(code).not.toStartWith("LINEAR_")
-  })
-
-  test("the README's Troubleshooting table lists exactly the plugin's codes", () => {
-    expect(tableCodes(TROUBLESHOOTING).sort()).toEqual([...PLUGIN_CODES].sort())
   })
 
   test("the configuration guide's Errors table lists exactly the plugin's codes", () => {

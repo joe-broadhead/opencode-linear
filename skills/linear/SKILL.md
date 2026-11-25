@@ -1,19 +1,19 @@
 ---
 name: linear
-description: Read before your first Linear tool call, linear_issues included. Use whenever the user asks about Linear or their Linear work - my issues, what I'm working on, what's in this cycle, a project's progress, an issue's comments, counts by state, a teammate's assignments - or names an identifier such as ENG-123 or a linear.app link. Covers choosing between linear_issues and list_issues, filters, paging, counts and citing links. Not for GitHub or Jira issues.
+description: The user's Linear work: my issues, this cycle, a project's progress, comments, counts by state, a teammate's assignments, or an identifier such as ENG-123. Covers tools.linear.issues versus list_issues, filters, paging and links. Not for GitHub or Jira issues.
 ---
 
-If Linear's tools are absent, run `/connect` and choose Linear, or on Jelly call jelly_connection_request.
+If Linear's tools are absent, run `/connect` and choose Linear.
 
 # Linear
 
 Linear's tools are `linear_<tool>`, or `tools.linear.<tool>(input)` in Code Mode, where `search` with namespace
-`linear` shows each signature. `linear_issues` is the plugin's own and is always a direct tool. Linear's schemas are
+`linear` shows each signature. `tools.linear.issues` is the plugin's own read. Linear's schemas are
 the reference for every field; this skill covers the choices they don't explain.
 
 ## Pick the tool
 
-- **A quick look at the user's issues** ("show my issues"): `linear_issues`. It is a sample, not the list: every
+- **A quick look at the user's issues** ("show my issues"): `tools.linear.issues`. It is a sample, not the list: every
   state, done and canceled included, the most recently updated first, 25 rows by default (at most 100). Its last line
   says whether Linear has more. Say the rows are the most recently updated, never give their number as a total, and
   never call a done row open.
@@ -92,11 +92,11 @@ Name each item by its identifier (or a project's name) and give the `url` Linear
 
 ## Scripts
 
-A cron job or shell script can run the same reads with no model through the tools RPC `linear.workspace.tools`;
-writes are never available there. It runs as a session's agent, under its rules, so a script, or a test of one, uses
+An OpenCode automation or a shell script can run the same reads with no model through the tools RPC
+`linear.workspace.tools`; a write runs only where the session's rules allow it. It runs as a session's agent, under its rules, so a script, or a test of one, uses
 a session created for it (`opencode api post /api/session -d '{"title":"…","agent":"build","location":{"directory":"/path/to/project"}}'`, keep `data.id`).
 Never borrow an existing session found through history or a list. Details:
-https://raw.githubusercontent.com/joe-broadhead/opencode-linear/HEAD/docs/scripting.md
+https://github.com/we-the-rebel-alliance/linear-plugin/blob/master/docs/scripting.md
 
 ## When Linear is not available
 

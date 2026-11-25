@@ -36,9 +36,9 @@ describe("skills", () => {
 
   test.each(NAMES)("%s names only Linear tools the plugin knows", (name) => {
     const named = [...read(name).matchAll(/\blinear_([a-z_]+)\b|\btools\.linear\.([a-z_]+)\b/g)].map((match) => (match[1] ?? match[2])!)
-    // The plugin's own linear_issues is a direct tool, never tools.linear.issues in Code Mode.
     expect(named.filter((tool) => ![...READ_TOOLS, ...WRITE_TOOLS, "issues"].includes(tool))).toEqual([])
-    expect(read(name)).not.toContain("tools.linear.issues")
+    // The main skill sends the model to linear_issues in Code Mode, with the rest of the namespace.
+    if (name === "linear") expect(read(name)).toContain("tools.linear.issues")
   })
 
   test("linear sends the user to /linear-status and the sign-in step when Linear is missing", () => {
@@ -50,7 +50,7 @@ describe("skills", () => {
 
   test.each(NAMES)("%s links only to plain files an agent can read, never to a GitHub page", (name) => {
     const links = read(name).match(/https?:\/\/[^\s)>]*[^\s)>.,]/g) ?? []
-    for (const link of links) expect(link).toMatch(/^https:\/\/raw\.githubusercontent\.com\/joe-broadhead\/opencode-linear\/HEAD\//)
+    for (const link of links) expect(link).toMatch(/^https:\/\/github\.com\/we-the-rebel-alliance\/linear-plugin\/blob\/master\//)
   })
 
   test("linear's scripts section creates a session for the script and never borrows one", () => {

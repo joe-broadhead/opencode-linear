@@ -36,7 +36,7 @@ try {
   const init = await request("initialize", {
     protocolVersion: PROTOCOL_VERSION,
     capabilities: {},
-    clientInfo: { name: "opencode-linear-drift-check", version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version },
+    clientInfo: { name: "linear-plugin-drift-check", version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version },
   })
   if (typeof init?.protocolVersion === "string") client.version = init.protocolVersion
   await notify("notifications/initialized")

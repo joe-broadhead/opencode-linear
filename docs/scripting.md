@@ -1,7 +1,7 @@
 # Scripting
 
-A script can call Linear's tools with no model: a cron job, a shell script, or any program that can reach the
-OpenCode server. It uses the tools RPC, `linear.workspace.tools`, through `opencode api` or an OpenCode client. The
+A script can call Linear's tools with no model: an OpenCode automation, a shell script, or any program that can reach
+the OpenCode server. It uses the tools RPC, `linear.workspace.tools`, through `opencode api` or an OpenCode client. The
 call is:
 
 ```sh
@@ -10,25 +10,26 @@ opencode api post /api/rpc/linear.workspace.tools/<method> -H "x-opencode-direct
 
 | Method | Class | The tool |
 | --- | --- | --- |
-| one per known Linear tool, named after it: `list_issues`, `get_issue`, `get_project`, `save_issue`, `save_comment` and the others | `read` or `write` | `linear_<method>`, such as `linear_list_issues` |
-| `issues` | read | `linear_issues`, the plugin's own: your assigned issues as a table, one row each |
-| `events_list` | read | `linear_events_list`, the plugin's own: what changed for you since a cursor, as Memory's events |
+| one per known Linear tool, named after it: `list_issues`, `get_issue`, `get_project`, `save_issue`, `save_comment` and the others | `read`, `write` or `destructive` | `linear_<method>`, such as `linear_list_issues` |
+| `issues` | read | the plugin's own issues read: your assigned issues as a table, one row each |
+| `events_list` | read | `linear_events_list`, the plugin's own: what changed for you since a cursor, as normalised events |
 | `probe` | read | `linear_probe`, the source contract's: who is signed in, `{ source, account, owner, trust }`, and nothing it reads |
 | `describe` | none | none: lists every method with its class, its permission action, whether OpenCode lists its tool now, and its input as JSON Schema; given a session, it also gives each method's `permission` |
 
 The methods are exactly the tools this plugin knows (`METHODS` in `src/tools-rpc.ts`): the 41 reads and the 37
 other tools of `READ_TOOLS` and `WRITE_TOOLS` in `src/linear-tools.ts` (Linear's changes, and `whoami`, which Linear
 marks not read-only), plus the plugin's own `issues`, `events_list` and `probe`, appended at
-registration. A tool Linear adds later is not a method.
+registration. The four deletes and `merge_diff` are `destructive`, so a consumer asks the person before one; the rules
+still decide whether a call runs. A tool Linear adds later is not a method.
 
 Each method runs Linear's own tool with the same input, through OpenCode's own connection and sign-in. The plugin
 never sees the OAuth token. Every `access` value uses Linear's one server, so every method is listed, and a write runs
 under the rules: at `read-only` the default rules deny it before it runs (`PERMISSION_DENIED`).
 
-`issues` runs the plugin's own `linear_issues`, as the model does: it reads through the host's `linear_list_issues`
+`issues` runs the plugin's own issues read, as the model does: it reads through the host's `linear_list_issues`
 executor, so that read's rules apply too. Its input is `{ "limit"?: 1 to 100 }`, 25 by default. It returns
 `{ "columns", "rows" }`: identifier, title, state, priority and link for each issue assigned to you.
-`events_list` is the plugin's own read for Memory's collector. It runs `linear_events_list`'s own spec as the session
+`events_list` is the plugin's own read for a consumer's collector. It runs `linear_events_list`'s own spec as the session
 and its agent: it asserts `linear_events_list`, then reads `list_issues` and `get_notifications` through OpenCode's
 executors, so each read's rules apply. Every call names `account`, `<workspace id>/<email>` as `probe` answers it, which
 must be the one signed in to Linear now. A call needs no `probe` first: after a start of OpenCode or a new sign-in the
@@ -73,9 +74,8 @@ opencode api post /api/session -d '{"title":"triage digest","agent":"build","loc
 ]}'
 ```
 
-A session rule also applies to that session's model turns. Create a session for the script alone. For a grant bound to
-the exact script the user approved, use a Jobs one-off script job: its approval writes the run session's `allow` rules,
-and the user sees the source, the methods and whom each write reaches before it exists.
+A session rule also applies to that session's model turns. Create a session for the script alone, and show the user the
+source, the methods and whom each write reaches before its session exists.
 
 An agent defined only in your config gets no default rules; `/linear-status` names it.
 
@@ -119,7 +119,7 @@ there. The HTTP equivalents are the `location[directory]` query parameter and th
 `location` that answered and a `locationHint`.
 
 A location unloads after OpenCode's idle timeout. If a scheduled script gets `rpc.unavailable` from a location that was
-loaded before, send the call again once: the request loads the location. Jobs keeps its own location loaded.
+loaded before, send the call again once: the request loads the location.
 
 ## Results
 

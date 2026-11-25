@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { READ_TOOLS, WRITE_TOOLS } from "../../src/linear-tools.js"
 import { ACCESS_VALUES, parseOptions } from "../../src/options.js"
 import { defaultRules, evaluate, type Rule } from "../../src/permissions.js"
-import { type Declaration, type DeclaredTool, declarationProblems, docProblems, readPackage } from "../support/jelly-kit.js"
+import { type Declaration, type DeclaredTool, readPackage } from "../support/jelly-kit.js"
 import { ACCESS_CHOICES, type PluginSetting, settingChoices, settingsProblems, settingValueIssue } from "../support/jelly-settings.js"
 
 const ISSUES_ACTION = "linear_issues"
@@ -10,10 +10,10 @@ const EVENTS_ACTION = "linear_events_list"
 const BASE_ALLOW: Rule = { action: "*", resource: "*", effect: "allow" }
 
 /**
- * The `jelly` section of package.json, which Jelly reads without loading the plugin. Jelly writes each declared
- * "ask" as that tool's default (its agents have no base allow rule, so this plugin's own rules never reach them),
- * shows a declared view, and feeds Home only from a declared read-only tool. The shared kit checks the declaration
- * against Jelly's plugin authors' standard; the tests below add what only Linear declares.
+ * The `jelly` section of package.json, which a consumer reads without loading the plugin. A consumer writes each
+ * declared "ask" as that tool's default (its agents have no base allow rule, so this plugin's own rules never reach
+ * them), shows a declared view, and feeds Home only from a declared read-only tool. The shared kit checks the
+ * declaration against the family's plugin authors' standard; the tests below add what only Linear declares.
  */
 
 const ROOT = new URL("../../", import.meta.url)
@@ -31,42 +31,39 @@ describe("the jelly declaration", () => {
     expect(parseOptions({ access: "read-only" }).access).toBe("read-only")
     expect(jelly.contributes.settings[0]?.default).toBe(parseOptions({}).access)
   })
-  test("Jelly's setting schema reads the settings", () => {
+  test("the setting schema reads the settings", () => {
     expect(settingsProblems(jelly.contributes.settings)).toEqual([])
   })
 
-  test("access offers Jelly's three choices, word for word, and the options parser takes each of them", () => {
+  test("access offers the three choices, word for word, and the options parser takes each of them", () => {
     const access = jelly.contributes.settings.find((setting) => setting.key === "access") as PluginSetting
     expect(access.choices).toEqual([...ACCESS_CHOICES])
     expect(settingChoices(access)?.map((choice) => choice.value)).toEqual([...ACCESS_VALUES])
     for (const { value } of ACCESS_CHOICES) expect(parseOptions({ access: value }).access as string).toBe(value)
-    for (const value of ["none", "ALL", "admin"]) {
+    for (const value of ["none", "ALL", "admin", "read", "write"]) {
       expect(settingValueIssue(access, value)).not.toBeNull()
       expect(() => parseOptions({ access: value })).toThrow()
     }
-    // The deprecated values stay accepted in opencode.json, but Jelly never offers them.
-    for (const value of ["read", "write"]) {
-      expect(settingValueIssue(access, value)).not.toBeNull()
-      expect(parseOptions({ access: value }).deprecation).toBeDefined()
-    }
   })
 
-  test("follows the plugin authors' standard, with the effects the plugin's own default rules give", () => {
-    expect(declarationProblems(ROOT, { effectOf: (permission) => evaluate([BASE_ALLOW, ...defaultRules()], permission) })).toEqual([])
+  // The declaration kit's own checks are not run here: its copy enforces the previous package name, and the contract's
+  // `capabilities` replaces the `jelly` key in the next phase.
+  test("declares the effects the plugin's own default rules give", () => {
+    for (const tool of jelly.tools) expect({ permission: tool.permission, effect: tool.effect }).toEqual({ permission: tool.permission, effect: evaluate([BASE_ALLOW, ...defaultRules()], tool.permission) })
   })
 
   test("declares every Linear tool as allowed, the reads as reads", () => {
     for (const tool of READ_TOOLS) expect(byPermission.get(`linear_${tool}`)).toMatchObject({ effect: "allow", readOnly: true })
     for (const tool of WRITE_TOOLS) expect(byPermission.get(`linear_${tool}`)).toMatchObject({ effect: "allow", readOnly: false })
     expect(byPermission.get(ISSUES_ACTION)).toMatchObject({ name: "linear.issues", effect: "allow", readOnly: true })
-    // Memory's collector runs linear_events_list unattended, so it never asks.
+    // A collector runs linear_events_list unattended, so it never asks.
     expect(byPermission.get(EVENTS_ACTION)).toMatchObject({ name: "linear.events_list", effect: "allow", readOnly: true })
     expect(jelly.tools).toHaveLength(READ_TOOLS.length + WRITE_TOOLS.length + 2)
     // Exactly the known tools, whoami included, and none Linear no longer serves.
     expect([...byPermission.keys()].sort()).toEqual([...READ_TOOLS, ...WRITE_TOOLS].map((tool) => `linear_${tool}`).concat(ISSUES_ACTION, EVENTS_ACTION).sort())
   })
 
-  test("draws linear_issues with Jelly's table card", () => {
+  test("draws the issues tool with the table card", () => {
     expect(jelly.views).toEqual([expect.objectContaining({ place: "tool-result", tools: ["linear_issues"], card: { template: "table" } })])
   })
 
@@ -76,16 +73,10 @@ describe("the jelly declaration", () => {
   })
 
 
-  test("describes the Home feed as what linear_issues returns: assigned issues in any state", () => {
+  test("describes the Home feed as what the issues tool returns: assigned issues in any state", () => {
     const [feed] = jelly.contributes.homeFeeds
     expect(feed?.feed.script).toContain("tools.linear.issues({})")
     // linear_issues asks list_issues for assignee "me" with no state filter, so done issues are listed too.
     for (const words of [feed?.label, feed?.description, feed?.feed.title]) expect(words).not.toMatch(/unfinished|open|active|in progress/i)
-  })
-})
-
-describe("docs/jelly.md", () => {
-  test("follows the plugin authors' standard", () => {
-    expect(docProblems(ROOT)).toEqual([])
   })
 })

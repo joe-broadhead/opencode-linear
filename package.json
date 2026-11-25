@@ -1,6 +1,6 @@
 {
-  "name": "@joe-broadhead/opencode-linear",
-  "version": "0.0.9",
+  "name": "@we-the-rebel-alliance/linear-plugin",
+  "version": "0.0.0",
   "private": true,
   "description": "Unofficial OpenCode plugin for Linear: find, read and cite issues, projects and documents through Linear's official MCP server",
   "keywords": [
@@ -12,11 +12,11 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/joe-broadhead/opencode-linear.git"
+    "url": "git+https://github.com/we-the-rebel-alliance/linear-plugin.git"
   },
-  "homepage": "https://github.com/joe-broadhead/opencode-linear#readme",
+  "homepage": "https://github.com/we-the-rebel-alliance/linear-plugin#readme",
   "bugs": {
-    "url": "https://github.com/joe-broadhead/opencode-linear/issues"
+    "url": "https://github.com/we-the-rebel-alliance/linear-plugin/issues"
   },
   "exports": {
     ".": "./dist/index.js",
@@ -36,7 +36,7 @@
     "CHANGELOG.md"
   ],
   "opencode": {
-    "host": ">=2.2.3 <2.4.0",
+    "host": ">=2.4.1 <2.5.0",
     "icons": [
       {
         "src": "assets/icon.svg",
@@ -155,14 +155,15 @@
     "capture": "node scripts/capture-tools.mjs"
   },
   "devDependencies": {
-    "@opencode/client": "2.2.3",
-    "@opencode/plugin": "2.2.3",
-    "@opencode/sdk": "2.2.3",
+    "@opencode/client": "2.4.1",
+    "@opencode/plugin": "2.4.1",
+    "@opencode/sdk": "2.4.1",
     "@opentui/core": "0.8.0",
     "@opentui/solid": "0.8.0",
     "@types/bun": "1.4.4",
     "@types/node": "24.19.2",
     "@we-the-rebel-alliance/source-contract": "github:we-the-rebel-alliance/source-contract#v0.3.0",
+    "effect": "4.1.0",
     "esbuild": "0.28.2",
     "solid-js": "1.9.17",
     "typescript": "5.9.3"
@@ -729,7 +730,7 @@
               "description": "Reads run. Changes never run."
             }
           ],
-          "description": "What Linear's tools may do without asking. Read only uses Linear's read-only server and may require signing in again."
+          "description": "What Linear's tools may do without asking. Every value uses Linear's one server, so changing it keeps the sign-in."
         }
       ]
     }
