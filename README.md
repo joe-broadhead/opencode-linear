@@ -63,9 +63,18 @@ accepts `account: "work"`; with two aliases and no account, a call is refused wi
 
 The rules cover this plugin's own methods and Linear's MCP tools, one alias at a time: a rule for `work` never reaches
 `personal`'s tools. They are inserted after each agent's base allow, and `status` names any agent that lacks them.
+Each of Linear's 78 tools has its own class, and one `mcp:*` write rule comes before them, so a tool Linear renames or
+adds is denied at `read-only` and asks at `ask-changes` instead of reaching OpenCode's base allow-all.
 
 The plugin's own methods are reads. The changes are Linear's MCP tools, which OpenCode runs under the same access
 rules; the plugin never proxies them and holds no credential.
+
+## Skills
+
+The plugin ships two skills and registers them when it starts: `linear`, for finding, reading and citing work, and
+`linear-write`, for a change. OpenCode does not discover a plugin's `skills/` folder on its own, so the plugin adds
+both itself; they are listed with the host's other skills once the plugin loads. A skill that cannot be read is
+reported in `status`, and the rest of the plugin still runs.
 
 ## Options
 
@@ -88,6 +97,7 @@ rules; the plugin never proxies them and holds no credential.
 | `probe` | read | optional | `get_workspace`, `get_user` |
 | `events_list` | read | optional | `get_workspace`, `get_user`, `list_issues`, `get_notifications` |
 | `issues` | read | optional | `list_issues` |
+| `mcp:*` | write | optional | — |
 | `mcp:create_attachment` | write | optional | `create_attachment` |
 | `mcp:create_attachment_from_upload` | write | optional | `create_attachment_from_upload` |
 | `mcp:create_initiative_label` | write | optional | `create_initiative_label` |
@@ -180,7 +190,7 @@ None.
 
 ### Bus events
 
-`rpc.linear.changed`, `rpc.linear.status`, `rpc.linear.account`
+`rpc.linear.status`, `rpc.linear.account`
 <!-- /generated:capabilities -->
 
 ## Errors

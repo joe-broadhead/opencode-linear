@@ -34,8 +34,9 @@ A cursor is bound to its plugin, source and account, and keeps the window it was
 read never list an event before that `since`. Do not share one between accounts: the plugin refuses it with
 `CURSOR_INVALID`.
 
-## Nudges
+## No nudge from a read
 
-`events_list` emits `rpc.linear.changed` after a page that lists at least one change, with `capability:
-"linear.activity"` and the account. An app that listens can re-read the source instead of waiting for its timer; the
-nudge carries no content, and the cursor still decides what is new.
+`events_list` is a read, and the plugin owns no write, so it emits no bus event: there is no `changed` nudge to
+listen for. An app that follows the source reads `events_list` on its own timer; the cursor still decides what is new,
+so a read that lists nothing advances nothing. The plugin emits `rpc.linear.status` once at setup and
+`rpc.linear.account` when an alias needs a sign-in or fails; both carry state, never Linear content.

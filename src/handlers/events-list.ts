@@ -1,12 +1,12 @@
 /**
  * `events_list`: the activity source's one read (contract §7). The input's normalisation and the page's shape come from
  * the contract's `events` module; this handler checks what only the plugin knows (the source's name) and asks the
- * provider. After a page that lists at least one change it nudges every app with `changed`.
+ * provider. A read emits nothing: the plugin owns no write, and the vendor's tools are the changes.
  */
 import { EVENTS_LIST_INPUT_SCHEMA, parseEventsListInput, PAGE_SCHEMA } from "@we-the-rebel-alliance/plugin-contract/events"
 import type { MethodHandler } from "@we-the-rebel-alliance/plugin-contract/register"
 import { refuseInput, refuseSource } from "./shared.ts"
-import { ACTIVITY_SOURCE, SOURCE } from "../provider/client.ts"
+import { SOURCE } from "../provider/client.ts"
 import type { HandlerRuntime } from "./index.ts"
 
 /** `events_list`: one account's issue changes and notifications, oldest first, with a cursor bound to the account. */
@@ -22,7 +22,6 @@ export function eventsListHandler(runtime: HandlerRuntime): MethodHandler {
       if (!parsed.ok) refuseInput(parsed.problems)
       if (parsed.value.source !== undefined && parsed.value.source !== SOURCE) refuseSource(runtime.plugin, parsed.value.source)
       const page = await runtime.provider.page({ account: call.account, request: parsed.value, now: runtime.clock(), call })
-      if (page.events.length > 0) await call.bus.emit("changed", { capability: ACTIVITY_SOURCE, account: call.account, reason: "refresh" })
       return page
     },
   }

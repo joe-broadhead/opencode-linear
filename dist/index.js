@@ -11926,8 +11926,8 @@ function shapes(name, method, item2, handler) {
   }
 }
 var plain32 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-function prepare(manifest2, handlers, accounts, access, agents) {
-  return { name: manifest2.plugin.name, manifest: manifest2, hash: manifestHash(manifest2), entries: methodEntries(manifest2, handlers), accounts, plans: planStore(), access, agents };
+function prepare(manifest2, handlers, accounts, access2, agents) {
+  return { name: manifest2.plugin.name, manifest: manifest2, hash: manifestHash(manifest2), entries: methodEntries(manifest2, handlers), accounts, plans: planStore(), access: access2, agents };
 }
 function checkedInput(entry, raw) {
   if (!plain32(raw)) refuse("INPUT_INVALID", `${entry.name} takes an object as its input`, "Pass the input its schema describes.");
@@ -12298,16 +12298,16 @@ async function register(context, manifest2, handlers, wiring = {}) {
   assertPluginName(name);
   const options = context.options ?? {};
   const accounts = accountsFor(manifest2, options);
-  const access = await applyAccess(context, { manifest: manifest2, options });
-  if (access.problems.length > 0) {
-    await access.dispose();
-    throw new Error(access.problems.join("\n"));
+  const access2 = await applyAccess(context, { manifest: manifest2, options });
+  if (access2.problems.length > 0) {
+    await access2.dispose();
+    throw new Error(access2.problems.join("\n"));
   }
-  return withCleanup([() => access.dispose()], async () => {
-    const environment = prepare(manifest2, handlers, accounts, access, async () => (await context.agent.list()).data);
+  return withCleanup([() => access2.dispose()], async () => {
+    const environment = prepare(manifest2, handlers, accounts, access2, async () => (await context.agent.list()).data);
     let bus;
     const writer = () => bus;
-    const rpc = await installRpc(context, environment, access.level, wiring.grant, writer);
+    const rpc = await installRpc(context, environment, access2.level, wiring.grant, writer);
     bus = createBus(name, rpc);
     return withCleanup([() => rpc.dispose()], async () => {
       const tools = await installTools(context, environment, writer);
@@ -12317,7 +12317,7 @@ async function register(context, manifest2, handlers, wiring = {}) {
         async dispose() {
           await rpc.dispose().catch(() => void 0);
           await tools.dispose().catch(() => void 0);
-          await access.dispose().catch(() => void 0);
+          await access2.dispose().catch(() => void 0);
         }
       };
     });
@@ -12334,7 +12334,6 @@ function assertHost(context, manifest2) {
 import { createHash as createHash5 } from "node:crypto";
 var MCP_URL = "https://mcp.linear.app/mcp";
 var SOURCE = "linear";
-var ACTIVITY_SOURCE = "linear.activity";
 var PAGE_BYTES = 9e5;
 var ISSUES_BYTES = 65536;
 var LOOKBACK_MS = 12e4;
@@ -12773,7 +12772,6 @@ function eventsListHandler(runtime) {
       if (!parsed.ok) refuseInput(parsed.problems);
       if (parsed.value.source !== void 0 && parsed.value.source !== SOURCE) refuseSource(runtime.plugin, parsed.value.source);
       const page = await runtime.provider.page({ account: call.account, request: parsed.value, now: runtime.clock(), call });
-      if (page.events.length > 0) await call.bus.emit("changed", { capability: ACTIVITY_SOURCE, account: call.account, reason: "refresh" });
       return page;
     }
   };
@@ -12851,6 +12849,91 @@ var packageName = file2.name;
 var version2 = file2.version;
 var manifest = checked.value;
 
+// src/skills.ts
+import { access, readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { Skill } from "@opencode/plugin";
+var SKILLS_DIR = fileURLToPath(new URL("../skills/", import.meta.url));
+var REINSTALL = "Reinstall the plugin from its release tag, or reinstall the version tag you installed.";
+var notLoaded = (name, problem) => `The "${name}" skill was not loaded: skills/${name}/SKILL.md ${problem}.`;
+function skillError(problem) {
+  return Object.assign(new Error(`SKILLS_INVALID: ${problem} Next step: ${REINSTALL}`), { code: "SKILLS_INVALID" });
+}
+function frontmatter(source2) {
+  const fields = /* @__PURE__ */ new Map();
+  const lines = source2.split("\n");
+  for (let index = 0; index < lines.length; index++) {
+    const match = /^([A-Za-z][A-Za-z0-9_-]*):[ \t]*(.*)$/.exec(lines[index] ?? "");
+    if (match === null) continue;
+    const key = match[1] ?? "";
+    const raw = (match[2] ?? "").trim();
+    if (raw === ">" || raw === "|") {
+      const block = [];
+      while (index + 1 < lines.length && ((lines[index + 1] ?? "").trim() === "" || /^[ \t]/.test(lines[index + 1] ?? ""))) block.push((lines[++index] ?? "").trim());
+      fields.set(key, raw === ">" ? block.join(" ").trim() : block.join("\n").trim());
+      continue;
+    }
+    fields.set(key, raw.replace(/^(["'])(.*)\1$/, "$2"));
+  }
+  return fields;
+}
+function parseSkill(name, path, text3) {
+  const fail = (problem) => skillError(notLoaded(name, problem));
+  const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text3.replace(/\r\n/g, "\n"));
+  if (match === null) throw fail("has no frontmatter");
+  const fields = frontmatter(match[1] ?? "");
+  if (fields.get("name") !== name) throw fail(`must be named "${name}" in its frontmatter`);
+  const description = fields.get("description");
+  if (!description) throw fail("has no description");
+  const content = (match[2] ?? "").trim();
+  if (content === "") throw fail("has no content");
+  return { id: Skill.ID.make(name), name: Skill.Name.make(name), description, path: Skill.Info.fields.path.make(path), content };
+}
+async function skillNames(directory = SKILLS_DIR) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const names2 = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    try {
+      await access(join(directory, entry.name, "SKILL.md"));
+      names2.push(entry.name);
+    } catch {
+    }
+  }
+  return names2.sort();
+}
+async function loadSkills(directory = SKILLS_DIR) {
+  const skills = [];
+  const problems = [];
+  let names2;
+  try {
+    names2 = await skillNames(directory);
+  } catch (error2) {
+    const reason = error2.code === "ENOENT" ? "the skills/ folder is missing" : `the skills/ folder cannot be read (${error2.code ?? String(error2)})`;
+    return { skills, problems: [skillError(`The plugin's skills were not loaded: ${reason}.`).message] };
+  }
+  for (const name of names2) {
+    const path = join(directory, name, "SKILL.md");
+    try {
+      skills.push(parseSkill(name, path, await readFile(path, "utf8")));
+    } catch (error2) {
+      if (error2.code === "SKILLS_INVALID") {
+        problems.push(error2.message);
+      } else {
+        const code = error2.code;
+        problems.push(skillError(notLoaded(name, code === "ENOENT" ? "is missing" : `cannot be read (${String(code)})`)).message);
+      }
+    }
+  }
+  return { skills, problems };
+}
+function registerSkills(skill, skills) {
+  return skill.transform((editor) => {
+    for (const info of skills) editor.add(info);
+  });
+}
+
 // src/index.ts
 var src_default = Plugin.define({
   id: manifest.plugin.name,
@@ -12859,8 +12942,9 @@ var src_default = Plugin.define({
     const options = context.options ?? {};
     const plan = accountsOf(manifest, options);
     if (!plan.ok) throw new Error(`OPTIONS_INVALID: ${plan.problems.join("; ")}. Next step: fix the plugin's accounts option.`);
+    const skills = await loadSkills();
     const accounts = await registerMcpAccounts(context, manifest, options);
-    const problems = [...accounts.problems];
+    const problems = [...accounts.problems, ...skills.problems];
     const provider = createProvider({
       plugin: manifest.plugin.name,
       package: packageName,
@@ -12881,8 +12965,17 @@ var src_default = Plugin.define({
       problems: () => problems
     });
     const registration = await register(context, manifest, handlers);
+    let skillRegistration;
+    try {
+      skillRegistration = await registerSkills(context.skill, skills.skills);
+    } catch (error2) {
+      problems.push(`UNAVAILABLE: the skills could not be registered: ${error2 instanceof Error ? error2.message : String(error2)}. Next step: reload the plugin, and reinstall it if the problem stays.`);
+    }
     await announceStatus(registration.bus, problems);
-    return () => registration.dispose();
+    return async () => {
+      await skillRegistration?.dispose();
+      await registration.dispose();
+    };
   }
 });
 export {

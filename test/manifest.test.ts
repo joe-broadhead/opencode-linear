@@ -31,9 +31,9 @@ test("the package and the manifest share one name, version and hash", () => {
   assert.ok(manifest.plugin.summary.length <= 400, `the namespace line is ${manifest.plugin.summary.length} characters`)
 })
 
-test("the methods table classifies all 82 callables and no method is pinned", () => {
-  assert.equal(Object.keys(manifest.methods).length, 82)
-  assert.deepEqual(classes(), { read: 46, write: 26, send: 4, delete: 4, share: 2 })
+test("the methods table classifies all 83 callables and no method is pinned", () => {
+  assert.equal(Object.keys(manifest.methods).length, 83)
+  assert.deepEqual(classes(), { read: 46, write: 27, send: 4, delete: 4, share: 2 })
   for (const [name, item] of Object.entries(manifest.methods)) {
     assert.equal(item.pinned, undefined, `${name} is pinned`)
     if (name.startsWith("mcp:delete_")) assert.equal(item.class, "delete", name)
@@ -44,13 +44,14 @@ test("the methods table classifies all 82 callables and no method is pinned", ()
   for (const [name, item] of Object.entries(manifest.methods)) if (name !== "status") assert.equal(item.accounts, "optional", name)
 })
 
-test("every pass-through method is one recorded Linear tool, with its class, and there is no wildcard", () => {
+test("every declared Linear tool is listed, and mcp:* keeps undeclared tools at write", () => {
+  const wildcard = manifest.methods["mcp:*"]
+  assert.deepEqual(wildcard, { class: "write", accounts: "optional" })
+  assert.equal(recorded.count, 78)
   const ours = Object.entries(manifest.methods)
-    .filter(([name]) => name.startsWith("mcp:"))
+    .filter(([name]) => name.startsWith("mcp:") && name !== "mcp:*")
     .map(([name, item]) => ({ name: name.slice("mcp:".length), class: item.class }))
     .sort((left, right) => left.name.localeCompare(right.name))
-  assert.equal(manifest.methods["mcp:*"], undefined)
-  assert.equal(recorded.count, 78)
   assert.deepEqual(ours, [...recorded.tools].sort((left, right) => left.name.localeCompare(right.name)))
 })
 
@@ -60,6 +61,9 @@ test("the handler table declares exactly the manifest's own methods", () => {
   assert.deepEqual(own, ["events_list", "issues", "probe", "status"])
   assert.equal(entries.find((entry) => entry.name === "events_list")?.item.class, "read")
   assert.deepEqual(entries.find((entry) => entry.name === "probe")?.item.operations, ["get_workspace", "get_user"])
+  // `issues` reads only `list_issues`; the identity reads belong to `probe` (and the activity page), so asserting them
+  // on `issues` would demand permissions for a call it never makes.
+  assert.deepEqual(entries.find((entry) => entry.name === "issues")?.item.operations, ["list_issues"])
 })
 
 test("the sources read declared methods, and their operations are among the method's", () => {
@@ -89,7 +93,7 @@ test("two aliases resolve to the MCP servers OpenCode signs in to", () => {
 })
 
 test("the manifest declares every bus event and no action", () => {
-  assert.deepEqual(Object.keys(manifest.events).sort(), ["account", "changed", "status"])
+  assert.deepEqual(Object.keys(manifest.events).sort(), ["account", "status"])
   assert.deepEqual(manifest.actions, [])
 })
 

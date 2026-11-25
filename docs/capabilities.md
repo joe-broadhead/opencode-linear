@@ -11,6 +11,7 @@ Every method, source, action and bus event the manifest declares.
 | `probe` | read | optional | `get_workspace`, `get_user` |
 | `events_list` | read | optional | `get_workspace`, `get_user`, `list_issues`, `get_notifications` |
 | `issues` | read | optional | `list_issues` |
+| `mcp:*` | write | optional | — |
 | `mcp:create_attachment` | write | optional | `create_attachment` |
 | `mcp:create_attachment_from_upload` | write | optional | `create_attachment_from_upload` |
 | `mcp:create_initiative_label` | write | optional | `create_initiative_label` |
@@ -103,7 +104,7 @@ None.
 
 ### Bus events
 
-`rpc.linear.changed`, `rpc.linear.status`, `rpc.linear.account`
+`rpc.linear.status`, `rpc.linear.account`
 <!-- /generated:capabilities -->
 
 ## Notes
@@ -117,11 +118,14 @@ None.
   `CURSOR_INVALID`. One feed failing lists the other and names the failed feed in `failed[]` as `feed:issues` or
   `feed:notifications`, with that feed's position kept in the cursor.
 - **`issues`** answers the `linear.issues` snapshot: up to fifty assigned issues as the contract's `list` output,
-  most recently updated first, in every state. It is a sample, not a count.
+  most recently updated first, in every state. It is a sample, not a count. It reads only `list_issues`; the identity
+  reads (`get_workspace`, `get_user`) belong to `probe`, and to the activity page's own identity check.
 - **The `mcp:` methods** are Linear's own MCP tools, declared one by one so each has its class: 42 reads, 26 writes,
-  four sends, four deletes and two shares. The server owns them; the manifest states their risk.
+  four sends, four deletes and two shares. `mcp:*` is one more write rule, emitted before them, so a tool Linear
+  renames or adds is denied at `read-only` and asked at `ask-changes` instead of falling through to OpenCode's base
+  allow-all. The server owns them; the manifest states their risk.
 - **The activity source** is private, free, and 900 KB per page. Its event URLs are on `linear.app`. The issues
   snapshot is private, free, and 64 KB.
 - **No actions:** the plugin has no write of its own and nothing to preview or commit. Writes are Linear's tools.
-- **Bus events:** `changed` after a page that lists at least one change; `account` when status finds an alias that
-  needs a sign-in or failed; `status` once when the plugin finishes setup.
+- **Bus events:** `account` when status finds an alias that needs a sign-in or failed; `status` once when the plugin
+  finishes setup. A read emits nothing, and the plugin owns no write to announce.
