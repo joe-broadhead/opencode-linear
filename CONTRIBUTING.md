@@ -19,9 +19,11 @@ npm run check
 
 | Step | What it proves |
 |---|---|
+| `npm run lint` | Biome's recommended lint rules pass |
 | `npm run typecheck` | the sources and tests typecheck under strict settings |
 | `npm run build` | `dist/index.js` is built from `src/index.ts` with esbuild |
-| `npm test` | the account wiring, provider, handlers, manifest, fixture and pack tests pass |
+| `npm test` | the account wiring, provider, handlers, manifest and fixture tests pass |
+| `npm run pack` | the tarball holds the built server, skills, assets, README and licence, and nothing else |
 | `plugin-kit check` | conformance T0 and T1, the doc file set, the forbidden patterns and no bundled kit |
 | `plugin-kit docs --check` | every generated doc section matches the manifest |
 
@@ -30,7 +32,7 @@ CI runs the same steps in one job named `ci`. `dist/` is generated and is not co
 
 ## The contract pin
 
-`package.json` pins the contract to an exact commit while v0.0.0 is unreleased; a released plugin pins the release tag,
+`package.json` pins the contract to the release tag
 `github:we-the-rebel-alliance/plugin-contract#v0.0.0`, and moves the pin with the contract's release. Never copy a
 contract module into this repository.
 

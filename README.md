@@ -21,12 +21,12 @@ Unofficial; not affiliated with Linear. Linear is a trademark of Linear Orbit, I
 Install from a release tag:
 
 ```sh
-opencode plugin add github:we-the-rebel-alliance/linear-plugin#v<version>
+opencode plugin add github:we-the-rebel-alliance/linear-plugin#v0.0.0
 opencode reload
 ```
 
-The first release on plugin-contract v0 is `v0.0.0`. It is cut by the maintainer after the pull request merges. Until
-then, do not install an older `v0.x` tag: those tags name the previous plugin, not this one.
+`v0.0.0` is the first release on plugin-contract v0. Do not install an older `v0.x` tag: those tags name the previous
+plugin, not this one.
 
 ## Sign in
 
@@ -66,6 +66,16 @@ The rules cover this plugin's own methods and Linear's MCP tools, one alias at a
 
 The plugin's own methods are reads. The changes are Linear's MCP tools, which OpenCode runs under the same access
 rules; the plugin never proxies them and holds no credential.
+
+## Options
+
+| Option | Default | Meaning |
+|---|---|---|
+| `access` | `"all"` | `all`, `ask-changes` or `read-only`; the ceiling for every method. |
+| `accounts` | one `default` | One empty profile per alias; the alias's sign-in decides the workspace. |
+| `allowUntestedHost` | `false` | Start outside `>=2.4.1 <2.5.0`. Leave it `false`. |
+
+[Configuration](docs/configuration.md) has the schema and examples.
 
 ## Capabilities
 
@@ -201,6 +211,18 @@ None.
 | `UNAVAILABLE` | the provider could not be reached |
 <!-- /generated:errors -->
 
+## Troubleshooting
+
+- **No Linear tools, or `NEEDS_SIGN_IN`.** Sign in to the alias's server: `/connect`, or `opencode mcp auth linear-work`.
+  Then read `tools.linear.status`; it reports each alias as `ready`, `needs_sign_in` or `error`.
+- **`ACCOUNT_REQUIRED`.** Several aliases are configured: pass `account: "work"` or the alias the options name.
+  **`ACCOUNT_UNKNOWN`.** The alias is not in `options.accounts`.
+- **`CURSOR_INVALID`.** The cursor was issued for another plugin, source, account or scope. Read again without it;
+  never reuse another account's cursor.
+- **`HOST_UNTESTED`.** OpenCode is outside `>=2.4.1 <2.5.0`. Install 2.4.1, or set `allowUntestedHost` knowingly.
+- **A change did not run.** `read-only` denies every change and `ask-changes` asks first; the plugin itself only reads.
+  Check the `access` option and the permission prompt's answer.
+
 ## Docs
 
 - [Capabilities](docs/capabilities.md)
@@ -211,3 +233,4 @@ None.
 - [Security](docs/security.md)
 - [Contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
+- [plugin-contract](https://github.com/we-the-rebel-alliance/plugin-contract)

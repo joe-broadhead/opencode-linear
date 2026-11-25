@@ -243,7 +243,9 @@ export function callFor(account: string, options: { readonly bus?: Bus; readonly
 
 /** Run one handler with an account and the input `register` would pass. */
 export async function run(runtime: HandlerRuntime, method: "status" | "probe" | "events_list" | "issues", input: Readonly<Record<string, unknown>>, account = "work", call = callFor(account)): Promise<unknown> {
-  return handlersFor(runtime)[method]!.run(input, call)
+  const handler = handlersFor(runtime)[method]
+  if (handler === undefined) throw new Error(`the handler table has no ${method}`)
+  return handler.run(input, call)
 }
 
 /** The `ToolCall` a provider receives, from a handler's call. */

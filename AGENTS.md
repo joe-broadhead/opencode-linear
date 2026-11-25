@@ -28,14 +28,14 @@ with `probe` and `status` beside them. It writes nothing of its own: Linear's MC
 | Command | Does |
 |---|---|
 | `npm ci --ignore-scripts` | installs the dev tooling; there are no runtime dependencies |
-| `npm run check` | typecheck, build, the tests, `plugin-kit check` and `plugin-kit docs --check` |
+| `npm run check` | lint, typecheck, build, the tests, the pack check, `plugin-kit check` and `plugin-kit docs --check` |
 | `npx plugin-kit check` | the conformance gate: T0, T1, docs, forbidden patterns, no bundled kit |
 | `npm run docs` | regenerates the generated doc sections from the manifest |
 | `npm run fixtures` | rebuilds the deterministic fake executor's recorded conformance fixture |
 | `npx plugin-kit record --account <alias>` | records and redacts a conformance fixture from a real account |
 | `npx plugin-kit release <version>` | cuts a release; CI publishes it |
 
-The tests use Node 24's own test runner. `npm run check` needs the built `dist/`, so it builds before the kit runs.
+The tests use Node 24's own test runner. `npm run check` needs the built `dist/`, so it builds before the pack and kit checks.
 
 ## Layout
 
@@ -45,12 +45,13 @@ src/accounts.ts           the mcp mechanism: one server per alias, through the c
 src/handlers/             one file per method: status, probe, events_list, issues
 src/provider/             Linear's MCP reads and their contract mapping; the only place Linear's URL is named
 src/manifest.ts           reads package.json capabilities and checks it with the contract
-test/                     accounts, provider, handlers, manifest, the recorded fixture and the packed tarball
+test/                     accounts, provider, handlers, manifest and the recorded fixture
 skills/linear/SKILL.md    how an agent reads Linear
 skills/linear-write/      how an agent changes Linear
 docs/                     capabilities, configuration, accounts, automations, architecture, security
 fixtures/conformance.json the recorded conformance answers the kit replays
 scripts/build.mjs         builds dist/index.js with esbuild
+scripts/check-pack.mjs    packs the tarball and checks its file set
 scripts/record-fixture.mjs rebuilds the fake executor's recorded fixture
 ```
 
@@ -95,7 +96,7 @@ through `call.bus`. T1 refuses a non-read RPC call that runs without an answered
   replaces it and the script with `npx plugin-kit record`.
 - `test/manifest.test.ts` proves the package name, the 82-method table, the sources, the aliases and that the handler
   table matches `methods`.
-- `test/pack.test.ts` proves the packed tarball's file set and the `./server` export.
+- `npm run pack` proves the packed tarball's file set and the `./server` export.
 
 ## Docs
 

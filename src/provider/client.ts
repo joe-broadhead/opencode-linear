@@ -108,6 +108,12 @@ export type ToolRead = (account: string, tool: string, input: Readonly<Record<st
 
 const record = (value: unknown): Record<string, unknown> => (typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {})
 const text = (value: unknown): string | undefined => (typeof value === "string" && value.trim() !== "" ? value.trim() : undefined)
+
+/** A text with control characters removed, the same characters the contract refuses in a field. */
+const printable = (value: string): string => [...value].filter((char) => {
+  const code = char.codePointAt(0) ?? 0
+  return code >= 0x20 && code !== 0x7f && !(code >= 0x80 && code <= 0x9f)
+}).join("")
 const time = (value: unknown): number | undefined => {
   const parsed = typeof value === "string" ? Date.parse(value) : Number.NaN
   return Number.isFinite(parsed) ? parsed : undefined
@@ -431,11 +437,11 @@ function listItem(item: unknown): IssueItem | undefined {
   const identifier = text(data["id"])
   const title = text(data["title"])
   if (identifier === undefined || title === undefined) return undefined
-  const id = identifier.replace(/[\u0000-\u001f\u007f-\u009f]/g, "").slice(0, 128)
-  const body = title.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 200)
+  const id = printable(identifier).slice(0, 128)
+  const body = printable(title).replace(/\s+/g, " ").trim().slice(0, 200)
   if (id === "" || body === "" || secretKinds(id).length > 0 || secretKinds(body).length > 0) return undefined
   const state = text(data["status"]) ?? text(record(data["status"])["name"])
-  const note = state === undefined ? undefined : state.replace(/[\u0000-\u001f\u007f-\u009f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 200)
+  const note = state === undefined ? undefined : printable(state).replace(/\s+/g, " ").trim().slice(0, 200)
   if (note !== undefined && secretKinds(note).length > 0) return undefined
   const type = text(data["statusType"])
   const done = type === "completed" || type === "canceled" || /^(done|canceled|cancelled|completed)$/i.test(note ?? "")

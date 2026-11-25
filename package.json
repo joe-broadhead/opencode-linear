@@ -1,14 +1,23 @@
 {
   "name": "@we-the-rebel-alliance/linear-plugin",
   "version": "0.0.0",
-  "private": true,
-  "description": "Linear for OpenCode: issues, projects, cycles, initiatives and documents through Linear's MCP server, with several workspaces at once",
+  "description": "Linear for OpenCode: issues, projects, cycles, initiatives and documents through Linear's MCP server, with several workspaces at once.",
   "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/we-the-rebel-alliance/linear-plugin.git"
   },
+  "homepage": "https://github.com/we-the-rebel-alliance/linear-plugin#readme",
+  "bugs": {
+    "url": "https://github.com/we-the-rebel-alliance/linear-plugin/issues"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "linear",
+    "plugin-contract"
+  ],
   "engines": {
     "node": ">=24"
   },
@@ -737,13 +746,16 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json",
+    "lint": "biome check .",
     "test": "node --test \"test/**/*.test.ts\"",
     "fixtures": "node scripts/record-fixture.mjs",
     "docs": "plugin-kit docs",
     "docs:check": "plugin-kit docs --check",
-    "check": "npm run typecheck && npm run build && npm run test && plugin-kit check && plugin-kit docs --check"
+    "check": "npm run lint && npm run typecheck && npm run build && npm run test && npm run pack && plugin-kit check && plugin-kit docs --check",
+    "pack": "node scripts/check-pack.mjs"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.9",
     "@opencode/client": "2.4.1",
     "@opencode/plugin": "2.4.1",
     "@opencode/sdk": "2.4.1",
