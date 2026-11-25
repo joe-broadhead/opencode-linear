@@ -6,7 +6,7 @@
 |---|---|---|
 | Entry | `src/index.ts` | `Plugin.define({ id, setup })`, `assertHost`, the account wiring, the skills and one `register` call |
 | Accounts | `src/accounts.ts` | one Linear MCP server per alias, through the contract's `accounts` module |
-| Skills | `src/skills.ts` | every `skills/<id>/SKILL.md`, parsed and added through `ctx.skill.transform` |
+| Skills | `src/skills.ts` | reads every `skills/<name>/SKILL.md`, parses its YAML frontmatter (including `>` and `|` block scalars), checks it and registers it with `ctx.skill.transform` |
 | Manifest | `src/manifest.ts` | reads `package.json` `capabilities` and checks it with the contract's validator |
 | Handlers | `src/handlers/` | one handler per method: the input, the answer schema, the description and the work |
 | Provider | `src/provider/client.ts` | Linear's MCP reads, normalised into the contract's page, probe and snapshot answers |
@@ -21,8 +21,8 @@ The entry is deliberately thin. `register` from the contract wires doors 1–3: 
 
 1. OpenCode loads `dist/index.js` through the package's `./server` export and calls `setup(ctx)`.
 2. `assertHost` refuses an OpenCode release outside `>=2.4.1 <2.5.0`, unless `allowUntestedHost` is set.
-3. `src/skills.ts` reads every `skills/*/SKILL.md` before the synchronous transform runs. A broken file becomes a
-   `status` problem, never a setup failure.
+3. `src/skills.ts` checks every `skills/<name>/SKILL.md` before anything registers. A malformed file throws
+   `SCHEMA_VIOLATION` and fails setup, so a broken package is visible immediately.
 4. The account wiring adds one MCP server per alias through `ctx.mcp.transform`, named `linear` or `linear-<alias>`.
 5. `register` checks the handler table against `capabilities.methods`, resolves the accounts from the options,
    generates the access rules into every agent, and registers the tools and the single RPC id.
@@ -35,21 +35,22 @@ The entry is deliberately thin. `register` from the contract wires doors 1–3: 
 
 OpenCode discovers skills inside a project's own `skills/` folder. A plugin's `skills/` folder sits in the installed
 package, outside that project, so it is never discovered on its own: the plugin must register it. `src/skills.ts` lists
-every directory in the package's `skills/` that holds a `SKILL.md`, parses its `---` frontmatter (a single-line value or
-the folded `>` and literal `|` blocks) and the body, and validates that:
+every directory in the package's `skills/`, reads its `SKILL.md`, parses the `---` frontmatter with the `yaml` package
+(so `>`, `|`, `>-`, `|-`, `>+` and `|+` register their real text) and validates that:
 
 - the frontmatter `name` equals the folder name, which is the skill's id;
-- a `description` exists;
+- a non-empty `description` exists, and it is not a bare block marker;
 - the content after the frontmatter is not empty.
 
-A file that fails a rule is reported as a `SKILLS_INVALID` problem in `status`; the other skills still load, and the
-server, rules and reads still work. The package ships `linear` and `linear-write`, and both are always registered: the
-`access` option is enforced by the permission rules, not by hiding a skill.
+A file that fails a rule throws `SCHEMA_VIOLATION` with a next step, and setup fails: a package with a broken skill is
+not loaded silently. The package ships `linear` and `linear-write`, and both are always registered; the `access`
+option is enforced by the permission rules, not by hiding a skill.
 
 Both shipped descriptions are one quoted line, because they contain `: ` and an unquoted plain scalar would be read as
-a nested mapping. The loader still supports YAML's folded `>` and literal `|` blocks; `test/skills.test.ts` compares
-that output with `YAML.parse`, and `test/host/skills.test.ts` compares each registered description with `YAML.parse` of
-the file, so a bare `>` or `|` marker can never be what an agent reads.
+a nested mapping. `test/skills.test.ts` checks YAML's block forms, and `test/host/skills.test.ts` compares each
+registered description with `YAML.parse` of the file, so a bare `>` or `|` marker can never be what an agent reads.
+The `yaml` package is a devDependency and is bundled into `dist/index.js` by `npm run bundle`; the build banner gives
+the CommonJS parser a real `require` in the ES module.
 
 ## The provider
 

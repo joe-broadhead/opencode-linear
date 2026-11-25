@@ -73,8 +73,9 @@ rules; the plugin never proxies them and holds no credential.
 
 The plugin ships two skills and registers them when it starts: `linear`, for finding, reading and citing work, and
 `linear-write`, for a change. OpenCode does not discover a plugin's `skills/` folder on its own, so the plugin adds
-both itself; they are listed with the host's other skills once the plugin loads. A skill that cannot be read is
-reported in `status`, and the rest of the plugin still runs.
+both itself; they are listed with the host's other skills once the plugin loads. The frontmatter is parsed as YAML, so
+a `>` or `|` description registers its text, not the marker. A malformed skill fails setup with `SCHEMA_VIOLATION`,
+so a broken package is visible immediately.
 
 ## Options
 
