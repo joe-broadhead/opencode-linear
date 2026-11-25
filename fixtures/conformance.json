@@ -30,7 +30,7 @@
     "linear.activity": {
       "cases": [
         {
-          "name": "the work account's changes",
+          "case": "the work account's changes",
           "input": {
             "source": "linear",
             "account": "work",
@@ -41,7 +41,7 @@
             "source": "linear",
             "account": "work",
             "owner": {
-              "id": "mailto:ada@example.test",
+              "id": "mailto:<redacted:email>",
               "label": "Ada Lane (acme)"
             },
             "events": [
@@ -56,12 +56,12 @@
                   {
                     "role": "assignee",
                     "id": "linear:U-ACME-ADA",
-                    "name": "Ada Lane"
+                    "name": "<redacted:personal>"
                   },
                   {
                     "role": "creator",
                     "id": "linear:U-ACME-ADA",
-                    "name": "Ada Lane"
+                    "name": "<redacted:personal>"
                   }
                 ],
                 "title": "ENG-103: Handover",
@@ -71,7 +71,7 @@
                   "assigned",
                   "backlog"
                 ],
-                "hash": "sha256:e88061f1dd2594de6cab0952356f06764f2d7139aed6070f2b15aee03d696060"
+                "hash": "sha256:a04876ed191abb1b612550a490f90800c17d16285d7195ea710a6749c315d813"
               },
               {
                 "source": "linear",
@@ -84,12 +84,12 @@
                   {
                     "role": "assignee",
                     "id": "linear:U-ACME-ADA",
-                    "name": "Ada Lane"
+                    "name": "<redacted:personal>"
                   },
                   {
                     "role": "creator",
                     "id": "linear:U-ACME-KAI",
-                    "name": "Kai Mensah"
+                    "name": "<redacted:personal>"
                   }
                 ],
                 "title": "ENG-102: Rehearsal notes",
@@ -100,7 +100,7 @@
                   "completed",
                   "release"
                 ],
-                "hash": "sha256:a25bfe525d4c8cc28d847eea46bb46ca63f7acd544590620f50dfa1c32b2c3b4"
+                "hash": "sha256:f0e3ab90bfb5b79688308c07564202f478bf47f2ce99e764b7dd9023422f62be"
               },
               {
                 "source": "linear",
@@ -113,7 +113,7 @@
                   {
                     "role": "from",
                     "id": "linear:U-ACME-KAI",
-                    "name": "Kai Mensah"
+                    "name": "<redacted:personal>"
                   }
                 ],
                 "title": "ENG-103: Handover",
@@ -123,7 +123,7 @@
                   "notification",
                   "issueAssigned"
                 ],
-                "hash": "sha256:eea2bc6193efe2dcd7f09013a071f67cb431484a41b30ba36580e86919f56de4"
+                "hash": "sha256:66c5a7a695d9127b32f1798fb3f1177176dfc3482a9a936ed4b946294cac9d42"
               },
               {
                 "source": "linear",
@@ -136,12 +136,12 @@
                   {
                     "role": "assignee",
                     "id": "linear:U-ACME-ADA",
-                    "name": "Ada Lane"
+                    "name": "<redacted:personal>"
                   },
                   {
                     "role": "creator",
                     "id": "linear:U-ACME-KAI",
-                    "name": "Kai Mensah"
+                    "name": "<redacted:personal>"
                   }
                 ],
                 "title": "ENG-101: Queue migration",
@@ -152,7 +152,7 @@
                   "started",
                   "infra"
                 ],
-                "hash": "sha256:07916bc6398273c4df02c2e76f5975971d9089b0a8cfd6434f6f3e50ae282e37"
+                "hash": "sha256:4dda8f8a18847f17f2afe3d58c4a202c5a2a91891590b6752d52ea5157528354"
               },
               {
                 "source": "linear",
@@ -165,7 +165,7 @@
                   {
                     "role": "from",
                     "id": "linear:U-ACME-KAI",
-                    "name": "Kai Mensah"
+                    "name": "<redacted:personal>"
                   }
                 ],
                 "title": "ENG-101: Queue migration",
@@ -175,7 +175,7 @@
                   "notification",
                   "issueMention"
                 ],
-                "hash": "sha256:af7e5ab79f94766f67227a469f6da07f0bf7b23f95c4cc907fcd9665fcf13fdd"
+                "hash": "sha256:8b0c5be3b99003e12cfb5a3c28c1ead514debb9ec237a0ea878adac32bce7a3c"
               }
             ],
             "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6IjI4YjRmNDk2ZmE2ZDc3YTkiLCJpIjpbMTc5NTUxNDQwMDAwMCwiRU5HLTEwMUAyMDI2LTExLTI0VDEwOjAwOjAwLjAwMFoiXSwibiI6WzE3OTU1MTgwMDAwMDAsIm5vdGlmaWNhdGlvbjpuLXdvcmstMSJdLCJzaSI6InBRRkVkXyIsInNuIjoiVDRiSnhLIiwiZiI6MTc5MzQ5MTIwMDAwMH0",
@@ -193,7 +193,7 @@
           }
         },
         {
-          "name": "the personal account's changes",
+          "case": "the personal account's changes",
           "input": {
             "source": "linear",
             "account": "personal",
@@ -204,7 +204,7 @@
             "source": "linear",
             "account": "personal",
             "owner": {
-              "id": "mailto:ada@personal.example",
+              "id": "mailto:<redacted:email>",
               "label": "Ada Lane (studio)"
             },
             "events": [
@@ -219,12 +219,12 @@
                   {
                     "role": "assignee",
                     "id": "linear:U-HOME-ADA",
-                    "name": "Ada Lane"
+                    "name": "<redacted:personal>"
                   },
                   {
                     "role": "creator",
                     "id": "linear:U-HOME-ADA",
-                    "name": "Ada Lane"
+                    "name": "<redacted:personal>"
                   }
                 ],
                 "title": "STUDIO-1: Weekend plans",
@@ -234,7 +234,7 @@
                   "assigned",
                   "unstarted"
                 ],
-                "hash": "sha256:fe877ec6dc9499dbcb5f5c1ca9a1745f9bea2006cfde0030f4cdd571c89dabf7"
+                "hash": "sha256:2a9e0bee33a88d795694ce735c079f5dbbaafded715cfbab48a35c6f8fdde841"
               },
               {
                 "source": "linear",
@@ -247,7 +247,7 @@
                   {
                     "role": "from",
                     "id": "linear:U-HOME-ROWAN",
-                    "name": "Rowan Vale"
+                    "name": "<redacted:personal>"
                   }
                 ],
                 "title": "STUDIO-1: Weekend plans",
@@ -257,7 +257,7 @@
                   "notification",
                   "issueComment"
                 ],
-                "hash": "sha256:a3b34c98b8ad46708bd3a8dbad122cf121a1e425e96385f5db9ea0e80c1d95b9"
+                "hash": "sha256:7757a806744f9d15f98436d207db24a15d94d75034401cbb8f7d67e508c4b1e0"
               }
             ],
             "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6ImFhMzBiMmFjOTdkN2QzMjUiLCJpIjpbMTc5NTQ1NjgwMDAwMCwiU1RVRElPLTFAMjAyNi0xMS0yM1QxODowMDowMC4wMDBaIl0sIm4iOlsxNzk1NDYwNDAwMDAwLCJub3RpZmljYXRpb246bi1zdHVkaW8tMSJdLCJzaSI6IkZTY1hSVSIsInNuIjoiSEhtX3dfIiwiZiI6MTc5MzQ5MTIwMDAwMH0",
@@ -268,7 +268,7 @@
           }
         },
         {
-          "name": "what follows the work page",
+          "case": "what follows the work page",
           "input": {
             "source": "linear",
             "account": "work",
@@ -279,7 +279,7 @@
             "source": "linear",
             "account": "work",
             "owner": {
-              "id": "mailto:ada@example.test",
+              "id": "mailto:<redacted:email>",
               "label": "Ada Lane (acme)"
             },
             "events": [],
@@ -291,7 +291,7 @@
           }
         },
         {
-          "name": "an empty window",
+          "case": "an empty window",
           "input": {
             "source": "linear",
             "account": "work",
@@ -302,7 +302,7 @@
             "source": "linear",
             "account": "work",
             "owner": {
-              "id": "mailto:ada@example.test",
+              "id": "mailto:<redacted:email>",
               "label": "Ada Lane (acme)"
             },
             "events": [],
@@ -314,7 +314,7 @@
           }
         },
         {
-          "name": "another account's cursor is refused",
+          "case": "another account's cursor is refused",
           "input": {
             "source": "linear",
             "account": "personal",
@@ -324,7 +324,7 @@
           "refuses": "CURSOR_INVALID: the cursor belongs to another plugin, source or account. Next step: Read again without the cursor, with since, to start a fresh window."
         },
         {
-          "name": "an unknown source is refused",
+          "case": "an unknown source is refused",
           "input": {
             "source": "other",
             "account": "work"
@@ -342,7 +342,7 @@
           "source": "linear",
           "account": "work",
           "owner": {
-            "id": "mailto:ada@example.test",
+            "id": "mailto:<redacted:email>",
             "label": "Ada Lane (acme)"
           },
           "trust": "untrusted"
@@ -359,7 +359,7 @@
           "source": "linear",
           "account": "work",
           "owner": {
-            "id": "mailto:ada@example.test",
+            "id": "mailto:<redacted:email>",
             "label": "Ada Lane (acme)"
           },
           "trust": "untrusted"

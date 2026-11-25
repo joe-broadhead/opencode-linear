@@ -2,7 +2,8 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { test } from "node:test"
 import { accountsOf, resolveAccount } from "@we-the-rebel-alliance/plugin-contract/accounts"
-import { SourceError } from "@we-the-rebel-alliance/plugin-contract/events"
+import { eventHash, SourceError } from "@we-the-rebel-alliance/plugin-contract/events"
+import { redactValue } from "@we-the-rebel-alliance/plugin-contract/kit"
 import { findSource } from "@we-the-rebel-alliance/plugin-contract/manifest"
 import { acceptAnswer } from "@we-the-rebel-alliance/plugin-contract/read"
 import { announceStatus } from "../src/handlers/status.ts"
@@ -10,7 +11,7 @@ import { manifest, packageName } from "../src/manifest.ts"
 import { callFor, recordingBus, run, runtimeFor } from "./support/handlers.ts"
 
 interface RecordedCase {
-  readonly name: string
+  readonly case: string
   readonly input: Readonly<Record<string, unknown>>
   readonly expect?: unknown
   readonly answer?: unknown
@@ -43,6 +44,26 @@ assert.ok(recorded !== undefined)
 assert.ok(recordedIssues !== undefined)
 const cases = recorded.cases ?? []
 assert.ok(cases.length > 0)
+
+/**
+ * The fixture's answer: the kit's redaction, then the event hash of the redacted event. `redactValue` replaces the
+ * personal fields (`name`, an email in `owner.id`) but cannot recompute a hash; `redactFixture` does both when it
+ * writes the file, so the exact comparison recomputes it here.
+ */
+function redacted(value: unknown, path: readonly string[] = []): unknown {
+  return rehash(redactValue(value, path))
+}
+
+function rehash(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(rehash)
+  if (typeof value !== "object" || value === null) return value
+  const record = { ...(value as Record<string, unknown>) }
+  for (const [key, item] of Object.entries(record)) record[key] = rehash(item)
+  if (typeof record["external_id"] === "string" && typeof record["hash"] === "string" && Array.isArray(record["actors"])) {
+    record["hash"] = eventHash(record as Parameters<typeof eventHash>[0])
+  }
+  return record
+}
 
 /** The input a handler sees: register removes the account selector. */
 function withoutAccount(input: Readonly<Record<string, unknown>>): { readonly account: string; readonly input: Record<string, unknown> } {
@@ -77,32 +98,32 @@ test("every recorded page is what the handlers answer today, and the consumer's 
       await assert.rejects(
         () => run(runtime, "events_list", input, account),
         (error: unknown) => error instanceof SourceError && error.message === item.refuses,
-        item.name,
+        item.case,
       )
       continue
     }
     const answer = await run(runtime, "events_list", input, account)
-    assert.deepEqual(answer, item.answer, item.name)
+    assert.deepEqual(redacted(answer), item.answer, item.case)
     const accepted = acceptAnswer(activity, account, answer)
-    if (!accepted.ok) throw new Error(`${item.name}: ${accepted.failure.message}`)
+    if (!accepted.ok) throw new Error(`${item.case}: ${accepted.failure.message}`)
   }
 })
 
 test("the recorded probe and snapshot answers are what the handlers answer today", async () => {
   assert.ok(recorded.probe !== undefined)
   const probe = withoutAccount(recorded.probe.input)
-  assert.deepEqual(await run(runtime, "probe", probe.input, probe.account), recorded.probe.answer)
+  assert.deepEqual(redacted(await run(runtime, "probe", probe.input, probe.account)), recorded.probe.answer)
 
   assert.ok(recordedIssues.snapshot !== undefined)
   const snapshot = withoutAccount(recordedIssues.snapshot.input)
   const answer = await run(runtime, "issues", snapshot.input, snapshot.account)
-  assert.deepEqual(answer, recordedIssues.snapshot.answer)
+  assert.deepEqual(redacted(answer), recordedIssues.snapshot.answer)
   const accepted = acceptAnswer(issues, snapshot.account, answer)
   if (!accepted.ok) throw new Error(accepted.failure.message)
 })
 
 test("the recorded status is what the status handler answers today", async () => {
-  assert.deepEqual(await run(runtime, "status", {}), fixture.events.status)
+  assert.deepEqual(redacted(await run(runtime, "status", {}), ["events", "status"]), fixture.events.status)
 })
 
 test("the fixture records exactly the bus events the plugin's call sites emit", async () => {
