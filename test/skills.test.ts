@@ -7,7 +7,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { after, test } from "node:test"
-import { loadSkills, parseSkill, registerSkills, SKILLS_DIR, skillNames } from "../src/skills.ts"
+import { parse as parseYaml } from "yaml"
+import { frontmatter, loadSkills, parseSkill, registerSkills, SKILLS_DIR, skillNames } from "../src/skills.ts"
 
 const root = mkdtempSync(join(tmpdir(), "linear-skills-"))
 after(() => rmSync(root, { recursive: true, force: true }))
@@ -36,24 +37,38 @@ test("the package ships linear and linear-write, each with a description and con
     assert.equal(skill.name, skill.id)
     assert.equal(skill.path, join(SKILLS_DIR, String(skill.id), "SKILL.md"))
     assert.ok((skill.description ?? "").length > 40, `${skill.id} has a short description`)
+    assert.ok((skill.description ?? "").length <= 300, `${skill.id} has a description over the 300-character budget`)
     assert.ok(skill.content.length > 0, `${skill.id} has no content`)
-    // The folded `description: >` block becomes one line, not the marker alone.
-    assert.ok(!skill.description?.includes(">"))
-    assert.ok(!skill.description?.includes("\n"))
+    assert.notEqual(skill.description, ">")
+    assert.notEqual(skill.description, "|")
   }
 })
 
 test("parses LF and CRLF frontmatter, a folded description and a literal block", () => {
   for (const newline of ["\n", "\r\n"]) {
-    const text = ["---", "name: linear", "description: >", "  Use Linear: find,", "  read and cite issues.", "---", "", "# Linear", "Body."].join(newline)
+    const front = ["name: linear", "description: >", "  Use Linear: find,", "  read and cite issues."].join(newline)
+    const text = ["---", front, "---", "", "# Linear", "Body."].join(newline)
     const skill = parseSkill("linear", "/pkg/skills/linear/SKILL.md", text)
     assert.equal(skill.id, "linear")
     assert.equal(skill.name, "linear")
-    assert.equal(skill.description, "Use Linear: find, read and cite issues.")
+    assert.equal(skill.description, parseYaml(front.replace(/\r\n/g, "\n")).description)
     assert.equal(skill.content, "# Linear\nBody.")
   }
   const literal = parseSkill("linear", "/x", "---\nname: linear\ndescription: |\n  one\n  two\n---\nBody\n")
-  assert.equal(literal.description, "one\ntwo")
+  assert.equal(literal.description, "one\ntwo\n")
+})
+
+test("block scalars match YAML.parse: folded, literal and a folded blank-line paragraph", () => {
+  const cases = [
+    "description: >\n  line one\n  line two\n",
+    "description: >\n  line one\n  line two\n\n  paragraph two\n",
+    "description: >\n  one\n\n  two\n\n\n  three\n",
+    "description: |\n  one\n  two\n",
+  ]
+  for (const source of cases) assert.equal(frontmatter(source).get("description"), parseYaml(source).description)
+  const source = "description: >\n  line one\n  line two\n\n  paragraph two\n"
+  const text = `---\nname: linear\n${source}---\nBody\n`
+  assert.equal(parseSkill("linear", "/x", text).description, parseYaml(source).description)
 })
 
 test("quoted frontmatter values are unquoted", () => {

@@ -17,7 +17,8 @@
 - Two skills, `linear` and `linear-write`, read from the package's `skills/` folder at setup and registered with
   `ctx.skill.transform`. The contract's `register` does not load skills, so the plugin registers them itself; a broken
   file is a `status` problem, not a setup failure. Both skills are always registered, and the `access` rules decide
-  what a change may do.
+  what a change may do. Each description is one quoted line; the loader's folded `>` and literal `|` support is
+  compared with `YAML.parse` in the tests, and the real-host test compares each registered description with the file.
 - Fresh documentation, `AGENTS.md`, and the two skills, with generated sections from the manifest and a conformance
   fixture for two synthetic aliases.
 

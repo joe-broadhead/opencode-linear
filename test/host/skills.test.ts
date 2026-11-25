@@ -12,16 +12,27 @@
  * configuration. `client.skill.list` also lists OpenCode's own skills; the assertions are about the plugin's ids.
  */
 import assert from "node:assert/strict"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { test } from "node:test"
+import { parse as parseYaml } from "yaml"
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url))
 const SKILLS = join(ROOT, "skills")
 /** The two skills the plugin ships; a release that drops one is a parity regression, not a test update. */
 const SHIPPED = ["linear", "linear-write"]
+
+/** The frontmatter of one SKILL.md, as the YAML parser reads it: the source of truth for the description text. */
+function frontmatterOf(path: string): Record<string, unknown> {
+  const text = readFileSync(path, "utf8").replace(/\r\n/g, "\n")
+  const match = /^---\n([\s\S]*?)\n---\n?/.exec(text)
+  assert.ok(match, `${path} has no frontmatter`)
+  const parsed = parseYaml(match[1] ?? "") as unknown
+  assert.ok(typeof parsed === "object" && parsed !== null, `${path}'s frontmatter is not a mapping`)
+  return parsed as Record<string, unknown>
+}
 
 const root = mkdtempSync(join(tmpdir(), "linear-skills-host-"))
 const home = join(root, "home")
@@ -95,8 +106,14 @@ test("the built plugin registers every skills/*/SKILL.md on the real 2.4.1 host"
     for (const id of expected) {
       const skill = listed.get(id)
       assert.ok(skill, `skills/${id}/SKILL.md is not registered; the host lists ${[...listed.keys()].join(", ")}`)
+      const parsed = frontmatterOf(join(SKILLS, id, "SKILL.md"))
+      const description = parsed["description"]
+      assert.equal(typeof description, "string", `${id}'s frontmatter has no description`)
+      assert.ok((description as string).trim().length > 0, `${id} has an empty description`)
+      assert.notEqual(description, ">", `${id}'s description is the folded marker`)
+      assert.notEqual(description, "|", `${id}'s description is the literal marker`)
       assert.equal(String(skill.name), id)
-      assert.ok((skill.description ?? "").trim().length > 20, `${id} has no description`)
+      assert.equal(skill.description, description, `${id}'s registered description is not what YAML.parse reads`)
       assert.ok(skill.content.trim().length > 0, `${id} has no content`)
       assert.equal(skill.path, join(SKILLS, id, "SKILL.md"), `${id} points at the wrong file`)
     }

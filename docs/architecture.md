@@ -46,6 +46,11 @@ A file that fails a rule is reported as a `SKILLS_INVALID` problem in `status`; 
 server, rules and reads still work. The package ships `linear` and `linear-write`, and both are always registered: the
 `access` option is enforced by the permission rules, not by hiding a skill.
 
+Both shipped descriptions are one quoted line, because they contain `: ` and an unquoted plain scalar would be read as
+a nested mapping. The loader still supports YAML's folded `>` and literal `|` blocks; `test/skills.test.ts` compares
+that output with `YAML.parse`, and `test/host/skills.test.ts` compares each registered description with `YAML.parse` of
+the file, so a bare `>` or `|` marker can never be what an agent reads.
+
 ## The provider
 
 `src/provider/client.ts` is the only file that names Linear. It reads through the host's own MCP tool executors, one

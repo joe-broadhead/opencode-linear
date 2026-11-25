@@ -1,8 +1,6 @@
 ---
 name: linear
-description: >
-  The user's Linear work: my issues, this cycle, a project's progress, comments, counts by state, or an identifier such
-  as ENG-123. Covers tools.linear.issues versus Linear's list_issues, filters, paging, links and picking a workspace.
+description: "The user's Linear work: my issues, this cycle, a project's progress, comments, counts by state, or an identifier such as ENG-123. Covers tools.linear.issues versus Linear's list_issues, filters, paging, links and picking a workspace."
 ---
 
 If Linear's tools are absent, sign in to the account's MCP server: `/connect`, or `opencode mcp auth linear-work`.
