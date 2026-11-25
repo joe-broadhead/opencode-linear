@@ -27,6 +27,27 @@ function skillError(problem: string): Error & { readonly code: "SKILLS_INVALID" 
 }
 
 /**
+ * A YAML block scalar, clip-chomped as YAML does by default: the lines are dedented by the first non-empty line's
+ * indentation, `>` folds single breaks into spaces and keeps a blank line as a newline, `|` keeps every newline, and
+ * the result ends with one newline. It matches `YAML.parse` for the headers this frontmatter uses.
+ */
+function blockScalar(style: ">" | "|", raw: readonly string[]): string {
+  const trimmed = raw.map((line) => line.trimEnd())
+  while (trimmed.length > 0 && (trimmed[trimmed.length - 1] ?? "") === "") trimmed.pop()
+  if (trimmed.length === 0) return ""
+  const first = trimmed.find((line) => line.trim() !== "") ?? ""
+  const indent = /^[ \t]*/.exec(first)?.[0].length ?? 0
+  const lines = trimmed.map((line) => (line.trim() === "" ? "" : line.slice(indent)))
+  if (style === "|") return `${lines.join("\n")}\n`
+  let text = ""
+  for (const line of lines) {
+    if (line === "") text += "\n"
+    else text += (text === "" || text.endsWith("\n") ? line : ` ${line}`)
+  }
+  return `${text}\n`
+}
+
+/**
  * Parses the frontmatter into its top-level fields: `key: value` lines, and the folded `>` or literal `|` block a
  * multi-line description uses. The body after the closing `---` is the skill's content.
  */
@@ -40,8 +61,8 @@ export function frontmatter(source: string): Map<string, string> {
     const raw = (match[2] ?? "").trim()
     if (raw === ">" || raw === "|") {
       const block: string[] = []
-      while (index + 1 < lines.length && ((lines[index + 1] ?? "").trim() === "" || /^[ \t]/.test(lines[index + 1] ?? ""))) block.push((lines[++index] ?? "").trim())
-      fields.set(key, raw === ">" ? block.join(" ").trim() : block.join("\n").trim())
+      while (index + 1 < lines.length && ((lines[index + 1] ?? "").trim() === "" || /^[ \t]/.test(lines[index + 1] ?? ""))) block.push(lines[++index] ?? "")
+      fields.set(key, blockScalar(raw, block))
       continue
     }
     fields.set(key, raw.replace(/^(["'])(.*)\1$/, "$2"))

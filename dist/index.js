@@ -12860,6 +12860,23 @@ var notLoaded = (name, problem) => `The "${name}" skill was not loaded: skills/$
 function skillError(problem) {
   return Object.assign(new Error(`SKILLS_INVALID: ${problem} Next step: ${REINSTALL}`), { code: "SKILLS_INVALID" });
 }
+function blockScalar(style, raw) {
+  const trimmed = raw.map((line) => line.trimEnd());
+  while (trimmed.length > 0 && (trimmed[trimmed.length - 1] ?? "") === "") trimmed.pop();
+  if (trimmed.length === 0) return "";
+  const first = trimmed.find((line) => line.trim() !== "") ?? "";
+  const indent = /^[ \t]*/.exec(first)?.[0].length ?? 0;
+  const lines = trimmed.map((line) => line.trim() === "" ? "" : line.slice(indent));
+  if (style === "|") return `${lines.join("\n")}
+`;
+  let text3 = "";
+  for (const line of lines) {
+    if (line === "") text3 += "\n";
+    else text3 += text3 === "" || text3.endsWith("\n") ? line : ` ${line}`;
+  }
+  return `${text3}
+`;
+}
 function frontmatter(source2) {
   const fields = /* @__PURE__ */ new Map();
   const lines = source2.split("\n");
@@ -12870,8 +12887,8 @@ function frontmatter(source2) {
     const raw = (match[2] ?? "").trim();
     if (raw === ">" || raw === "|") {
       const block = [];
-      while (index + 1 < lines.length && ((lines[index + 1] ?? "").trim() === "" || /^[ \t]/.test(lines[index + 1] ?? ""))) block.push((lines[++index] ?? "").trim());
-      fields.set(key, raw === ">" ? block.join(" ").trim() : block.join("\n").trim());
+      while (index + 1 < lines.length && ((lines[index + 1] ?? "").trim() === "" || /^[ \t]/.test(lines[index + 1] ?? ""))) block.push(lines[++index] ?? "");
+      fields.set(key, blockScalar(raw, block));
       continue;
     }
     fields.set(key, raw.replace(/^(["'])(.*)\1$/, "$2"));

@@ -115,11 +115,12 @@ T1 refuses a non-read RPC call that runs without an answered ask or a valid gran
   the tool's answer comes back from the host's own executor, a missing server is `NEEDS_SIGN_IN`, and an upstream
   `isError` rejects.
 - `test/skills.test.ts` proves the two shipped skills parse, the frontmatter rules (`name` equals the folder, a
-  description, content that is not empty), a broken skill becoming a `status` problem, and `registerSkills` adding
-  every loaded skill.
+  description, content that is not empty), that `>`/`|` block scalars match `YAML.parse` (folded, literal and a
+  blank-line paragraph), a broken skill becoming a `status` problem, and `registerSkills` adding every loaded skill.
 - `test/host/skills.test.ts` loads the built `dist/index.js` in the real embedded OpenCode 2.4.1 host, activates it
-  and reads `client.skill.list`: every `skills/*/SKILL.md` id must be there. It fails when the plugin stops registering
-  its skills.
+  and reads `client.skill.list`: every `skills/*/SKILL.md` id must be there, and each registered description must equal
+  the text `YAML.parse` reads from the file (never `'>'` or `'|'`). It fails when the plugin stops registering its
+  skills or drops a block-scalar description to its marker.
 - `npm run pack` proves the packed tarball's file set and the `./server` export.
 
 ## Docs
