@@ -12,7 +12,7 @@ If Linear's tools are absent, sign in to the account's MCP server: `/connect`, o
 Two kinds of tools reach Linear:
 
 - **This plugin's methods**: `tools.linear.status`, `tools.linear.probe`, `tools.linear.issues` and
-  `tools.linear.events_list`. Each takes `account` when several workspaces are configured.
+  `tools.linear.events_list`. The reads take `account` when several workspaces are configured; `status` takes none.
 - **Linear's own MCP tools**, named for the account's server: `linear_<tool>` for `default`, or `linear-work_<tool>`
   and `linear-personal_<tool>` for the other aliases. In Code Mode they are `tools.linear.<tool>` or
   `tools["linear-work"].<tool>`. `search` with the new namespace shows each signature.

@@ -53,7 +53,8 @@ where it resumes. When one of the two feeds cannot be read, the page lists the o
 | `ctx.mcp.transform` | `src/accounts.ts` |
 | `ctx.mcp.list` | `status` |
 | `ctx.tool.list`, tool `execute` | the provider, for Linear's reads |
-| `ctx.agent.transform`, `ctx.agent.list` | `register`'s rules, and `status` for `unguardedAgents` |
+| `ctx.agent.transform` | `register`'s rules |
+| `ctx.agent.list` | the agent list `call.unguardedAgents()` reads for status |
 | `ctx.tool.transform`, `ctx.rpc.register`, `ctx.permission.assert` | `register` only |
 
 ## State and caching
