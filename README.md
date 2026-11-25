@@ -67,6 +67,13 @@ The rules cover this plugin's own methods and Linear's MCP tools, one alias at a
 The plugin's own methods are reads. The changes are Linear's MCP tools, which OpenCode runs under the same access
 rules; the plugin never proxies them and holds no credential.
 
+## Skills
+
+The plugin ships two skills and registers them when it starts: `linear`, for finding, reading and citing work, and
+`linear-write`, for a change. OpenCode does not discover a plugin's `skills/` folder on its own, so the plugin adds
+both itself; they are listed with the host's other skills once the plugin loads. A skill that cannot be read is
+reported in `status`, and the rest of the plugin still runs.
+
 ## Options
 
 | Option | Default | Meaning |

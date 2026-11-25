@@ -1,8 +1,10 @@
 /**
- * The plugin's one entry: `Plugin.define({ id, setup })`, the host gate, the accounts and one `register` call.
+ * The plugin's one entry: `Plugin.define({ id, setup })`, the host gate, the accounts, the skills and one `register`
+ * call.
  *
- * `register` wires doors 1–3 from `handlers`, resolves accounts, generates the access rules and builds the bus. This
- * file never calls `ctx.tool`, `ctx.rpc` or `ctx.permission` itself.
+ * `register` wires doors 1–3 from `handlers`, resolves accounts, generates the access rules and builds the bus. It does
+ * not register skills, so `src/skills.ts` adds every `skills/<id>/SKILL.md` through `ctx.skill.transform`. This file
+ * never calls `ctx.tool`, `ctx.rpc` or `ctx.permission` itself.
  */
 import { Plugin } from "@opencode/plugin"
 import { accountName, accountsOf } from "@we-the-rebel-alliance/plugin-contract/accounts"
@@ -12,6 +14,7 @@ import { announceStatus } from "./handlers/status.ts"
 import { handlersFor } from "./handlers/index.ts"
 import { manifest, packageName, version } from "./manifest.ts"
 import { createProvider, createToolRead } from "./provider/client.ts"
+import { loadSkills, registerSkills } from "./skills.ts"
 
 export default Plugin.define({
   id: manifest.plugin.name,
@@ -22,9 +25,12 @@ export default Plugin.define({
     const plan = accountsOf(manifest, options)
     if (!plan.ok) throw new Error(`OPTIONS_INVALID: ${plan.problems.join("; ")}. Next step: fix the plugin's accounts option.`)
 
+    // Read before the synchronous transforms run: a broken file is a status problem, never a setup failure.
+    const skills = await loadSkills()
+
     // The vendor's MCP server holds the credentials: one server per alias, named linear or linear-<alias>.
     const accounts = await registerMcpAccounts(context, manifest, options)
-    const problems = [...accounts.problems]
+    const problems = [...accounts.problems, ...skills.problems]
     const provider = createProvider({
       plugin: manifest.plugin.name,
       package: packageName,
@@ -47,7 +53,18 @@ export default Plugin.define({
     })
 
     const registration = await register(context, manifest, handlers)
+    // The transform is the one registration the contract does not make. A host that refuses it is a status problem,
+    // not a setup failure, so the server, the rules and the reads still work.
+    let skillRegistration: Awaited<ReturnType<typeof registerSkills>> | undefined
+    try {
+      skillRegistration = await registerSkills(context.skill, skills.skills)
+    } catch (error) {
+      problems.push(`UNAVAILABLE: the skills could not be registered: ${error instanceof Error ? error.message : String(error)}. Next step: reload the plugin, and reinstall it if the problem stays.`)
+    }
     await announceStatus(registration.bus, problems)
-    return () => registration.dispose()
+    return async () => {
+      await skillRegistration?.dispose()
+      await registration.dispose()
+    }
   },
 })

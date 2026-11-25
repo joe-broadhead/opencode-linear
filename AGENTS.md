@@ -11,7 +11,8 @@ An OpenCode plugin for Linear. Linear's MCP server holds the credentials, so the
 account alias (`linear`, `linear-work`, `linear-personal`) and reads through the host's own executors for those
 servers. It adds two reads of its own: the activity source (`events_list`) and the assigned-issues snapshot (`issues`),
 with `probe` and `status` beside them. It writes nothing of its own: Linear's MCP tools are the changes, declared in
-`methods` with their class so access can decide them.
+`methods` with their class so access can decide them. It ships two skills, `linear` and `linear-write`, and registers
+both itself: the contract's `register` wires tools, Code Mode, RPC and rules, but it does not load skills.
 
 ## Names
 
@@ -40,8 +41,9 @@ The tests use Node 24's own test runner. `npm run check` needs the built `dist/`
 ## Layout
 
 ```
-src/index.ts              Plugin.define({ id, setup }), assertHost, the account wiring and one register call
+src/index.ts              Plugin.define({ id, setup }), assertHost, the account wiring, the skills and one register call
 src/accounts.ts           the mcp mechanism: one server per alias, through the contract's accounts module
+src/skills.ts             reads every skills/<id>/SKILL.md and registers it with ctx.skill.transform
 src/handlers/             one file per method: status, probe, events_list, issues
 src/provider/             Linear's MCP reads and their contract mapping; the only place Linear's URL is named
 src/manifest.ts           reads package.json capabilities and checks it with the contract
@@ -58,7 +60,10 @@ scripts/record-fixture.mjs rebuilds the fake executor's recorded fixture
 ## Rules
 
 1. **The manifest is the source of truth.** Add or change a method, source or action in `package.json` `capabilities`
-   first, then its handler, then its tests. Never register a tool by hand: `contract.register` does it.
+   first, then its handler, then its tests. Never register a tool by hand: `contract.register` does it. **Skills are the
+   one exception:** `register` does not load them, so `src/skills.ts` registers every `skills/*/SKILL.md` with
+   `ctx.skill.transform` at setup and setup disposes the transform. A skill is discovered from its folder: adding
+   `skills/<id>/SKILL.md` is enough, and its frontmatter `name` must equal `<id>`.
 2. **Every method that reads Linear takes the account** through the contract's `accounts` module. Never assume
    `default`, and never resolve an alias by hand.
 3. **Classify every MCP tool truthfully.** A `delete_*` tool is `delete`, `share_*` is `share`, a comment or review
@@ -81,7 +86,9 @@ scripts/record-fixture.mjs rebuilds the fake executor's recorded fixture
 2. Write the handler in `src/handlers/`, pure where possible, with the Linear read in `src/provider/`.
 3. Add unit tests, then rebuild the fixture with `npm run fixtures` for two accounts.
 4. Run `npx plugin-kit docs`, then `npx plugin-kit check`.
-5. Describe it in `docs/capabilities.md` and, if agents should use it, in the skill.
+5. Describe it in `docs/capabilities.md` and, if agents should use it, update `skills/linear` or
+   `skills/linear-write`. The frontmatter `name` equals the folder, the description says when to read it, and the body
+   is what the agent reads; `test/skills.test.ts` checks the frontmatter and `npm run pack` checks the file set.
 
 When you add a write, add a planning read and its commit, an `actions` entry with the two methods, and emit `changed`
 through `call.bus`. T1 refuses a non-read RPC call that runs without an answered ask or a valid grant.
@@ -96,6 +103,12 @@ through `call.bus`. T1 refuses a non-read RPC call that runs without an answered
   replaces it and the script with `npx plugin-kit record`.
 - `test/manifest.test.ts` proves the package name, the 82-method table, the sources, the aliases and that the handler
   table matches `methods`.
+- `test/skills.test.ts` proves the two shipped skills parse, the frontmatter rules (`name` equals the folder, a
+  description, content that is not empty), a broken skill becoming a `status` problem, and `registerSkills` adding
+  every loaded skill.
+- `test/host/skills.test.ts` loads the built `dist/index.js` in the real embedded OpenCode 2.4.1 host, activates it
+  and reads `client.skill.list`: every `skills/*/SKILL.md` id must be there. It fails when the plugin stops registering
+  its skills.
 - `npm run pack` proves the packed tarball's file set and the `./server` export.
 
 ## Docs
