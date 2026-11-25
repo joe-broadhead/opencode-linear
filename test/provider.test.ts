@@ -120,6 +120,47 @@ test("both feeds failing refuses the call instead of answering an empty page", a
   assert.equal(await refusalCode(() => broken.page({ account: "work", request: request({ since }), now: NOW, call: toolCall("work") })), "UNAVAILABLE")
 })
 
+test("a cursor that ends on one of two events at the same timestamp lists the other, never skips it", async () => {
+  const stamp = "2026-11-23T09:30:00.000Z"
+  const issue = (identifier: string) => ({
+    id: identifier,
+    uuid: `uuid-${identifier}`,
+    title: `Issue ${identifier}`,
+    description: "",
+    url: `https://linear.app/acme/issue/${identifier}/same-time`,
+    updatedAt: stamp,
+    status: "Todo",
+    statusType: "unstarted",
+    priority: { name: "No priority" },
+    labels: [],
+    assignee: { id: "U-ACME-ADA", name: "Ada Lane" },
+    assigneeId: "U-ACME-ADA",
+    createdBy: { id: "U-ACME-ADA", name: "Ada Lane" },
+    createdById: "U-ACME-ADA",
+  })
+  const items = [issue("SAME-1"), issue("SAME-2")]
+  // Linear answers newest first; this fake pages one item at a time, so the pair also straddles a provider page.
+  const sameTime = createProvider({
+    plugin: "linear",
+    package: "@we-the-rebel-alliance/linear-plugin",
+    read: async (account, tool, input, call) => {
+      if (tool === "list_issues") {
+        const start = typeof input["cursor"] === "string" ? Number(input["cursor"]) : 0
+        const next = start + 1
+        return { issues: items.slice(start, next), hasNextPage: next < items.length, ...(next < items.length ? { cursor: String(next) } : {}) }
+      }
+      if (tool === "get_notifications") return { notifications: [], hasNextPage: false }
+      return fakeRead(account, tool, input, call)
+    },
+  })
+  const first = await sameTime.page({ account: "work", request: request({ since: Date.parse("2026-11-01T00:00:00.000Z"), limit: 1 }), now: NOW, call: toolCall("work") })
+  assert.deepEqual(first.events.map((event) => event.external_id), ["SAME-1@2026-11-23T09:30:00.000Z"])
+  assert.equal(first.more, true)
+  const second = await sameTime.page({ account: "work", request: request({ cursor: first.cursor, limit: 1 }), now: NOW, call: toolCall("work") })
+  assert.deepEqual(second.events.map((event) => event.external_id), ["SAME-2@2026-11-23T09:30:00.000Z"])
+  assert.equal(second.more, false)
+})
+
 test("an account the fake does not hold is refused", async () => {
   assert.equal(await refusalCode(() => provider.page({ account: "team", request: request(), now: NOW, call: toolCall("team") })), "ACCOUNT_UNKNOWN")
   assert.equal(await refusalCode(() => provider.probe("team", toolCall("team"))), "ACCOUNT_UNKNOWN")
