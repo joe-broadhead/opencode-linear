@@ -28,7 +28,7 @@ test("the mcp mechanism registers one Linear server per alias, named for the acc
   assert.equal(registration.mechanism, "mcp")
   assert.deepEqual(registration.accounts.map((account) => account.name), ["linear-work", "linear-personal"])
   for (const name of ["linear-work", "linear-personal"]) {
-    assert.deepEqual(servers.get(name), { type: "remote", url: "https://mcp.linear.app/mcp", oauth: true })
+    assert.deepEqual(servers.get(name), { type: "remote", url: "https://mcp.linear.app/mcp", oauth: { scope: "read write" } })
   }
   assert.deepEqual(registration.problems, [])
 })
@@ -37,7 +37,7 @@ test("with no accounts option the plugin has one default server", async () => {
   const { fake, servers } = context()
   const registration = await registerMcpAccounts(fake, manifest, {})
   assert.deepEqual(registration.accounts.map((account) => account.name), ["linear"])
-  assert.deepEqual(servers.get("linear"), { type: "remote", url: "https://mcp.linear.app/mcp", oauth: true })
+  assert.deepEqual(servers.get("linear"), { type: "remote", url: "https://mcp.linear.app/mcp", oauth: { scope: "read write" } })
 })
 
 test("a bad alias is reported and registers no server", async () => {
