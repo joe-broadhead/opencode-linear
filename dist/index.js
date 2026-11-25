@@ -12703,11 +12703,14 @@ function mcpServerUrl(_name) {
 }
 
 // src/accounts.ts
+function serverConfig(name) {
+  return { type: "remote", url: mcpServerUrl(name), oauth: { scope: "read write" } };
+}
 function registerMcpAccounts(context, manifest2, options) {
   return registerAccounts(context, {
     manifest: manifest2,
     options,
-    server: (_account, name) => ({ type: "remote", url: mcpServerUrl(name), oauth: true })
+    server: (_account, name) => serverConfig(name)
   });
 }
 
