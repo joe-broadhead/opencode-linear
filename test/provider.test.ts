@@ -120,6 +120,26 @@ test("both feeds failing refuses the call instead of answering an empty page", a
   assert.equal(await refusalCode(() => broken.page({ account: "work", request: request({ since }), now: NOW, call: toolCall("work") })), "UNAVAILABLE")
 })
 
+/** One issue at a given update time, for the cursor tests. */
+function issueAt(identifier: string, updatedAt: string): Record<string, unknown> {
+  return {
+    id: identifier,
+    uuid: `uuid-${identifier}`,
+    title: `Issue ${identifier}`,
+    description: "",
+    url: `https://linear.app/acme/issue/${identifier}`,
+    updatedAt,
+    status: "Todo",
+    statusType: "unstarted",
+    priority: { name: "No priority" },
+    labels: [],
+    assignee: { id: "U-ACME-ADA", name: "Ada Lane" },
+    assigneeId: "U-ACME-ADA",
+    createdBy: { id: "U-ACME-ADA", name: "Ada Lane" },
+    createdById: "U-ACME-ADA",
+  }
+}
+
 test("a cursor that ends on one of two events at the same timestamp lists the other, never skips it", async () => {
   const stamp = "2026-11-23T09:30:00.000Z"
   const issue = (identifier: string) => ({
@@ -159,6 +179,47 @@ test("a cursor that ends on one of two events at the same timestamp lists the ot
   const second = await sameTime.page({ account: "work", request: request({ cursor: first.cursor, limit: 1 }), now: NOW, call: toolCall("work") })
   assert.deepEqual(second.events.map((event) => event.external_id), ["SAME-2@2026-11-23T09:30:00.000Z"])
   assert.equal(second.more, false)
+})
+
+test("since with limit 1, paged to the end with the cursor, returns each matching event exactly once", async () => {
+  const since = Date.parse("2026-11-22T00:00:00.000Z")
+  const seen: string[] = []
+  let cursor: string | undefined
+  for (let pages = 0; pages < 20; pages++) {
+    const page = await provider.page({ account: "work", request: request({ limit: 1, ...(cursor === undefined ? { since } : { cursor }) }), now: NOW, call: toolCall("work") })
+    seen.push(...page.events.map((event) => event.external_id))
+    if (!page.more) break
+    cursor = page.cursor
+    assert.ok(pages < 19, "the pages did not end")
+  }
+  assert.deepEqual(seen, [
+    "ENG-103@2026-11-22T08:00:00.000Z",
+    "ENG-102@2026-11-23T09:30:00.000Z",
+    "notification:n-work-2",
+    "ENG-101@2026-11-24T10:00:00.000Z",
+    "notification:n-work-1",
+  ])
+  assert.equal(new Set(seen).size, seen.length, "an event repeated across pages")
+})
+
+test("the cursor keeps the since floor, so a late event before it is never listed", async () => {
+  const since = Date.parse("2026-11-24T10:00:00.000Z")
+  const earlier = { ...issueAt("EARLIER", "2026-11-24T09:59:00.000Z") }
+  const later = { ...issueAt("LATER", "2026-11-24T10:01:00.000Z") }
+  // Linear may show an update late; this fake returns both whatever the updatedAt filter says.
+  const late = createProvider({
+    plugin: "linear",
+    package: "@we-the-rebel-alliance/linear-plugin",
+    read: async (account, tool, input, call) => {
+      if (tool === "list_issues") return { issues: [later, earlier], hasNextPage: false }
+      if (tool === "get_notifications") return { notifications: [], hasNextPage: false }
+      return fakeRead(account, tool, input, call)
+    },
+  })
+  const first = await late.page({ account: "work", request: request({ since, limit: 1 }), now: NOW, call: toolCall("work") })
+  assert.deepEqual(first.events.map((event) => event.external_id), ["LATER@2026-11-24T10:01:00.000Z"])
+  const second = await late.page({ account: "work", request: request({ cursor: first.cursor, limit: 1 }), now: NOW, call: toolCall("work") })
+  assert.deepEqual(second.events, [])
 })
 
 test("an account the fake does not hold is refused", async () => {

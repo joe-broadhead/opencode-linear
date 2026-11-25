@@ -26,6 +26,7 @@ interface FakeAccount {
   readonly notifications: readonly Record<string, unknown>[]
 }
 
+/** An invented credential for the screening test, built from parts so no committed line is itself a credential. */
 const FAKE_KEY = ["sk", "live", "abcdefghijklmnopqrstuvwx"].join("_")
 
 const WORK: FakeAccount = {

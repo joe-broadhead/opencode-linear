@@ -179,12 +179,14 @@ interface FeedRead {
   readonly cut?: number
 }
 
-/** What a cursor holds for each feed: its position and the hashes of what was listed in the lookback window. */
+/** What a cursor holds: each feed's position, the hashes it listed in the lookback window, and the read's floor. */
 interface CursorState {
   readonly issues: Position
   readonly notifications: Position
   readonly issuesSeen: ReadonlySet<string>
   readonly notificationsSeen: ReadonlySet<string>
+  /** The first instant the read may list: its `since`, kept so a later page never reads behind it. */
+  readonly floor: number
 }
 
 /** What the plugin asks its provider for. Handlers never touch a tool, a URL or a credential. */
@@ -231,14 +233,15 @@ function stateOf(plugin: string, cursor: string, account: string): CursorState {
   const decoded = decodeBoundCursor(bindingOf(plugin, account), cursor)
   const issues = decoded.ok ? positionOf(decoded.state["i"]) : undefined
   const notifications = decoded.ok ? positionOf(decoded.state["n"]) : undefined
-  if (!decoded.ok || issues === undefined || notifications === undefined) {
+  const floor = decoded.ok && Number.isSafeInteger(decoded.state["f"]) ? (decoded.state["f"] as number) : undefined
+  if (!decoded.ok || issues === undefined || notifications === undefined || floor === undefined) {
     throw new SourceError({
       code: "CURSOR_INVALID",
       what: decoded.ok ? "the cursor holds no position this source issued" : decoded.reason === "foreign" ? "the cursor belongs to another plugin, source or account" : "the cursor is not one this plugin issued",
       next: "Read again without the cursor, with since, to start a fresh window.",
     })
   }
-  return { issues, notifications, issuesSeen: hashesOf(decoded.state["si"]), notificationsSeen: hashesOf(decoded.state["sn"]) }
+  return { issues, notifications, issuesSeen: hashesOf(decoded.state["si"]), notificationsSeen: hashesOf(decoded.state["sn"]), floor }
 }
 
 /** A person Linear names: an object with an id and a name, with its id in a sibling `<field>Id` when absent. */
@@ -388,8 +391,9 @@ function readNotifications(read: ToolRead, account: string, since: number, call:
 }
 
 /** The changes this call may list: after the cursor, or late arrivals in the lookback the cursor has not seen, minus a cut. */
-function fresh(changes: readonly Change[], from: Position, line: number, seen: ReadonlySet<string>, cut: number | undefined): Change[] {
+function fresh(changes: readonly Change[], from: Position, line: number, seen: ReadonlySet<string>, cut: number | undefined, floor: number): Change[] {
   return changes.filter((change) => {
+    if (change.pos.t < floor) return false
     if (cut !== undefined && change.pos.t <= cut) return false
     if (after(change.pos, from)) return true
     if (change.pos.t < line) return false
@@ -459,10 +463,12 @@ export function createProvider(options: { readonly plugin: string; readonly pack
     async page({ account, request, now, call }) {
       const from = request.cursor === undefined ? undefined : stateOf(options.plugin, request.cursor, account)
       const since = request.since ?? now - FIRST_RUN_HOURS * 3_600_000
-      const fromIssues = from?.issues ?? { t: since, k: "" }
-      const fromNotifications = from?.notifications ?? { t: since, k: "" }
-      const lineIssues = fromIssues.t - LOOKBACK_MS
-      const lineNotifications = fromNotifications.t - LOOKBACK_MS
+      // The window is part of the cursor: a page after a `since` read never reads behind that `since`.
+      const floor = from?.floor ?? since
+      const fromIssues = from?.issues ?? { t: floor, k: "" }
+      const fromNotifications = from?.notifications ?? { t: floor, k: "" }
+      const lineIssues = Math.max(fromIssues.t - LOOKBACK_MS, floor)
+      const lineNotifications = Math.max(fromNotifications.t - LOOKBACK_MS, floor)
       // One feed failing does not cancel the other: the page lists what it could read, names the feed it could not,
       // and keeps that feed's position in the cursor, so the next read asks for it again.
       const failed: FailedEvent[] = []
@@ -489,8 +495,8 @@ export function createProvider(options: { readonly plugin: string; readonly pack
       const cut = [issuesRead.cut, notificationsRead.cut].filter((value): value is number => value !== undefined)
       const edge = cut.length === 0 ? undefined : Math.min(...cut)
       const changes = [
-        ...fresh(issuesRead.changes, fromIssues, lineIssues, from?.issuesSeen ?? new Set(), edge),
-        ...fresh(notificationsRead.changes, fromNotifications, lineNotifications, from?.notificationsSeen ?? new Set(), edge),
+        ...fresh(issuesRead.changes, fromIssues, lineIssues, from?.issuesSeen ?? new Set(), edge, floor),
+        ...fresh(notificationsRead.changes, fromNotifications, lineNotifications, from?.notificationsSeen ?? new Set(), edge, floor),
       ]
       const unique = new Map<string, Change>()
       for (const change of changes) if (!unique.has(change.event.external_id)) unique.set(change.event.external_id, change)
@@ -528,6 +534,7 @@ export function createProvider(options: { readonly plugin: string; readonly pack
         n: [notificationsAt.t, notificationsAt.k],
         si: seenFor(accounted(issuesRead.changes, issuesAt), issuesAt),
         sn: seenFor(accounted(notificationsRead.changes, notificationsAt), notificationsAt),
+        f: floor,
       })
       const refused = screened.refused.filter((entry) => consumed.some((change) => change.event.external_id === entry.external_id))
       return eventsListResult(

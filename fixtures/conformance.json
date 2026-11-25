@@ -178,7 +178,7 @@
                 "hash": "sha256:af7e5ab79f94766f67227a469f6da07f0bf7b23f95c4cc907fcd9665fcf13fdd"
               }
             ],
-            "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6IjI4YjRmNDk2ZmE2ZDc3YTkiLCJpIjpbMTc5NTUxNDQwMDAwMCwiRU5HLTEwMUAyMDI2LTExLTI0VDEwOjAwOjAwLjAwMFoiXSwibiI6WzE3OTU1MTgwMDAwMDAsIm5vdGlmaWNhdGlvbjpuLXdvcmstMSJdLCJzaSI6InBRRkVkXyIsInNuIjoiVDRiSnhLIn0",
+            "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6IjI4YjRmNDk2ZmE2ZDc3YTkiLCJpIjpbMTc5NTUxNDQwMDAwMCwiRU5HLTEwMUAyMDI2LTExLTI0VDEwOjAwOjAwLjAwMFoiXSwibiI6WzE3OTU1MTgwMDAwMDAsIm5vdGlmaWNhdGlvbjpuLXdvcmstMSJdLCJzaSI6InBRRkVkXyIsInNuIjoiVDRiSnhLIiwiZiI6MTc5MzQ5MTIwMDAwMH0",
             "more": false,
             "trust": "untrusted",
             "refused": [
@@ -260,7 +260,7 @@
                 "hash": "sha256:a3b34c98b8ad46708bd3a8dbad122cf121a1e425e96385f5db9ea0e80c1d95b9"
               }
             ],
-            "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6ImFhMzBiMmFjOTdkN2QzMjUiLCJpIjpbMTc5NTQ1NjgwMDAwMCwiU1RVRElPLTFAMjAyNi0xMS0yM1QxODowMDowMC4wMDBaIl0sIm4iOlsxNzk1NDYwNDAwMDAwLCJub3RpZmljYXRpb246bi1zdHVkaW8tMSJdLCJzaSI6IkZTY1hSVSIsInNuIjoiSEhtX3dfIn0",
+            "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6ImFhMzBiMmFjOTdkN2QzMjUiLCJpIjpbMTc5NTQ1NjgwMDAwMCwiU1RVRElPLTFAMjAyNi0xMS0yM1QxODowMDowMC4wMDBaIl0sIm4iOlsxNzk1NDYwNDAwMDAwLCJub3RpZmljYXRpb246bi1zdHVkaW8tMSJdLCJzaSI6IkZTY1hSVSIsInNuIjoiSEhtX3dfIiwiZiI6MTc5MzQ5MTIwMDAwMH0",
             "more": false,
             "trust": "untrusted",
             "plugin": "@we-the-rebel-alliance/linear-plugin",
@@ -272,7 +272,7 @@
           "input": {
             "source": "linear",
             "account": "work",
-            "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6IjI4YjRmNDk2ZmE2ZDc3YTkiLCJpIjpbMTc5NTUxNDQwMDAwMCwiRU5HLTEwMUAyMDI2LTExLTI0VDEwOjAwOjAwLjAwMFoiXSwibiI6WzE3OTU1MTgwMDAwMDAsIm5vdGlmaWNhdGlvbjpuLXdvcmstMSJdLCJzaSI6InBRRkVkXyIsInNuIjoiVDRiSnhLIn0"
+            "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6IjI4YjRmNDk2ZmE2ZDc3YTkiLCJpIjpbMTc5NTUxNDQwMDAwMCwiRU5HLTEwMUAyMDI2LTExLTI0VDEwOjAwOjAwLjAwMFoiXSwibiI6WzE3OTU1MTgwMDAwMDAsIm5vdGlmaWNhdGlvbjpuLXdvcmstMSJdLCJzaSI6InBRRkVkXyIsInNuIjoiVDRiSnhLIiwiZiI6MTc5MzQ5MTIwMDAwMH0"
           },
           "expect": "empty",
           "answer": {
@@ -283,7 +283,7 @@
               "label": "Ada Lane (acme)"
             },
             "events": [],
-            "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6IjI4YjRmNDk2ZmE2ZDc3YTkiLCJpIjpbMTc5NTUxNDQwMDAwMCwiRU5HLTEwMUAyMDI2LTExLTI0VDEwOjAwOjAwLjAwMFoiXSwibiI6WzE3OTU1MTgwMDAwMDAsIm5vdGlmaWNhdGlvbjpuLXdvcmstMSJdLCJzaSI6InBRRkVkXyIsInNuIjoiVDRiSnhLIn0",
+            "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6IjI4YjRmNDk2ZmE2ZDc3YTkiLCJpIjpbMTc5NTUxNDQwMDAwMCwiRU5HLTEwMUAyMDI2LTExLTI0VDEwOjAwOjAwLjAwMFoiXSwibiI6WzE3OTU1MTgwMDAwMDAsIm5vdGlmaWNhdGlvbjpuLXdvcmstMSJdLCJzaSI6InBRRkVkXyIsInNuIjoiVDRiSnhLIiwiZiI6MTc5MzQ5MTIwMDAwMH0",
             "more": false,
             "trust": "untrusted",
             "plugin": "@we-the-rebel-alliance/linear-plugin",
@@ -306,7 +306,7 @@
               "label": "Ada Lane (acme)"
             },
             "events": [],
-            "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6IjI4YjRmNDk2ZmE2ZDc3YTkiLCJpIjpbMTc5NTU2NDgwMDAwMCwiIl0sIm4iOlsxNzk1NTY0ODAwMDAwLCIiXSwic2kiOiIiLCJzbiI6IiJ9",
+            "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6IjI4YjRmNDk2ZmE2ZDc3YTkiLCJpIjpbMTc5NTU2NDgwMDAwMCwiIl0sIm4iOlsxNzk1NTY0ODAwMDAwLCIiXSwic2kiOiIiLCJzbiI6IiIsImYiOjE3OTU1NjQ4MDAwMDB9",
             "more": false,
             "trust": "untrusted",
             "plugin": "@we-the-rebel-alliance/linear-plugin",
@@ -318,7 +318,7 @@
           "input": {
             "source": "linear",
             "account": "personal",
-            "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6IjI4YjRmNDk2ZmE2ZDc3YTkiLCJpIjpbMTc5NTUxNDQwMDAwMCwiRU5HLTEwMUAyMDI2LTExLTI0VDEwOjAwOjAwLjAwMFoiXSwibiI6WzE3OTU1MTgwMDAwMDAsIm5vdGlmaWNhdGlvbjpuLXdvcmstMSJdLCJzaSI6InBRRkVkXyIsInNuIjoiVDRiSnhLIn0"
+            "cursor": "eyJ2IjoyLCJzIjoibGluZWFyIiwiYiI6IjI4YjRmNDk2ZmE2ZDc3YTkiLCJpIjpbMTc5NTUxNDQwMDAwMCwiRU5HLTEwMUAyMDI2LTExLTI0VDEwOjAwOjAwLjAwMFoiXSwibiI6WzE3OTU1MTgwMDAwMDAsIm5vdGlmaWNhdGlvbjpuLXdvcmstMSJdLCJzaSI6InBRRkVkXyIsInNuIjoiVDRiSnhLIiwiZiI6MTc5MzQ5MTIwMDAwMH0"
           },
           "expect": "CURSOR_INVALID",
           "refuses": "CURSOR_INVALID: the cursor belongs to another plugin, source or account. Next step: Read again without the cursor, with since, to start a fresh window."

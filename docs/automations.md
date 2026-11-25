@@ -30,7 +30,8 @@ const page = await tools.linear.events_list({
 state.cursor = page.cursor
 ```
 
-A cursor is bound to its plugin, source and account. Do not share one between accounts: the plugin refuses it with
+A cursor is bound to its plugin, source and account, and keeps the window it was issued with: pages after a `since`
+read never list an event before that `since`. Do not share one between accounts: the plugin refuses it with
 `CURSOR_INVALID`.
 
 ## Nudges
