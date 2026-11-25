@@ -43,7 +43,7 @@ The tests use Node 24's own test runner. `npm run check` needs the built `dist/`
 ```
 src/index.ts              Plugin.define({ id, setup }), assertHost, the account wiring, the skills and one register call
 src/accounts.ts           the mcp mechanism: one server per alias, through the contract's accounts module
-src/skills.ts             reads every skills/<id>/SKILL.md and registers it with ctx.skill.transform
+src/skills.ts             reads every skills/<id>/SKILL.md (YAML frontmatter) and registers it with ctx.skill.transform
 src/handlers/             one file per method: status, probe, events_list, issues
 src/provider/             Linear's MCP reads and their contract mapping; the only place Linear's URL is named
 src/manifest.ts           reads package.json capabilities and checks it with the contract
@@ -61,9 +61,11 @@ scripts/record-fixture.mjs rebuilds the fake executor's recorded fixture
 
 1. **The manifest is the source of truth.** Add or change a method, source or action in `package.json` `capabilities`
    first, then its handler, then its tests. Never register a tool by hand: `contract.register` does it. **Skills are the
-   one exception:** `register` does not load them, so `src/skills.ts` registers every `skills/*/SKILL.md` with
-   `ctx.skill.transform` at setup and setup disposes the transform. A skill is discovered from its folder: adding
-   `skills/<id>/SKILL.md` is enough, and its frontmatter `name` must equal `<id>`.
+   one exception:** `register` does not load them, so `src/skills.ts` reads every `skills/<id>/SKILL.md`, parses its
+   YAML frontmatter and registers it with `ctx.skill.transform` at setup; setup disposes the transform. A skill is
+   discovered from its folder: adding `skills/<id>/SKILL.md` is enough, and its frontmatter `name` must equal `<id>`.
+   A malformed file (bad YAML, a missing or empty description, a bare block marker, an empty body) throws
+   `SCHEMA_VIOLATION` and **fails setup**, so a broken package is visible immediately.
 2. **Every method that reads Linear takes the account** through the contract's `accounts` module. Never assume
    `default`, and never resolve an alias by hand.
 3. **Classify every MCP tool truthfully.** A `delete_*` tool is `delete`, `share_*` is `share`, a comment or review
@@ -90,7 +92,9 @@ scripts/record-fixture.mjs rebuilds the fake executor's recorded fixture
 4. Run `npx plugin-kit docs`, then `npx plugin-kit check`.
 5. Describe it in `docs/capabilities.md` and, if agents should use it, update `skills/linear` or
    `skills/linear-write`. The frontmatter `name` equals the folder, the description says when to read it, and the body
-   is what the agent reads; `test/skills.test.ts` checks the frontmatter and `npm run pack` checks the file set.
+   is what the agent reads. The description is YAML: quote it when it contains `": "`, and keep it under 300 characters.
+   `test/skills.test.ts` checks the YAML, `test/host/skills.test.ts` proves the host registers it, and `npm run pack`
+   checks the file set.
 
 When you add a write, add a planning read and its commit, an `actions` entry with the two methods, declare `changed`
 in `capabilities.events` and emit it through `call.bus` (the plugin owns no write today, so it declares neither).
@@ -114,12 +118,13 @@ T1 refuses a non-read RPC call that runs without an answered ask or a valid gran
 - `test/host/tool-read.test.ts` runs `createToolRead` through the real OpenCode 2.4.1 host and a loopback MCP server:
   the tool's answer comes back from the host's own executor, a missing server is `NEEDS_SIGN_IN`, and an upstream
   `isError` rejects.
-- `test/skills.test.ts` proves the two shipped skills parse, the frontmatter rules (`name` equals the folder, a
-  description, content that is not empty), a broken skill becoming a `status` problem, and `registerSkills` adding
-  every loaded skill.
-- `test/host/skills.test.ts` loads the built `dist/index.js` in the real embedded OpenCode 2.4.1 host, activates it
-  and reads `client.skill.list`: every `skills/*/SKILL.md` id must be there. It fails when the plugin stops registering
-  its skills.
+- `test/skills.test.ts` proves `readSkills` checks the two shipped skills, that YAML's `>`, `|`, `>-`, `|-`, `>+` and
+  `|+` blocks register their real text, that a malformed file throws `SCHEMA_VIOLATION` with a next step, and that
+  `registerSkills` adds every checked skill and returns a disposer.
+- `test/host/skills.test.ts` resolves and loads the built `dist/index.js` on the real OpenCode 2.4.1 host, activates it
+  with a fresh empty project, and reads `client.skill.list`: every `skills/<name>/SKILL.md` must be registered, and each
+  description must equal `YAML.parse` of its frontmatter (never `'>'`, `'|'`, `'>-'`, `'|-'`, `'>+'` or `'|+'`). It fails
+  when the plugin stops registering its skills or drops a block-scalar description to its marker.
 - `npm run pack` proves the packed tarball's file set and the `./server` export.
 
 ## Docs

@@ -71,17 +71,17 @@ const fixture = {
   sources: {
     "linear.activity": {
       cases: [
-        { name: "the work account's changes", input: { source: "linear", account: "work", since }, expect: "page", answer: work },
-        { name: "the personal account's changes", input: { source: "linear", account: "personal", since }, expect: "page", answer: personal },
-        { name: "what follows the work page", input: { source: "linear", account: "work", cursor: work.cursor }, expect: "empty", answer: next },
-        { name: "an empty window", input: { source: "linear", account: "work", since: "2026-11-25T00:00:00.000Z" }, expect: "empty", answer: empty },
+        { case: "the work account's changes", input: { source: "linear", account: "work", since }, expect: "page", answer: work },
+        { case: "the personal account's changes", input: { source: "linear", account: "personal", since }, expect: "page", answer: personal },
+        { case: "what follows the work page", input: { source: "linear", account: "work", cursor: work.cursor }, expect: "empty", answer: next },
+        { case: "an empty window", input: { source: "linear", account: "work", since: "2026-11-25T00:00:00.000Z" }, expect: "empty", answer: empty },
         {
-          name: "another account's cursor is refused",
+          case: "another account's cursor is refused",
           input: { source: "linear", account: "personal", cursor: work.cursor },
           expect: "CURSOR_INVALID",
           refuses: crossAccount,
         },
-        { name: "an unknown source is refused", input: { source: "other", account: "work" }, expect: "SOURCE_UNKNOWN", refuses: unknownSource },
+        { case: "an unknown source is refused", input: { source: "other", account: "work" }, expect: "SOURCE_UNKNOWN", refuses: unknownSource },
       ],
       probe: { input: { source: "linear", account: "work" }, answer: probe },
     },

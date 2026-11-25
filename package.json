@@ -1,6 +1,6 @@
 {
   "name": "@we-the-rebel-alliance/linear-plugin",
-  "version": "0.0.0",
+  "version": "0.0.10",
   "description": "Linear for OpenCode: issues, projects, cycles, initiatives and documents through Linear's MCP server, with several workspaces at once.",
   "license": "MIT",
   "type": "module",
@@ -28,6 +28,7 @@
     "dist",
     "skills",
     "assets",
+    "NOTICE",
     "README.md",
     "LICENSE"
   ],
@@ -765,6 +766,7 @@
     "@types/node": "24.19.2",
     "@we-the-rebel-alliance/plugin-contract": "github:we-the-rebel-alliance/plugin-contract#v0.0.0",
     "esbuild": "0.28.2",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "yaml": "2.9.1"
   }
 }

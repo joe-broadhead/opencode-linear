@@ -21,12 +21,13 @@ Unofficial; not affiliated with Linear. Linear is a trademark of Linear Orbit, I
 Install from a release tag:
 
 ```sh
-opencode plugin add github:we-the-rebel-alliance/linear-plugin#v0.0.0
+opencode plugin add github:we-the-rebel-alliance/linear-plugin#v0.0.10
 opencode reload
 ```
 
-`v0.0.0` is the first release on plugin-contract v0. Do not install an older `v0.x` tag: those tags name the previous
-plugin, not this one.
+`v0.0.10` is the post-release fix on plugin-contract v0: it registers the Linear MCP server and ships the YAML
+skills. `v0.0.0` is the earlier release and does not register the MCP server; do not install it, or an older `v0.x`
+tag (those name the previous plugin).
 
 ## Sign in
 
@@ -73,8 +74,9 @@ rules; the plugin never proxies them and holds no credential.
 
 The plugin ships two skills and registers them when it starts: `linear`, for finding, reading and citing work, and
 `linear-write`, for a change. OpenCode does not discover a plugin's `skills/` folder on its own, so the plugin adds
-both itself; they are listed with the host's other skills once the plugin loads. A skill that cannot be read is
-reported in `status`, and the rest of the plugin still runs.
+both itself; they are listed with the host's other skills once the plugin loads. The frontmatter is parsed as YAML, so
+a `>` or `|` description registers its text, not the marker. A malformed skill fails setup with `SCHEMA_VIOLATION`,
+so a broken package is visible immediately.
 
 ## Options
 

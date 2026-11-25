@@ -16,7 +16,7 @@ The options and their defaults, generated from `capabilities.options`.
 {
   "plugins": [
     {
-      "package": "github:we-the-rebel-alliance/linear-plugin#v0.0.0",
+      "package": "github:we-the-rebel-alliance/linear-plugin#v0.0.10",
       "options": {
         "access": "read-only",
         "accounts": { "work": {}, "personal": {} }

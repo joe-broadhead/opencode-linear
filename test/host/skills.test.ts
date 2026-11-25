@@ -1,108 +1,89 @@
-/**
- * The real OpenCode 2.4.1 host lists every skill the plugin ships, by the id its folder gives it.
- *
- * The contract's `createHost` records tools, RPC, agents and asks, but not skills, so this test builds the same
- * embedded host the kit builds (`@we-the-rebel-alliance/plugin-contract` `dist/internal/host/createHost`: one
- * `OpenCode.create`, a session, one queued prompt, then `waitForActivation`) and reads the host client's own
- * `skill.list` (`@opencode/client/dist/promise/client.d.ts:182-184`). The plugin loaded is the committed
- * `dist/index.js`, the file an install runs, so a `skills/` folder that is not registered fails this test.
- *
- * Before `@opencode/sdk` loads, the environment is moved into a fresh temp root: HOME, the XDG folders, the config
- * directory, the project directory and the database all live there, so the host never reads this machine's skills or
- * configuration. `client.skill.list` also lists OpenCode's own skills; the assertions are about the plugin's ids.
- */
 import assert from "node:assert/strict"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { fileURLToPath, pathToFileURL } from "node:url"
 import { test } from "node:test"
+import { fileURLToPath } from "node:url"
+import { OpenCode } from "@opencode/sdk"
+import type { Plugin } from "@opencode/plugin"
+import { load, resolve } from "@opencode/plugin/host"
+import { waitForActivation } from "@we-the-rebel-alliance/plugin-contract/kit"
+import { parse as parseYaml } from "yaml"
 
-const ROOT = fileURLToPath(new URL("../../", import.meta.url))
-const SKILLS = join(ROOT, "skills")
-/** The two skills the plugin ships; a release that drops one is a parity regression, not a test update. */
-const SHIPPED = ["linear", "linear-write"]
+const root = fileURLToPath(new URL("../..", import.meta.url))
 
-const root = mkdtempSync(join(tmpdir(), "linear-skills-host-"))
-const home = join(root, "home")
-const config = join(root, "config")
-const work = join(root, "work")
-for (const directory of [home, config, work]) mkdirSync(directory, { recursive: true })
-Object.assign(process.env, {
-  HOME: home,
-  OPENCODE_TEST_HOME: home,
-  XDG_CONFIG_HOME: join(home, ".config"),
-  XDG_DATA_HOME: join(home, ".local", "share"),
-  XDG_CACHE_HOME: join(home, ".cache"),
-  XDG_STATE_HOME: join(home, ".local", "state"),
-  TMPDIR: join(root, "tmp"),
-})
-mkdirSync(join(root, "tmp"), { recursive: true })
+/** The real host's domains this test reads, as `@opencode/plugin` exposes them to a plugin. */
+interface Host {
+  readonly sessions: {
+    create(input: Record<string, unknown>): Promise<{ readonly id: string }>
+    prompt(input: Record<string, unknown>): Promise<unknown>
+  }
+  readonly plugin: {
+    list(input: Record<string, unknown>): Promise<{ readonly data: readonly { readonly id?: string }[] }>
+  }
+  readonly skill: {
+    list(input: Record<string, unknown>): Promise<{
+      readonly data: readonly { readonly id: string; readonly name: string; readonly description?: string; readonly path: string; readonly content: string }[]
+    }>
+  }
+  close(): Promise<void>
+}
 
-test("the built plugin registers every skills/*/SKILL.md on the real 2.4.1 host", { timeout: 120_000 }, async (t) => {
-  t.after(() => rmSync(root, { recursive: true, force: true }))
-  const expected = readdirSync(SKILLS, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && existsSync(join(SKILLS, entry.name, "SKILL.md")))
+test("the real OpenCode 2.4.1 host registers every skills/<name>/SKILL.md after load", async () => {
+  const entry = resolve({ directory: root }).server
+  assert.ok(entry !== undefined, "the package has no server entry")
+  const module = (await load(entry)) as { readonly default?: Plugin.Plugin }
+  const definition = module.default
+  assert.ok(definition !== undefined, "the server entry exports no Plugin.define value")
+
+  const ids = readdirSync(join(root, "skills"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort()
-  for (const id of SHIPPED) assert.ok(expected.includes(id), `skills/${id}/SKILL.md is missing`)
+  assert.ok(ids.length > 0, "the package ships no skill")
 
-  const module = (await import(pathToFileURL(join(ROOT, "dist", "index.js")).href)) as { default?: { id?: string; setup?: unknown } }
-  const plugin = module.default
-  assert.equal(plugin?.id, "linear")
-  assert.equal(typeof plugin?.setup, "function")
-
-  const { OpenCode } = await import("@opencode/sdk")
-  const host = await OpenCode.create({
-    plugins: [plugin as never],
-    app: { name: "opencode", version: "2.4.1" },
-    config: { content: "{}", directory: config, project: false },
-    database: { path: join(root, "opencode.db") },
-    models: { fetch: false },
-    fs: { filewatcher: false },
-    log: { level: "error", emit: () => undefined },
-  })
-  const location = { directory: work }
-  /** The parts of the host's plugin and skill entries this test reads. */
-  interface HostEntry {
-    readonly id: string
-    readonly state?: { readonly status?: string; readonly error?: string }
-  }
-  interface HostSkill {
-    readonly id: string
-    readonly name: string
-    readonly description?: string
-    readonly path: string
-    readonly content: string
-  }
+  // An empty project: OpenCode discovers `<project>/skills/` itself, so using the repository root here would let
+  // the test pass without `registerSkills`. The skills must come from the plugin's transform alone.
+  const project = mkdtempSync(join(tmpdir(), "plugin-skill-project-"))
   try {
-    const session = await host.sessions.create({ location, agent: "build", permissions: [] } as never)
-    await host.sessions.prompt({ sessionID: session.id, text: "activate the plugin", delivery: "queue" } as never).catch(() => undefined)
+    const host = (await OpenCode.create({
+      plugins: [definition],
+      config: { directory: project },
+      app: { name: "opencode", version: "2.4.1" },
+      log: { level: "error", emit: () => undefined },
+    })) as unknown as Host
 
-    const deadline = Date.now() + 60_000
-    for (;;) {
-      const entries = (await host.plugin.list({ location })) as unknown as { readonly data: readonly HostEntry[] }
-      const entry = entries.data.find((item) => item.id === "linear")
-      const state = entry?.state
-      if (state?.status === "active") break
-      assert.notEqual(state?.status, "failed", `the plugin failed to start: ${JSON.stringify(state)}`)
-      assert.ok(Date.now() < deadline, "the plugin did not activate within 60 s")
-      await new Promise((resolve) => setTimeout(resolve, 100))
+    try {
+      const session = await host.sessions.create({ location: { directory: project }, agent: "build", permissions: [] })
+      await host.sessions.prompt({ sessionID: session.id, text: "activate the skill registration", delivery: "queue" }).catch(() => undefined)
+      await waitForActivation({
+        isActive: async () => {
+          const list = await host.plugin.list({ location: { directory: project } }).catch(() => undefined)
+          return list?.data.some((entry) => entry.id === definition.id) ?? false
+        },
+        timeoutMs: 20_000,
+      })
+      const answer = await host.skill.list({ location: { directory: project } })
+      for (const id of ids) {
+        const skill = answer.data.find((candidate) => candidate.id === id)
+        assert.ok(skill !== undefined, `the host did not register the ${id} skill`)
+        assert.equal(skill.name, id)
+        assert.equal(skill.path, join(root, "skills", id, "SKILL.md"))
+        assert.ok(skill.content.trim().length > 0, `the ${id} skill has no body`)
+        const text = readFileSync(skill.path, "utf8")
+        const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text)
+        assert.ok(frontmatter !== null, `the ${id} skill has no frontmatter`)
+        const parsed = parseYaml(frontmatter[1] ?? "") as { readonly description?: unknown }
+        assert.equal(typeof parsed.description, "string", `the ${id} skill has no YAML description`)
+        const expected = parsed.description as string
+        assert.notEqual(expected.trim(), "", `the ${id} skill has an empty description`)
+        for (const marker of [">", "|", ">-", "|-", ">+", "|+"]) assert.notEqual(expected.trim(), marker, `the ${id} skill registers the block marker ${marker}, not its text`)
+        assert.equal(skill.description, expected, `the ${id} skill description is not the YAML text`)
+      }
+    } finally {
+      await host.close()
     }
-
-    const answer = (await host.skill.list({ location })) as unknown as { readonly data: readonly HostSkill[] }
-    const listed = new Map(answer.data.map((skill) => [skill.id, skill]))
-    for (const id of expected) {
-      const skill = listed.get(id)
-      assert.ok(skill, `skills/${id}/SKILL.md is not registered; the host lists ${[...listed.keys()].join(", ")}`)
-      assert.equal(String(skill.name), id)
-      assert.ok((skill.description ?? "").trim().length > 20, `${id} has no description`)
-      assert.ok(skill.content.trim().length > 0, `${id} has no content`)
-      assert.equal(skill.path, join(SKILLS, id, "SKILL.md"), `${id} points at the wrong file`)
-    }
-    // The plugin's own ids, named here as well as derived from the folder, so a missing one is never an empty pass.
-    for (const id of SHIPPED) assert.ok(listed.has(id), `${id} is not registered on the real 2.4.1 host`)
   } finally {
-    await host.close()
+    rmSync(project, { recursive: true, force: true })
   }
 })

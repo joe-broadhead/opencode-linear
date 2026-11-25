@@ -35,7 +35,8 @@ The plugin has no write of its own, so it has no preview or commit to confirm. W
 OpenCode runs under the same access rules and its own permission prompts; the plugin neither proxies nor observes them.
 Under `ask-changes` every Linear change asks first, and under `read-only` every change is denied. The 78 declared tools
 each carry their class, and the `mcp:*` write rule before them covers a tool Linear renames or adds, so an unknown
-Linear tool cannot fall through to OpenCode's base allow.
+Linear tool cannot fall through to OpenCode's base allow. The 78 explicit rows still classify every known tool;
+`mcp:*` only covers a tool they do not name.
 
 ## Reporting
 
