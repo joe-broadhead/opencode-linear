@@ -103,7 +103,7 @@ test("probe refuses an unknown source and extra input", async () => {
   assert.equal(await codeOf(() => run(runtime, "probe", { limit: 1 })), "INPUT_INVALID")
 })
 
-test("events_list answers a page the consumer's own check accepts, and nudges changed once", async () => {
+test("events_list answers a page the consumer's own check accepts, and emits nothing", async () => {
   const bus = recordingBus()
   const answer = await run(runtime, "events_list", { source: "linear", since: "2026-11-01T00:00:00.000Z" }, "work", callFor("work", { bus }))
   const source = findSource(manifest, "linear.activity")
@@ -112,10 +112,11 @@ test("events_list answers a page the consumer's own check accepts, and nudges ch
   if (!accepted.ok) throw new Error(accepted.failure.message)
   assert.equal(accepted.kind, "events")
   assert.equal(accepted.page.events.length, 5)
-  assert.deepEqual(bus.emitted, [{ event: "changed", data: { capability: "linear.activity", account: "work", reason: "refresh" } }])
+  // The plugin owns no write, so a read is not a change: no bus event.
+  assert.deepEqual(bus.emitted, [])
 })
 
-test("events_list does not nudge when the page lists nothing", async () => {
+test("events_list emits nothing when the page lists nothing", async () => {
   const bus = recordingBus()
   await run(runtime, "events_list", { source: "linear", since: "2026-11-25T00:00:00.000Z" }, "work", callFor("work", { bus }))
   assert.deepEqual(bus.emitted, [])

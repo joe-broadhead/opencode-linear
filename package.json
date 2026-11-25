@@ -130,6 +130,10 @@
           "list_issues"
         ]
       },
+      "mcp:*": {
+        "class": "write",
+        "accounts": "optional"
+      },
       "mcp:create_attachment": {
         "class": "write",
         "accounts": "optional",
@@ -738,7 +742,6 @@
     ],
     "actions": [],
     "events": {
-      "changed": {},
       "status": {},
       "account": {}
     }

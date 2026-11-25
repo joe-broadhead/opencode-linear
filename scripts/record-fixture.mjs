@@ -40,9 +40,11 @@ const probe = await run(runtime, "probe", { source: "linear" }, "work")
 const issues = await run(runtime, "issues", { source: "linear" }, "work")
 const status = await run(runtime, "status", {})
 
-// The three bus events the plugin emits, each through the call site that emits it in the host.
-const changedBus = recordingBus()
-await run(runtime, "events_list", { source: "linear", since }, "work", callFor("work", { bus: changedBus }))
+// The two bus events the plugin emits, each through the call site that emits it in the host. `events_list` is a read
+// and emits nothing, which the recording proves before it writes the fixture.
+const readBus = recordingBus()
+await run(runtime, "events_list", { source: "linear", since }, "work", callFor("work", { bus: readBus }))
+if (readBus.emitted.length > 0) throw new Error(`events_list emitted ${readBus.emitted.map((entry) => entry.event).join(", ")}, and a read emits nothing`)
 const signingIn = runtimeFor(undefined, {
   servers: async () => [
     { name: "linear-work", status: { status: "connected" } },
@@ -53,14 +55,14 @@ const accountBus = recordingBus()
 await run(signingIn, "status", {}, "work", callFor("work", { bus: accountBus }))
 const statusBus = recordingBus()
 await announceStatus(statusBus, [])
-const emitted = [...new Set([...changedBus.emitted, ...accountBus.emitted, ...statusBus.emitted].map((entry) => entry.event))]
+const emitted = [...new Set([...accountBus.emitted, ...statusBus.emitted].map((entry) => entry.event))]
 
 const fixture = {
-  $comment: "Recorded from the deterministic fake Linear MCP executor through the plugin's own handlers: two mcp accounts, the activity source, the issues snapshot and the three bus events. Every workspace, person, issue and notification is invented.",
+  $comment: "Recorded from the deterministic fake Linear MCP executor through the plugin's own handlers: two mcp accounts, the activity source, the issues snapshot and the two bus events. Every workspace, person, issue and notification is invented.",
   plugin: packageName,
   namespace: manifest.plugin.summary,
   accounts: {
-    real: true,
+    real: false,
     aliases: ["work", "personal"],
     required: { method: "events_list", code: "ACCOUNT_REQUIRED" },
     unknown: { method: "events_list", account: "nobodyhere", code: "ACCOUNT_UNKNOWN" },

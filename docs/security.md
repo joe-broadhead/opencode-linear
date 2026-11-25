@@ -33,7 +33,9 @@ query string, a token or a credential.
 
 The plugin has no write of its own, so it has no preview or commit to confirm. Writes are Linear's MCP tools, which
 OpenCode runs under the same access rules and its own permission prompts; the plugin neither proxies nor observes them.
-Under `ask-changes` every Linear change asks first, and under `read-only` every change is denied.
+Under `ask-changes` every Linear change asks first, and under `read-only` every change is denied. The 78 declared tools
+each carry their class, and the `mcp:*` write rule before them covers a tool Linear renames or adds, so an unknown
+Linear tool cannot fall through to OpenCode's base allow.
 
 ## Reporting
 

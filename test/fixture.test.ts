@@ -50,10 +50,10 @@ function withoutAccount(input: Readonly<Record<string, unknown>>): { readonly ac
   return { account: typeof account === "string" ? account : "work", input: rest }
 }
 
-test("the fixture was recorded for this package and names the real two-account run", () => {
+test("the fixture was recorded for this package and keeps the two synthetic aliases", () => {
   assert.equal(fixture.plugin, packageName)
   assert.equal(fixture.namespace, manifest.plugin.summary)
-  assert.equal(fixture.accounts.real, true)
+  assert.equal(fixture.accounts.real, false)
   assert.deepEqual(fixture.accounts.aliases, ["work", "personal"])
 })
 
@@ -106,8 +106,8 @@ test("the recorded status is what the status handler answers today", async () =>
 })
 
 test("the fixture records exactly the bus events the plugin's call sites emit", async () => {
-  const changedBus = recordingBus()
-  await run(runtime, "events_list", { source: "linear", since: "2026-11-01T00:00:00.000Z" }, "work", callFor("work", { bus: changedBus }))
+  const readBus = recordingBus()
+  await run(runtime, "events_list", { source: "linear", since: "2026-11-01T00:00:00.000Z" }, "work", callFor("work", { bus: readBus }))
   const signingIn = runtimeFor(undefined, {
     servers: async () => [
       { name: "linear-work", status: { status: "connected" } },
@@ -118,7 +118,9 @@ test("the fixture records exactly the bus events the plugin's call sites emit", 
   await run(signingIn, "status", {}, "work", callFor("work", { bus: accountBus }))
   const statusBus = recordingBus()
   await announceStatus(statusBus, [])
-  const emitted = [...new Set([...changedBus.emitted, ...accountBus.emitted, ...statusBus.emitted].map((entry) => entry.event))]
+  // A read emits nothing; only the account nudge and the setup status are events.
+  assert.deepEqual(readBus.emitted, [])
+  const emitted = [...new Set([...accountBus.emitted, ...statusBus.emitted].map((entry) => entry.event))]
   assert.deepEqual([...fixture.events.emitted].sort(), emitted.sort())
-  assert.deepEqual(emitted.sort(), ["account", "changed", "status"])
+  assert.deepEqual(emitted.sort(), ["account", "status"])
 })

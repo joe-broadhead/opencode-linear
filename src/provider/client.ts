@@ -35,9 +35,6 @@ export const MCP_URL = "https://mcp.linear.app/mcp"
 /** The source's name, as `events_list` takes it and as a cursor binds it. */
 export const SOURCE = "linear"
 
-/** The events source's capability id. */
-export const ACTIVITY_SOURCE = "linear.activity"
-
 /** The most bytes one events page may take: the source's declared `maxBytes`. */
 export const PAGE_BYTES = 900_000
 

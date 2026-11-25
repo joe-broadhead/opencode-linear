@@ -12334,7 +12334,6 @@ function assertHost(context, manifest2) {
 import { createHash as createHash5 } from "node:crypto";
 var MCP_URL = "https://mcp.linear.app/mcp";
 var SOURCE = "linear";
-var ACTIVITY_SOURCE = "linear.activity";
 var PAGE_BYTES = 9e5;
 var ISSUES_BYTES = 65536;
 var LOOKBACK_MS = 12e4;
@@ -12773,7 +12772,6 @@ function eventsListHandler(runtime) {
       if (!parsed.ok) refuseInput(parsed.problems);
       if (parsed.value.source !== void 0 && parsed.value.source !== SOURCE) refuseSource(runtime.plugin, parsed.value.source);
       const page = await runtime.provider.page({ account: call.account, request: parsed.value, now: runtime.clock(), call });
-      if (page.events.length > 0) await call.bus.emit("changed", { capability: ACTIVITY_SOURCE, account: call.account, reason: "refresh" });
       return page;
     }
   };

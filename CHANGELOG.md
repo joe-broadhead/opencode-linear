@@ -6,11 +6,14 @@
   tools, Code Mode, RPC, the access rules and the bus.
 - Accounts use the `mcp` mechanism: one Linear MCP server per alias (`linear`, `linear-work`, `linear-personal`), each
   with its own sign-in, and `account` on every method that reads Linear.
-- 82 methods: `status`, `probe`, `events_list`, `issues`, and Linear's 78 MCP tools declared one by one as
-  `mcp:<tool>` with their class — 46 reads, 26 writes, 4 sends, 4 deletes and 2 shares.
+- 83 methods: `status`, `probe`, `events_list`, `issues`, Linear's 78 MCP tools declared one by one as
+  `mcp:<tool>` with their class — 46 reads, 26 writes, 4 sends, 4 deletes and 2 shares — and one `mcp:*` write
+  wildcard, emitted before them, so an undeclared or renamed Linear tool is denied at `read-only` and asked at
+  `ask-changes` instead of reaching OpenCode's base allow-all.
 - Two sources: `linear.activity` (issue changes and notifications, oldest first, with a `(timestamp, external_id)`
   cursor and a two-minute late-arrival lookback) and `linear.issues` (the assigned-issues `list` snapshot).
-- Bus events `rpc.linear.changed`, `rpc.linear.status` and `rpc.linear.account`.
+- Bus events `rpc.linear.status` and `rpc.linear.account`. A read emits nothing: the plugin owns no write, and the
+  vendor's tools are the changes.
 - Two skills, `linear` and `linear-write`, read from the package's `skills/` folder at setup and registered with
   `ctx.skill.transform`. The contract's `register` does not load skills, so the plugin registers them itself; a broken
   file is a `status` problem, not a setup failure. Both skills are always registered, and the `access` rules decide
