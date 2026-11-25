@@ -1,6 +1,6 @@
 {
   "name": "@we-the-rebel-alliance/linear-plugin",
-  "version": "0.0.0",
+  "version": "0.0.10",
   "description": "Linear for OpenCode: issues, projects, cycles, initiatives and documents through Linear's MCP server, with several workspaces at once.",
   "license": "MIT",
   "type": "module",
