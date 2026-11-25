@@ -64,7 +64,7 @@ test("status names an agent that no longer holds the generated rules", async () 
   assert.deepEqual(answer["unguardedAgents"], ["build"])
 })
 
-test("status reads the contract's next unguardedAgents shape without a change", async () => {
+test("status reports an unreadable agent list as a problem, not a zero", async () => {
   const call = { ...callFor("work"), unguardedAgents: async () => ({ ok: false, error: "the agent list could not be read" }) } as unknown as Parameters<typeof run>[4]
   const answer = (await run(runtime, "status", {}, "work", call)) as Record<string, unknown>
   assert.equal(answer["state"], "error")

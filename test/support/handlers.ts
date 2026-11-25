@@ -5,7 +5,6 @@
  * produced by the same code the plugin runs. Every person, workspace and issue is invented.
  */
 import { accountName, accountsOf } from "@we-the-rebel-alliance/plugin-contract/accounts"
-import type { AccessRegistration } from "@we-the-rebel-alliance/plugin-contract/access"
 import type { Bus } from "@we-the-rebel-alliance/plugin-contract/bus"
 import { SourceError } from "@we-the-rebel-alliance/plugin-contract/events"
 import type { MethodCall } from "@we-the-rebel-alliance/plugin-contract/register"
@@ -226,11 +225,6 @@ export function recordingBus(): Bus & { readonly emitted: Emitted[] } {
   }
 }
 
-/** The access rules `register` generated, as a handler sees them. */
-export function accessFor(aliases: readonly string[]): AccessRegistration {
-  return { level: "all", aliases, rules: [], problems: [], dispose: async () => undefined }
-}
-
 /** The call context a handler sees, as `register` builds it. */
 export function callFor(account: string, options: { readonly bus?: Bus; readonly unguarded?: readonly string[] } = {}): MethodCall {
   return {
@@ -242,8 +236,7 @@ export function callFor(account: string, options: { readonly bus?: Bus; readonly
     progress: async () => undefined,
     account,
     bus: options.bus ?? recordingBus(),
-    access: accessFor([account]),
-    unguardedAgents: async () => options.unguarded ?? [],
+    unguardedAgents: async () => ({ ok: true, agents: options.unguarded ?? [] }),
     door: "tool",
   }
 }

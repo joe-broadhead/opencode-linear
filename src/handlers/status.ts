@@ -5,24 +5,15 @@
  * ready, one that needs a sign-in is `needs_sign_in`, and the rest are `error`. A read of status never calls Linear.
  */
 import { accountStatuses, STATUS_SCHEMA, statusAnswer, type AccountSignal } from "@we-the-rebel-alliance/plugin-contract/accounts"
+import type { UnguardedAgentsResult } from "@we-the-rebel-alliance/plugin-contract/access"
 import type { Bus } from "@we-the-rebel-alliance/plugin-contract/bus"
 import type { MethodCall, MethodHandler } from "@we-the-rebel-alliance/plugin-contract/register"
 import { EMPTY } from "./shared.ts"
 import type { HandlerRuntime, PluginServer } from "./index.ts"
 
-/**
- * The agents whose rules no longer hold the generated ones. The contract changed this call's answer from a list to
- * `{ ok, agents } | { ok: false, error }`; this one helper reads both, so status needs no other edit.
- */
-async function unguarded(call: MethodCall): Promise<{ readonly agents: readonly string[]; readonly problem?: string }> {
-  const result: unknown = await call.unguardedAgents()
-  if (Array.isArray(result)) return { agents: result.filter((id): id is string => typeof id === "string") }
-  if (typeof result === "object" && result !== null) {
-    const held = result as { readonly ok?: unknown; readonly agents?: unknown; readonly error?: unknown }
-    if (held.ok === true && Array.isArray(held.agents)) return { agents: held.agents.filter((id): id is string => typeof id === "string") }
-    if (held.ok === false) return { agents: [], problem: typeof held.error === "string" ? held.error : "The agent list could not be read." }
-  }
-  return { agents: [], problem: "The agent list answered a shape the plugin does not read." }
+/** The agents whose rules no longer hold the generated ones, as `register` answers it. */
+function unguarded(call: MethodCall): Promise<UnguardedAgentsResult> {
+  return call.unguardedAgents()
 }
 
 /** Emit the plugin's state once, after setup wired the doors. */
@@ -55,19 +46,14 @@ export function statusHandler(runtime: HandlerRuntime): MethodHandler {
       const accounts = accountStatuses(runtime.accounts, signals)
       // A nudge for every alias whose sign-in state a person may need to act on; the answer carries the same states.
       for (const account of accounts) if (account.state !== "ready") await call.bus.emit("account", { account: account.alias, state: account.state })
-      const agents = await unguarded(call)
-      const problems = [
-        ...runtime.problems(),
-        ...(agents.problem === undefined ? [] : [agents.problem]),
-        ...accounts.filter((account) => account.state === "error").map((account) => `${account.alias}: ${account.reason ?? "the account failed"}`),
-      ]
+      const problems = [...runtime.problems(), ...accounts.filter((account) => account.state === "error").map((account) => `${account.alias}: ${account.reason ?? "the account failed"}`)]
       return statusAnswer({
         manifest: runtime.manifest,
         version: runtime.version,
         hostVersion: runtime.hostVersion,
         accounts,
         ...(problems.length === 0 ? {} : { problems }),
-        unguardedAgents: agents.agents,
+        unguardedAgents: await unguarded(call),
       })
     },
   }
